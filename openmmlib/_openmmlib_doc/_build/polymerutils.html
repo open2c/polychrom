@@ -1,0 +1,298 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Analysis scripts &mdash; Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation" href="index.html" />
+    <link rel="next" title="Polymer scalings" href="polymerScalings.html" />
+    <link rel="prev" title="Knot complexity scripts" href="knotAnalysis.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="np-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="polymerScalings.html" title="Polymer scalings"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="knotAnalysis.html" title="Knot complexity scripts"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="analysis-scripts">
+<h1>Analysis scripts<a class="headerlink" href="#analysis-scripts" title="Permalink to this headline">¶</a></h1>
+<p>A set of small utilities, general for the library</p>
+<span class="target" id="module-polymerutils"></span><dl class="function">
+<dt id="polymerutils.Cload">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">Cload</tt><big>(</big><em>filename</em>, <em>center=False</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#Cload"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.Cload" title="Permalink to this definition">¶</a></dt>
+<dd><p>fast polymer loader using weave.inline</p>
+<p>..warning:: About to be deprecated</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.load">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">load</tt><big>(</big><em>filename</em>, <em>h5dictKey=None</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#load"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.load" title="Permalink to this definition">¶</a></dt>
+<dd><p>Universal load function for any type of data file</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.rotation_matrix">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">rotation_matrix</tt><big>(</big><em>rotate</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#rotation_matrix"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.rotation_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates rotation matrix based on three rotation angles</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.msd">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">msd</tt><big>(</big><em>data1</em>, <em>data2</em>, <em>rotate=True</em>, <em>N=999999</em>, <em>fullReturn=False</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#msd"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.msd" title="Permalink to this definition">¶</a></dt>
+<dd><p>An utility to calculate mean square displacement between two polymer conformations
+Parameters
+&#8212;&#8212;&#8212;-</p>
+<dl class="docutils">
+<dt>data1, dat2 <span class="classifier-delimiter">:</span> <span class="classifier">Mx3 array</span></dt>
+<dd>First conformation</dd>
+<dt>rotate <span class="classifier-delimiter">:</span> <span class="classifier">bool (true by default)</span></dt>
+<dd>Compensate for rotation and displacement between conformation</dd>
+<dt>N <span class="classifier-delimiter">:</span> <span class="classifier">int (optional)</span></dt>
+<dd>If conformations are large, use only M monomers for comparison.
+If N &gt; M (num. of particles), use all monomers (default)</dd>
+<dt>fullReturn <span class="classifier-delimiter">:</span> <span class="classifier">bool, default=False</span></dt>
+<dd>Return information about all displacements</dd>
+</dl>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>MSD</strong> : float</p>
+<blockquote>
+<div><p>Diplacement between conformation</p>
+</div></blockquote>
+<p><strong>if fullReturn==False: dictionary of results</strong> :</p>
+<blockquote class="last">
+<div><p>See the end of the code for reference</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.create_spiral">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">create_spiral</tt><big>(</big><em>r1</em>, <em>r2</em>, <em>N</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#create_spiral"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.create_spiral" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a &#8220;propagating spiral&#8221;, often used as a starting conformation.
+Run it with r1=10, r2 = 13, N=5000, and see what it does.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.grow_rw">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">grow_rw</tt><big>(</big><em>step</em>, <em>size</em>, <em>method='line'</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#grow_rw"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.grow_rw" title="Permalink to this definition">¶</a></dt>
+<dd><p>This does not grow a random walk, but the name stuck.</p>
+<p>What it does - it grows a polymer in the middle of the sizeXsizeXsize box.
+It can start with a small ring in the middle (method=&#8221;standart&#8221;),
+or it can start with a line (&#8220;method=line&#8221;).
+If method=&#8221;linear&#8221;, then it grows a linearly organized chain from 0 to size.</p>
+<p>step has to be less than size^3</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.createSpiralRing">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">createSpiralRing</tt><big>(</big><em>N</em>, <em>twist</em>, <em>r=0</em>, <em>offsetPerParticle=3.141592653589793</em>, <em>offset=0</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#createSpiralRing"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.createSpiralRing" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a ring of length N. Then creates a spiral</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.smooth_conformation">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">smooth_conformation</tt><big>(</big><em>conformation</em>, <em>n_avg</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#smooth_conformation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.smooth_conformation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Smooth a conformation using moving average.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.distance_matrix">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">distance_matrix</tt><big>(</big><em>d1</em>, <em>d2=None</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#distance_matrix"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.distance_matrix" title="Permalink to this definition">¶</a></dt>
+<dd><p>A brute-force to find a matrix of distances between i-th and j-th
+particles.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>d1</strong> : numpy.array</p>
+<blockquote class="last">
+<div><blockquote>
+<div><p>If the only array supplied, find the pairwise distances.</p>
+</div></blockquote>
+<dl class="docutils">
+<dt>d2 <span class="classifier-delimiter">:</span> <span class="classifier">numpy.array</span></dt>
+<dd><p class="first last">If supplied, find distances from every point in d1 to
+every point in d2.</p>
+</dd>
+</dl>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.endtoend">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">endtoend</tt><big>(</big><em>d</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#endtoend"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.endtoend" title="Permalink to this definition">¶</a></dt>
+<dd><p>A brute-force method to find average end-to-end distance v.s. separation.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.getCloudGeometry">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">getCloudGeometry</tt><big>(</big><em>d</em>, <em>frac=0.05</em>, <em>numSegments=1</em>, <em>widthPercentile=50</em>, <em>delta=0</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#getCloudGeometry"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.getCloudGeometry" title="Permalink to this definition">¶</a></dt>
+<dd><p>Trace the centerline of an extended cloud of points and determine
+its length and width.</p>
+<p>The function switches to the principal axes of the cloud (e1,e2,e3)
+and applies LOWESS to define the centerline as (x2,x3)=f(x1).
+The length is then determined as the total length of the centerline.
+The width is determined as the median shortest distance from the points of
+clouds to the centerline.
+On top of that, the cloud can be chopped into <cite>numSegments</cite> in the order
+of data entries in <cite>d</cite>. The centerline is then determined independently for
+each segment.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>d</strong> : np.array, 3xN</p>
+<blockquote>
+<div><p>an array of coordinates</p>
+</div></blockquote>
+<p><strong>frac</strong> : float</p>
+<blockquote>
+<div><p>The fraction of all points used to determine the local position and
+slope of the centerline in LOWESS.</p>
+</div></blockquote>
+<p><strong>numSegments</strong> : int</p>
+<blockquote>
+<div><p>The number of segments to split <cite>d</cite> into. The centerline in fit
+independently for each data segment.</p>
+</div></blockquote>
+<p><strong>widthPercentile</strong> : float</p>
+<blockquote>
+<div><p>The width is determined at <cite>widthPercentile</cite> of shortest distances
+from the points to the centerline. The default value is 50, i.e. the
+width is the median distance to the centerline.</p>
+</div></blockquote>
+<p><strong>delta</strong> : float</p>
+<blockquote class="last">
+<div><p>The parameter of LOWESS. According to the documentation:
+&#8220;delta can be used to save computations. For each x_i, regressions are
+skipped for points closer than delta. The next regression is fit for the
+farthest point within delta of x_i and all points in between are
+estimated by linearly interpolating between the two regression fits.&#8221;</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerutils.findSimplifiedPolymer">
+<tt class="descclassname">polymerutils.</tt><tt class="descname">findSimplifiedPolymer</tt><big>(</big><em>data</em><big>)</big><a class="reference internal" href="_modules/polymerutils.html#findSimplifiedPolymer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerutils.findSimplifiedPolymer" title="Permalink to this definition">¶</a></dt>
+<dd><p>a weave.inline wrapper for polymer simplification code
+Calculates a simplified topologically equivalent polymer ring</p>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="knotAnalysis.html"
+                        title="previous chapter">Knot complexity scripts</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="polymerScalings.html"
+                        title="next chapter">Polymer scalings</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/polymerutils.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="np-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="polymerScalings.html" title="Polymer scalings"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="knotAnalysis.html" title="Knot complexity scripts"
+             >previous</a> |</li>
+        <li><a href="index.html">Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Maxim Imakaev, Anton Goloborodko, Geoffrey Fudenberg, Leonid Mirny.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.3.
+    </div>
+  </body>
+</html>

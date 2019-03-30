@@ -1,0 +1,20 @@
+This is the exact code which was used to perform simulations for (Naumova 2013) ("Organization of the Mitotic Chromosome") publication. Note that the files in the "originalFiles" folder were simply copied from their original context; those files may refer to other files present in our system and not in this examples, and filenames for these files will need to be updated and proper input files will need to be created. 
+
+You will need a CUDA-enabled GPU (meaning NVIDIA gaming GPU, ideally supporting Compute 3.0 or higher, 2.0 is possible with some limitations, see http://en.wikipedia.org/wiki/CUDA, a $150+ GPU is recommended for efficient computations; using laptop GPUs may cause overheating);
+
+The code would probably work on ATI GPUs, but I never tested it. CUDA platform would definitely not work on ATI GPU, and you would have to chose OPenCL. Please refer to OpenMM documentation and technical support for that.
+
+You will need to install OpenMM, which is presented in some details on Pande's website, (UserGuide from here https://simtk.org/project/xml/downloads.xml?group_id=161), but installation will likely require root access and experience with system administration. At the time this message was created (2014-Feb-25), openmm-polymer is using OpenMM 5.2. Few days ago, OpenMM 6.0 was released, it will be tested soon, and if needed,  support for it will be added. 
+
+The file used to create Consecutive loops model ("scaffoldExample.py") was updated to be run standalone. However, other files were not modified. 
+
+To run run other files on your computer, you would need to do the following things. 
+
+1. Create meaningful initial conformations as described in the supplemental methods.
+2. Change the part of the code which loads initial conformations. 
+3. Fix errors which may arise from possible incompabibility with the new openmm versions, or downgrade to the old revision mentioned in the manuscript. Usually, an error message will tell you what exactly needs to be updated.
+4. Modify part of the code which defines parameters to explore other parameter values. 
+
+Please note that scaffold.py code was used interactively. First, the first stage fiber was created. Then the code was modified to load the file with the first fiber, and to include the second stage fiber. Please refer to the supplemental materials for timings and details of the parameters; not all forces which are in the file were used for actual simulations.
+
+

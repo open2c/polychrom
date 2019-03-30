@@ -1,0 +1,515 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>polymerScalings &mdash; Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation" href="../index.html" />
+    <link rel="up" title="Module code" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../np-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../index.html">Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</a> &raquo;</li>
+          <li><a href="index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for polymerScalings</h1><div class="highlight"><pre>
+<span class="c"># (c) 2013 Massachusetts Institute of Technology. All Rights Reserved</span>
+<span class="c"># Code written by: Maksim Imakaev (imakaev@mit.edu)</span>
+
+<span class="kn">import</span> <span class="nn">mirnylib.systemutils</span>
+<span class="kn">from</span> <span class="nn">mirnylib.systemutils</span> <span class="kn">import</span> <span class="n">fmap</span>
+<span class="kn">import</span> <span class="nn">polymerutils</span>
+<span class="kn">from</span> <span class="nn">mirnylib.numutils</span> <span class="kn">import</span> <span class="n">logbins</span>
+<span class="kn">import</span> <span class="nn">contactmaps</span>
+<span class="kn">from</span> <span class="nn">contactmaps</span> <span class="kn">import</span> <span class="n">load</span><span class="p">,</span> <span class="n">giveContacts</span>
+<span class="kn">import</span> <span class="nn">cPickle</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">copy</span> <span class="kn">import</span> <span class="n">copy</span>
+
+
+<div class="viewcode-block" id="giveCpScaling"><a class="viewcode-back" href="../polymerScalings.html#polymerScalings.giveCpScaling">[docs]</a><span class="k">def</span> <span class="nf">giveCpScaling</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">bins0</span><span class="p">,</span> <span class="n">cutoff</span><span class="o">=</span><span class="mf">1.1</span><span class="p">,</span> <span class="n">integrate</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+                  <span class="n">ring</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">intContacts</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+                  <span class="n">maxContacts</span><span class="o">=</span><span class="mi">300</span><span class="p">):</span>
+
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns contact probability scaling for a given polymer conformation</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    data : 3xN array of ints/floats</span>
+<span class="sd">        Input polymer conformation</span>
+<span class="sd">    bins0 : list</span>
+<span class="sd">        Bins to calculate scaling.</span>
+<span class="sd">    cutoff : float, optional</span>
+<span class="sd">        Cutoff to calculate scaling</span>
+<span class="sd">    integrate : bool, optional</span>
+<span class="sd">        if True, will return cumulative probability</span>
+<span class="sd">    ring : bool, optional</span>
+<span class="sd">        If True, will calculate contacts for the ring</span>
+<span class="sd">    intContacts : bool, optional</span>
+<span class="sd">        If True, will speed up calculation of contacts for a cubit lattice case.</span>
+<span class="sd">    verbose : bool, optional</span>
+<span class="sd">        If True, print some information.</span>
+<span class="sd">    maxContacts : int</span>
+<span class="sd">        Maximum number of contacts per monomer.</span>
+<span class="sd">        If total number of contacts exceeds maxContacts*N, program becomes uncontrollable.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    (bins, contact probabilities) where &quot;bins&quot; are centers of bins in the input bins0 array.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">T</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;Wrong data shape&quot;</span><span class="p">)</span>
+
+    <span class="n">N</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="n">bins0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">bins0</span><span class="p">)</span>
+    <span class="n">bins</span> <span class="o">=</span> <span class="p">[(</span><span class="n">bins0</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">bins0</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bins0</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span>
+
+    <span class="k">if</span> <span class="n">intContacts</span> <span class="o">==</span> <span class="bp">False</span><span class="p">:</span>
+        <span class="n">contacts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">giveContacts</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">cutoff</span><span class="p">,</span> <span class="n">maxContacts</span><span class="o">=</span><span class="n">maxContacts</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">contacts</span> <span class="o">=</span> <span class="n">contactmaps</span><span class="o">.</span><span class="n">giveIntContacts</span><span class="p">(</span>
+            <span class="n">data</span><span class="p">)</span>  <span class="c"># integer contacts are faster</span>
+
+    <span class="n">contacts</span> <span class="o">=</span> <span class="n">contacts</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">contacts</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>  <span class="c"># contact lengthes</span>
+
+    <span class="k">if</span> <span class="n">ring</span> <span class="o">==</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">contacts</span> <span class="o">&gt;</span> <span class="n">N</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="n">contacts</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span> <span class="o">=</span> <span class="n">N</span> <span class="o">-</span> <span class="n">contacts</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+    <span class="n">scontacts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">contacts</span><span class="p">)</span>  <span class="c"># sorted contact lengthes</span>
+    <span class="n">connections</span> <span class="o">=</span> <span class="mf">1.</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span>
+        <span class="n">scontacts</span><span class="p">,</span> <span class="n">bins0</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="s">&quot;left&quot;</span><span class="p">))</span>  <span class="c"># binned contact lengthes</span>
+    <span class="n">possible</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">N</span> <span class="o">*</span> <span class="n">bins0</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">bins0</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">bins0</span> <span class="o">**</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+        <span class="k">print</span> <span class="s">&quot;average contacts per monomer:&quot;</span><span class="p">,</span> <span class="n">connections</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">N</span>
+
+    <span class="k">if</span> <span class="n">integrate</span> <span class="o">==</span> <span class="bp">False</span><span class="p">:</span>
+        <span class="n">connections</span> <span class="o">/=</span> <span class="n">possible</span>
+    <span class="k">if</span> <span class="n">integrate</span> <span class="o">==</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="n">connections</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">connections</span><span class="p">)</span> <span class="o">/</span> <span class="n">connections</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="n">a</span> <span class="o">=</span> <span class="p">[</span><span class="n">sqrt</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+        <span class="k">print</span> <span class="nb">list</span><span class="p">(</span><span class="n">connections</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">connections</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="give_distance"><a class="viewcode-back" href="../polymerScalings.html#polymerScalings.give_distance">[docs]</a><span class="k">def</span> <span class="nf">give_distance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">ring</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Returns end-to-end distance scaling of a given polymer conformation.</span>
+<span class="sd">    ..warning:: This method averages end-to-end scaling over bins to make better average</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+
+<span class="sd">    data: 3xN array</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">ring</span> <span class="o">==</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">data</span><span class="p">,</span> <span class="n">data</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">bins</span> <span class="o">=</span> <span class="p">[(</span><span class="n">bins</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">bins</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span>
+
+    <span class="n">rads</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">))]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">)):</span>
+        <span class="n">oneBin</span> <span class="o">=</span> <span class="n">bins</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">rad</span> <span class="o">=</span> <span class="mf">0.</span>
+        <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">oneBin</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">oneBin</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">(</span><span class="n">oneBin</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">oneBin</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="mi">10</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">length</span> <span class="o">=</span> <span class="n">j</span>
+            <span class="k">if</span> <span class="n">ring</span> <span class="o">==</span> <span class="bp">True</span><span class="p">:</span>
+                <span class="n">rad</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">data</span><span class="p">[:,</span> <span class="p">:</span><span class="n">N</span><span class="p">]</span>
+                                               <span class="o">-</span> <span class="n">data</span><span class="p">[:,</span> <span class="n">length</span><span class="p">:</span><span class="n">length</span> <span class="o">+</span> <span class="n">N</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rad</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">data</span><span class="p">[:,</span> <span class="p">:</span><span class="o">-</span>
+                                                    <span class="n">length</span><span class="p">]</span> <span class="o">-</span> <span class="n">data</span><span class="p">[:,</span> <span class="n">length</span><span class="p">:])</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
+            <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="n">rads</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">rad</span> <span class="o">/</span> <span class="n">count</span>
+    <span class="n">bins</span> <span class="o">=</span> <span class="p">[</span><span class="n">sqrt</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">bins</span><span class="p">,</span> <span class="n">rads</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="give_radius_scaling"><a class="viewcode-back" href="../polymerScalings.html#polymerScalings.give_radius_scaling">[docs]</a><span class="k">def</span> <span class="nf">give_radius_scaling</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">ring</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="s">&quot;main working horse for radius of gyration&quot;</span>
+    <span class="s">&quot;uses dymanic programming algorithm&quot;</span>
+
+    <span class="n">bins</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">sqrt</span><span class="p">(</span><span class="n">bins</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">bins</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
+    <span class="n">coms</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c"># cumulative sum of locations to calculate COM</span>
+    <span class="n">coms2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span>
+        <span class="n">data</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c"># cumulative sum of locations^2 to calculate RG</span>
+
+    <span class="k">def</span> <span class="nf">radius_gyration</span><span class="p">(</span><span class="n">len2</span><span class="p">):</span>
+        <span class="n">data</span>
+        <span class="k">if</span> <span class="n">ring</span> <span class="o">==</span> <span class="bp">True</span><span class="p">:</span>
+            <span class="n">comsadd</span> <span class="o">=</span> <span class="n">coms</span><span class="p">[:,</span> <span class="p">:</span><span class="n">len2</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">coms2add</span> <span class="o">=</span> <span class="n">coms2</span><span class="p">[:,</span> <span class="p">:</span><span class="n">len2</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">comsadd</span> <span class="o">+=</span> <span class="n">coms</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">][:,</span> <span class="bp">None</span><span class="p">]</span>
+            <span class="n">coms2add</span> <span class="o">+=</span> <span class="n">coms2</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">][:,</span> <span class="bp">None</span><span class="p">]</span>
+            <span class="n">comsw</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">coms</span><span class="p">,</span> <span class="n">comsadd</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">coms2w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">coms2</span><span class="p">,</span> <span class="n">coms2add</span><span class="p">],</span>
+                                    <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c"># for rings we extend need longer chain</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">comsw</span> <span class="o">=</span> <span class="n">coms</span>
+            <span class="n">coms2w</span> <span class="o">=</span> <span class="n">coms2</span>
+
+        <span class="n">coms2d</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="n">coms2w</span><span class="p">[:,</span> <span class="p">:</span><span class="o">-</span><span class="n">len2</span><span class="p">]</span> <span class="o">+</span> <span class="n">coms2w</span><span class="p">[:,</span> <span class="n">len2</span><span class="p">:])</span> <span class="o">/</span> <span class="n">len2</span>
+        <span class="n">comsd</span> <span class="o">=</span> <span class="p">((</span><span class="n">comsw</span><span class="p">[:,</span> <span class="p">:</span><span class="o">-</span><span class="n">len2</span><span class="p">]</span> <span class="o">-</span> <span class="n">comsw</span><span class="p">[:,</span> <span class="n">len2</span><span class="p">:])</span> <span class="o">/</span> <span class="n">len2</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="n">diffs</span> <span class="o">=</span> <span class="n">coms2d</span> <span class="o">-</span> <span class="n">comsd</span>
+        <span class="n">sums</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">diffs</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">sums</span><span class="p">)</span>
+
+    <span class="n">rads</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">))]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">)):</span>
+        <span class="n">rads</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">radius_gyration</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">bins</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">copy</span><span class="p">(</span><span class="n">bins</span><span class="p">),</span> <span class="n">rads</span><span class="p">)</span>
+
+</div>
+<span class="k">def</span> <span class="nf">give_radius_scaling_eig</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c"># gives volume^^0.33 as  defined through  eigenvectors</span>
+    <span class="k">if</span> <span class="n">bins</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">bins</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span> <span class="o">*</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">logbins</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.45</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="mf">1.3</span><span class="p">,</span> <span class="mi">40</span><span class="p">)]</span>
+    <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+    <span class="n">coords</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">]</span>
+    <span class="n">sums</span> <span class="o">=</span> <span class="p">[[</span><span class="n">i</span> <span class="o">*</span> <span class="n">j</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">coords</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">coords</span><span class="p">]</span>
+    <span class="n">sums</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">sums</span><span class="p">)</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">coms</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">sums</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">sums</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">tensor</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+        <span class="n">newsums</span> <span class="o">=</span> <span class="p">(</span><span class="n">sums</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">b</span><span class="p">]</span> <span class="o">-</span> <span class="n">sums</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">a</span><span class="p">])</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span>
+        <span class="n">newcoms</span> <span class="o">=</span> <span class="p">(</span><span class="n">coms</span><span class="p">[:,</span> <span class="n">b</span><span class="p">]</span> <span class="o">-</span> <span class="n">coms</span><span class="p">[:,</span> <span class="n">a</span><span class="p">])</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span>
+        <span class="n">tensor</span> <span class="o">=</span> <span class="n">newsums</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">newcoms</span><span class="p">,</span> <span class="n">newcoms</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigvalsh</span><span class="p">(</span><span class="n">tensor</span><span class="p">)</span>
+    <span class="n">ret</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">:</span>
+        <span class="n">av</span> <span class="o">=</span> <span class="mf">0.</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">1000</span><span class="p">):</span>
+            <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="n">N</span> <span class="o">-</span> <span class="mi">5</span> <span class="o">-</span> <span class="n">i</span><span class="p">)</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">tensor</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">t</span> <span class="o">+</span> <span class="n">i</span><span class="p">)</span>
+            <span class="n">av</span> <span class="o">+=</span> <span class="n">sqrt</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">res</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="mf">1.</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="mf">6.</span><span class="p">)</span>
+        <span class="n">ret</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">av</span> <span class="o">/</span> <span class="mi">1000</span><span class="p">)</span>
+    <span class="n">retret</span> <span class="o">=</span> <span class="p">(</span><span class="n">copy</span><span class="p">(</span><span class="n">bins</span><span class="p">),</span> <span class="n">ret</span><span class="p">)</span>
+    <span class="k">return</span>  <span class="n">retret</span>
+
+
+<div class="viewcode-block" id="subchainDensityFunction"><a class="viewcode-back" href="../polymerScalings.html#polymerScalings.subchainDensityFunction">[docs]</a><span class="k">def</span> <span class="nf">subchainDensityFunction</span><span class="p">(</span><span class="n">filenames</span><span class="p">,</span> <span class="n">bins</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="s">&quot;Rg&quot;</span><span class="p">,</span> <span class="n">maxLength</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">Nbins</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">coverage</span><span class="o">=</span><span class="mf">1.</span><span class="p">,</span> <span class="n">centerAt</span><span class="o">=</span><span class="s">&quot;mid&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Calculates density function of subchains</span>
+<span class="sd">    That is, for each bin size, it calculates an average density profile</span>
+<span class="sd">    for subchains of the size within the bin.</span>
+<span class="sd">    Density profile is how density of a subchain depends on a distance from the center.</span>
+
+<span class="sd">    filenames : str</span>
+<span class="sd">        Filenames to average density function</span>
+<span class="sd">    bins : iterable</span>
+<span class="sd">         List of positions of bins (lengthes at which to evaluate).</span>
+<span class="sd">    normalize : str, not implemented</span>
+<span class="sd">        How to normalize the subchain density function</span>
+<span class="sd">    lengthmult : int, optional</span>
+<span class="sd">        Calculate distribution to lengthmult*Rg distance only (default = 3)</span>
+<span class="sd">    Nbins : int, optional</span>
+<span class="sd">        Number of bins for each distribution (default = 30)</span>
+<span class="sd">    coverage : float, optional</span>
+<span class="sd">        Use each monomer &#39;coverage&#39; times (on average) to calculate each distribution. Default = 1.</span>
+
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">normalize</span> <span class="o">=</span> <span class="n">normalize</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="n">centerAt</span> <span class="o">=</span> <span class="n">centerAt</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">newbins</span> <span class="o">=</span> <span class="p">[(</span><span class="n">i</span> <span class="o">-</span> <span class="mi">2</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">bins</span><span class="p">]</span>
+    <span class="n">binsForRg</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="nb">list</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">newbins</span><span class="p">],</span> <span class="p">[])</span>
+    <span class="n">midbins</span> <span class="o">=</span> <span class="p">[(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">newbins</span><span class="p">]</span>
+    <span class="n">rgs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">filenames</span><span class="p">:</span>
+        <span class="n">rgs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">give_radius_scaling</span><span class="p">(</span><span class="n">polymerutils</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">binsForRg</span><span class="p">,</span> <span class="n">ring</span><span class="o">=</span><span class="bp">False</span><span class="p">)[</span><span class="mi">1</span><span class="p">][::</span><span class="mi">2</span><span class="p">])</span>
+    <span class="n">rgs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">rgs</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">filenames</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">polymerutils</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+        <span class="n">N</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+
+        <span class="n">curresults</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">onebin</span><span class="p">,</span> <span class="n">rg</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">newbins</span><span class="p">,</span> <span class="n">rgs</span><span class="p">):</span>
+            <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&quot;S = </span><span class="si">%.1lf</span><span class="s">; &quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">onebin</span><span class="p">))</span> <span class="o">+</span> <span class="s">&quot; Rg=</span><span class="si">%.2lf</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">rg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">normalize</span> <span class="o">==</span> <span class="s">&quot;rg&quot;</span><span class="p">:</span>
+                <span class="n">lengthbins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">maxLength</span> <span class="o">*</span> <span class="n">rg</span><span class="p">,</span> <span class="n">Nbins</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">lengthbins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">maxLength</span><span class="p">,</span> <span class="n">Nbins</span><span class="p">)</span>
+
+            <span class="n">lengthBinMids</span> <span class="o">=</span> <span class="p">(</span><span class="n">lengthbins</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">lengthbins</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span> <span class="o">*</span> <span class="mf">0.5</span>
+            <span class="n">volumes</span> <span class="o">=</span> <span class="p">(</span><span class="mf">4.</span> <span class="o">/</span> <span class="mf">3.</span><span class="p">)</span> <span class="o">*</span> <span class="mf">3.141592</span> <span class="o">*</span> <span class="p">(</span><span class="n">lengthbins</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span>
+            <span class="n">volumes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">volumes</span><span class="p">)</span>
+            <span class="n">count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">N</span> <span class="o">*</span> <span class="n">coverage</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">onebin</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">sphereCounts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">volumes</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">count</span><span class="p">):</span>
+                <span class="n">size</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">onebin</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">onebin</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">start</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">N</span> <span class="o">-</span> <span class="n">size</span><span class="p">)</span>
+                <span class="n">subchain</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">start</span> <span class="o">+</span> <span class="n">size</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">centerAt</span> <span class="o">==</span> <span class="s">&quot;com&quot;</span><span class="p">:</span>
+                    <span class="n">com</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">subchain</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">centerAt</span> <span class="o">==</span> <span class="s">&quot;mid&quot;</span><span class="p">:</span>
+                    <span class="n">com</span> <span class="o">=</span> <span class="n">subchain</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">subchain</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s">&quot;Provide correct centerAt: com or mid&quot;</span><span class="p">)</span>
+                <span class="n">shifted</span> <span class="o">=</span> <span class="n">subchain</span> <span class="o">-</span> <span class="n">com</span><span class="p">[</span><span class="bp">None</span><span class="p">,</span> <span class="p">:]</span>
+                <span class="c"># print shifted</span>
+                <span class="n">dists</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">shifted</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+                <span class="n">sphereCounts</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">dists</span><span class="p">,</span> <span class="n">lengthbins</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">sphereCounts</span> <span class="o">/=</span> <span class="p">(</span><span class="n">volumes</span> <span class="o">*</span> <span class="n">count</span><span class="p">)</span>
+            <span class="c"># curresults.append(np.array([lengthBinMids/rg,sphereCounts]))</span>
+            <span class="k">if</span> <span class="n">normalize</span> <span class="o">==</span> <span class="s">&quot;rg&quot;</span><span class="p">:</span>
+                <span class="n">curresults</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">lengthBinMids</span> <span class="o">/</span> <span class="n">rg</span><span class="p">,</span> <span class="n">sphereCounts</span><span class="p">]))</span>
+            <span class="k">elif</span> <span class="n">normalize</span> <span class="o">==</span> <span class="s">&quot;none&quot;</span><span class="p">:</span>
+                <span class="n">curresults</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">lengthBinMids</span><span class="p">,</span> <span class="n">sphereCounts</span><span class="p">]))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">print</span> <span class="s">&quot;Normalize=&quot;</span><span class="p">,</span> <span class="n">normalize</span><span class="p">,</span> <span class="s">&quot;is not implemented&quot;</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">curresults</span><span class="p">)</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="nb">float</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="n">labels</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s">&quot;label&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s">&quot;label&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">label</span>
+        <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">midbins</span><span class="p">,</span> <span class="n">results</span><span class="p">))</span>
+
+</div>
+<span class="k">def</span> <span class="nf">give_slices</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="n">tosave</span><span class="p">,</span> <span class="n">slices</span><span class="p">,</span> <span class="n">sliceParams</span><span class="p">,</span>
+                <span class="n">multipliers</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">&quot;chain&quot;</span><span class="p">,</span> <span class="n">loadFunction</span><span class="o">=</span><span class="n">load</span><span class="p">,</span>
+                <span class="n">integrate</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">exceptionList</span><span class="o">=</span><span class="p">[],</span>
+                <span class="n">nproc</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">cutoff</span><span class="o">=</span><span class="mf">1.7</span><span class="p">,</span> <span class="n">binstep</span><span class="o">=</span><span class="mf">1.15</span><span class="p">,</span> <span class="n">integerSlices</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">seterr</span><span class="p">(</span><span class="n">invalid</span><span class="o">=</span><span class="s">&#39;raise&#39;</span><span class="p">)</span>
+
+    <span class="n">plotsBySlice</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">cur_slice</span> <span class="ow">in</span> <span class="n">slices</span><span class="p">:</span>
+
+        <span class="n">files</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">def</span> <span class="nf">slice2D</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">mult</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">tm</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">==</span> <span class="nb">tuple</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                    <span class="n">tm</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="n">a</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="nb">type</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">==</span> <span class="nb">int</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                    <span class="n">tm</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="n">a</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="nb">type</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">==</span> <span class="nb">list</span><span class="p">:</span>
+                <span class="n">tm</span> <span class="o">=</span> <span class="p">[(</span><span class="n">i</span><span class="p">,</span> <span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">b</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">integerSlices</span><span class="p">:</span>
+                <span class="n">tm2</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">([(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">int</span><span class="p">(</span>
+                    <span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="n">m</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">tm</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">mult</span><span class="p">])))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">tm2</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">tm</span><span class="p">)</span>
+            <span class="k">print</span> <span class="n">tm2</span>
+            <span class="k">return</span> <span class="n">tm2</span>
+
+        <span class="k">def</span> <span class="nf">slice3D</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">mult</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">tm</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">b</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">c</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                    <span class="n">tm</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">t</span><span class="p">))</span>
+            <span class="n">tm2</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">([(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">int</span><span class="p">(</span>
+                <span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="n">m</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">tm</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">mult</span><span class="p">])))</span>
+            <span class="k">print</span> <span class="n">tm2</span>
+            <span class="k">return</span> <span class="n">tm2</span>
+
+        <span class="c"># sluces actually are defined</span>
+        <span class="n">runs</span> <span class="o">=</span> <span class="n">slice2D</span><span class="p">(</span><span class="n">cur_slice</span><span class="p">,</span> <span class="n">sliceParams</span><span class="p">,</span> <span class="n">multipliers</span><span class="p">)</span>
+        <span class="c"># runs = slice3D(cur_slice, (1,14),(1,10),multipliers)</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">runs</span><span class="p">:</span>
+            <span class="c"># filename is replaced in slices</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;DATA1&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;DATA2&quot;</span><span class="p">,</span>
+                                                                      <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;DATA3&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">2</span><span class="p">])))</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="n">files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;DATA1&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                                                       <span class="p">))</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s">&quot;DATA2&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">])))</span>
+
+        <span class="n">datas</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">def</span> <span class="nf">newload</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+            <span class="c"># loads a file</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">loadFunction</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">T</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">StandardError</span><span class="p">(</span><span class="s">&quot;Wrong shape of data&quot;</span><span class="p">)</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s">&quot;C&quot;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">data</span>
+            <span class="k">except</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">exceptionList</span><span class="p">):</span>
+                <span class="k">print</span> <span class="s">&quot;file not found&quot;</span><span class="p">,</span> <span class="n">i</span>
+                <span class="k">return</span> <span class="bp">None</span>
+
+        <span class="c"># use this for determining the file size</span>
+        <span class="n">datas</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">,</span> <span class="n">fmap</span><span class="p">(</span><span class="n">newload</span><span class="p">,</span> <span class="n">files</span><span class="p">[::</span>
+                                            <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)</span> <span class="o">/</span> <span class="mi">20</span> <span class="o">+</span> <span class="mi">1</span><span class="p">],</span> <span class="n">n</span><span class="o">=</span><span class="mi">3</span><span class="p">))</span>
+        <span class="n">datlen</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">datas</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;chain&quot;</span><span class="p">:</span>
+            <span class="n">bins2</span> <span class="o">=</span> <span class="n">logbins</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">datlen</span> <span class="o">-</span> <span class="mi">100</span><span class="p">,</span> <span class="n">binstep</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;parts&quot;</span><span class="p">:</span>
+            <span class="n">bins2</span> <span class="o">=</span> <span class="n">logbins</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">datlen</span> <span class="o">-</span> <span class="mi">100</span><span class="p">,</span> <span class="n">binstep</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;ring&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;intring&quot;</span><span class="p">):</span>
+            <span class="n">b1</span> <span class="o">=</span> <span class="n">logbins</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">datlen</span> <span class="o">/</span> <span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">binstep</span><span class="p">)</span>
+            <span class="n">bins2</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span> <span class="o">*</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">b1</span><span class="p">]</span>
+            <span class="k">print</span> <span class="n">bins2</span>
+        <span class="n">binsrg</span> <span class="o">=</span> <span class="n">logbins</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">datlen</span> <span class="o">-</span> <span class="mi">100</span><span class="p">,</span> <span class="n">binstep</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">give_plots</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">newload</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">None</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">data</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;ring&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;intring&quot;</span><span class="p">):</span>
+                <span class="n">b</span> <span class="o">=</span> <span class="n">give_radius_scaling</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">binsrg</span><span class="p">,</span> <span class="n">ring</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">b</span> <span class="o">=</span> <span class="n">give_radius_scaling</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">binsrg</span><span class="p">,</span> <span class="n">ring</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;chain&quot;</span><span class="p">):</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">giveCpScaling</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">bins2</span><span class="p">,</span> <span class="n">cutoff</span><span class="p">,</span> <span class="n">integrate</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;ring&quot;</span><span class="p">):</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">giveCpScaling</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">bins2</span><span class="p">,</span> <span class="n">cutoff</span><span class="p">,</span> <span class="n">integrate</span><span class="p">,</span> <span class="n">ring</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;intring&quot;</span><span class="p">):</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">giveCpScaling</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">bins2</span><span class="p">,</span> <span class="n">cutoff</span><span class="p">,</span> <span class="n">integrate</span><span class="p">,</span> <span class="n">ring</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+                                  <span class="n">project</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">intContacts</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;project&quot;</span><span class="p">):</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">giveCpScaling</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">bins2</span><span class="p">,</span> <span class="mf">1.450</span><span class="p">,</span> <span class="n">integrate</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;ring&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="s">&quot;intring&quot;</span><span class="p">):</span>
+                <span class="n">c</span> <span class="o">=</span> <span class="n">give_distance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">bins2</span><span class="p">,</span> <span class="n">ring</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">c</span> <span class="o">=</span> <span class="n">give_distance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">bins2</span><span class="p">,</span> <span class="n">ring</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">normalize</span> <span class="o">==</span> <span class="bp">True</span><span class="p">):</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+                <span class="n">pos</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">values</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">r_</span><span class="p">[</span><span class="mf">1.5</span> <span class="o">*</span> <span class="n">pos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">pos</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                             <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">pos</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">+</span> <span class="n">pos</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">pos</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span>
+                <span class="n">lens</span> <span class="o">=</span> <span class="n">bins</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">bins</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">ints</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">lens</span> <span class="o">*</span> <span class="n">values</span><span class="p">)</span>
+
+                <span class="n">values</span> <span class="o">/=</span> <span class="n">ints</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">ints</span> <span class="o">/=</span> <span class="n">ints</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="p">[</span><span class="n">pos</span><span class="p">,</span> <span class="n">values</span><span class="p">]</span>
+
+            <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">])</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">files</span><span class="p">)</span>
+
+        <span class="n">parPlots</span> <span class="o">=</span> <span class="n">fmap</span><span class="p">(</span><span class="n">give_plots</span><span class="p">,</span> <span class="n">files</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">nproc</span><span class="p">)</span>
+
+        <span class="n">parPlots</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">,</span> <span class="n">parPlots</span><span class="p">)</span>
+
+        <span class="n">means</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">parPlots</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">plotsBySlice</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">means</span><span class="p">,</span> <span class="p">{</span><span class="s">&quot;slice&quot;</span><span class="p">:</span><span class="n">cur_slice</span><span class="p">}])</span>
+
+    <span class="k">if</span> <span class="n">tosave</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">cPickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">plotsBySlice</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">tosave</span><span class="p">,</span> <span class="s">&#39;wb&#39;</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">print</span> <span class="s">&quot;Finished!!!&quot;</span>
+    <span class="k">return</span> <span class="n">plotsBySlice</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../np-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../index.html">Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</a> &raquo;</li>
+          <li><a href="index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Maxim Imakaev, Anton Goloborodko, Geoffrey Fudenberg, Leonid Mirny.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.3.
+    </div>
+  </body>
+</html>

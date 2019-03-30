@@ -1,0 +1,37 @@
+#!/usr/bin/env python
+from __future__ import absolute_import, division, print_function
+import sys 
+import numpy
+from numpy import sqrt
+import scipy.optimize
+np = numpy
+from numpy import sin,cos
+import joblib
+from openmmlib import polymerutils
+import os 
+import pyximport; pyximport.install()
+from openmmlib import polymerCython
+
+
+if os.path.exists(sys.argv[1]):
+    data = polymerutils.load(sys.argv[1])
+elif os.path.exists("block%s.dat" % sys.argv[1]):
+    data = polymerutils.load("block%s.dat" % sys.argv[1])
+else:
+    raise IOError("File not found: {0}").format(sys.argv[1])
+dataa = data - numpy.sum(data,0)/float(len(data))
+
+if os.path.exists(sys.argv[2]):
+    data = polymerutils.load(sys.argv[2])
+elif os.path.exists("block{0}.dat".format(sys.argv[2])):
+    data = polymerutils.load("block%s.dat" % sys.argv[2])
+else:
+    raise IOError("File not found: {0}")
+
+datab = data - numpy.sum(data,0)/float(len(data))
+
+
+print("Shuffled distance", np.mean([polymerCython.fastMSD(dataa, datab[np.argsort(np.random.random(len(datab)))]) for _ in range(10)]))
+
+print("actual distance", polymerCython.fastMSD(dataa,datab))
+

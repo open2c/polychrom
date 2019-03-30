@@ -1,0 +1,207 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Polymer scalings &mdash; Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation" href="index.html" />
+    <link rel="prev" title="Analysis scripts" href="polymerutils.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="np-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="polymerutils.html" title="Analysis scripts"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="polymer-scalings">
+<h1>Polymer scalings<a class="headerlink" href="#polymer-scalings" title="Permalink to this headline">¶</a></h1>
+<p>A set of small utilities to analyze P(s), Rg(s)</p>
+<span class="target" id="module-polymerScalings"></span><dl class="function">
+<dt id="polymerScalings.giveCpScaling">
+<tt class="descclassname">polymerScalings.</tt><tt class="descname">giveCpScaling</tt><big>(</big><em>data</em>, <em>bins0</em>, <em>cutoff=1.1</em>, <em>integrate=False</em>, <em>ring=False</em>, <em>intContacts=False</em>, <em>verbose=False</em>, <em>maxContacts=300</em><big>)</big><a class="reference internal" href="_modules/polymerScalings.html#giveCpScaling"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerScalings.giveCpScaling" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns contact probability scaling for a given polymer conformation</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>data</strong> : 3xN array of ints/floats</p>
+<blockquote>
+<div><p>Input polymer conformation</p>
+</div></blockquote>
+<p><strong>bins0</strong> : list</p>
+<blockquote>
+<div><p>Bins to calculate scaling.</p>
+</div></blockquote>
+<p><strong>cutoff</strong> : float, optional</p>
+<blockquote>
+<div><p>Cutoff to calculate scaling</p>
+</div></blockquote>
+<p><strong>integrate</strong> : bool, optional</p>
+<blockquote>
+<div><p>if True, will return cumulative probability</p>
+</div></blockquote>
+<p><strong>ring</strong> : bool, optional</p>
+<blockquote>
+<div><p>If True, will calculate contacts for the ring</p>
+</div></blockquote>
+<p><strong>intContacts</strong> : bool, optional</p>
+<blockquote>
+<div><p>If True, will speed up calculation of contacts for a cubit lattice case.</p>
+</div></blockquote>
+<p><strong>verbose</strong> : bool, optional</p>
+<blockquote>
+<div><p>If True, print some information.</p>
+</div></blockquote>
+<p><strong>maxContacts</strong> : int</p>
+<blockquote>
+<div><p>Maximum number of contacts per monomer.
+If total number of contacts exceeds maxContacts*N, program becomes uncontrollable.</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><strong>(bins, contact probabilities) where &#8220;bins&#8221; are centers of bins in the input bins0 array.</strong> :</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerScalings.give_distance">
+<tt class="descclassname">polymerScalings.</tt><tt class="descname">give_distance</tt><big>(</big><em>data</em>, <em>bins=None</em>, <em>ring=False</em><big>)</big><a class="reference internal" href="_modules/polymerScalings.html#give_distance"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerScalings.give_distance" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns end-to-end distance scaling of a given polymer conformation.
+..warning:: This method averages end-to-end scaling over bins to make better average</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>data: 3xN array</strong> :</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerScalings.give_radius_scaling">
+<tt class="descclassname">polymerScalings.</tt><tt class="descname">give_radius_scaling</tt><big>(</big><em>data</em>, <em>bins=None</em>, <em>ring=False</em><big>)</big><a class="reference internal" href="_modules/polymerScalings.html#give_radius_scaling"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerScalings.give_radius_scaling" title="Permalink to this definition">¶</a></dt>
+<dd><p>main working horse for radius of gyration</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="polymerScalings.subchainDensityFunction">
+<tt class="descclassname">polymerScalings.</tt><tt class="descname">subchainDensityFunction</tt><big>(</big><em>filenames</em>, <em>bins</em>, <em>normalize='Rg'</em>, <em>maxLength=3</em>, <em>Nbins=30</em>, <em>coverage=1.0</em>, <em>centerAt='mid'</em>, <em>**kwargs</em><big>)</big><a class="reference internal" href="_modules/polymerScalings.html#subchainDensityFunction"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#polymerScalings.subchainDensityFunction" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates density function of subchains
+That is, for each bin size, it calculates an average density profile
+for subchains of the size within the bin.
+Density profile is how density of a subchain depends on a distance from the center.</p>
+<dl class="docutils">
+<dt>filenames <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Filenames to average density function</dd>
+<dt>bins <span class="classifier-delimiter">:</span> <span class="classifier">iterable</span></dt>
+<dd>List of positions of bins (lengthes at which to evaluate).</dd>
+<dt>normalize <span class="classifier-delimiter">:</span> <span class="classifier">str, not implemented</span></dt>
+<dd>How to normalize the subchain density function</dd>
+<dt>lengthmult <span class="classifier-delimiter">:</span> <span class="classifier">int, optional</span></dt>
+<dd>Calculate distribution to lengthmult*Rg distance only (default = 3)</dd>
+<dt>Nbins <span class="classifier-delimiter">:</span> <span class="classifier">int, optional</span></dt>
+<dd>Number of bins for each distribution (default = 30)</dd>
+<dt>coverage <span class="classifier-delimiter">:</span> <span class="classifier">float, optional</span></dt>
+<dd>Use each monomer &#8216;coverage&#8217; times (on average) to calculate each distribution. Default = 1.</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="polymerutils.html"
+                        title="previous chapter">Analysis scripts</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/polymerScalings.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="np-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="polymerutils.html" title="Analysis scripts"
+             >previous</a> |</li>
+        <li><a href="index.html">Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Maxim Imakaev, Anton Goloborodko, Geoffrey Fudenberg, Leonid Mirny.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.3.
+    </div>
+  </body>
+</html>

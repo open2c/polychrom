@@ -1,0 +1,398 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Building contactmaps &mdash; Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation" href="index.html" />
+    <link rel="next" title="Knot complexity scripts" href="knotAnalysis.html" />
+    <link rel="prev" title="Openmm-lib - a wrapper around Openmm to use with polymer simulations" href="openmmlib.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="np-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="knotAnalysis.html" title="Knot complexity scripts"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="openmmlib.html" title="Openmm-lib - a wrapper around Openmm to use with polymer simulations"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="building-contactmaps">
+<h1>Building contactmaps<a class="headerlink" href="#building-contactmaps" title="Permalink to this headline">¶</a></h1>
+<p>A set of small utilities to analyze polymer simulations</p>
+<span class="target" id="module-contactmaps"></span><dl class="function">
+<dt id="contactmaps.intload">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">intload</tt><big>(</big><em>filename</em>, <em>center='N/A'</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#intload"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.intload" title="Permalink to this definition">¶</a></dt>
+<dd><div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">About to be deprecated</p>
+</div>
+</dd></dl>
+
+<dl class="class">
+<dt id="contactmaps.h5dictLoad">
+<em class="property">class </em><tt class="descclassname">contactmaps.</tt><tt class="descname">h5dictLoad</tt><a class="reference internal" href="_modules/contactmaps.html#h5dictLoad"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.h5dictLoad" title="Permalink to this definition">¶</a></dt>
+<dd><p>An experimental class to fetch h5dict values based on a fake filename.</p>
+<p>It accepts filenames in a form
+/path-to-h5dict/h5dictKey</p>
+<p>It automatically caches h5dicts that are already open</p>
+<p>use simpleFetch method for concurrent fetching using fmap</p>
+<p class="rubric">Methods</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.rad2">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">rad2</tt><big>(</big><em>data</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#rad2"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.rad2" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns Rg(N^(2/3)
+This is an important point, as for a dense equilibrium globule at N^{2/3}
+both P(s) and Rg(s) plots reach a plateau.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.giveIntContacts">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">giveIntContacts</tt><big>(</big><em>data</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#giveIntContacts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.giveIntContacts" title="Permalink to this definition">¶</a></dt>
+<dd><p>give all contacts of a polymer on a cubic lattice
+Intersections are not counted as contacts. Sorry :(</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>data</strong> : Nx3 or 3xN array of ints</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.giveContactsOpenMM">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">giveContactsOpenMM</tt><big>(</big><em>data</em>, <em>cutoff=1.7</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#giveContactsOpenMM"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.giveContactsOpenMM" title="Permalink to this definition">¶</a></dt>
+<dd><p>A wrapper to an ultra-fast openmm filter by VJ Pande
+If you use it, you may want to cite OpenMM</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.giveContactsAny">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">giveContactsAny</tt><big>(</big><em>data</em>, <em>cutoff=1.7</em>, <em>maxContacts=300</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#giveContactsAny"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.giveContactsAny" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns contacts of any sets of molecules with a given cutoff.
+Is slower than give_contacts, but can tolerate multiple chains.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>data</strong> : Nx3 or 3xN array</p>
+<blockquote>
+<div><p>Polymer configuration. One chaon only.</p>
+</div></blockquote>
+<p><strong>cutoff</strong> : float , optional</p>
+<blockquote>
+<div><p>Cutoff distance that defines contact</p>
+</div></blockquote>
+<p><strong>maxContacts</strong> : int</p>
+<blockquote>
+<div><p>Maximum number of contacts per monomer.
+If total number of contacts exceeds maxContacts*N, program becomes uncontrollable.</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><strong>k by 2 array of contacts. Each row corresponds to a contact.</strong> :</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.giveContacts">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">giveContacts</tt><big>(</big><em>data</em>, <em>cutoff=1.7</em>, <em>maxContacts=300</em>, <em>method='auto'</em>, <em>tryOpenMM=True</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#giveContacts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.giveContacts" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns contacts of a single polymer with a given cutoff</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">Use this only to find contacts of a single polymer chain</p>
+</div>
+<p>with distance between monomers of 1.
+Multiple chains will lead to silent bugs.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>data</strong> : Nx3 or 3xN array</p>
+<blockquote>
+<div><p>Polymer configuration. One chaon only.</p>
+</div></blockquote>
+<p><strong>cutoff</strong> : float , optional</p>
+<blockquote>
+<div><p>Cutoff distance that defines contact</p>
+</div></blockquote>
+<p><strong>maxContacts</strong> : int</p>
+<blockquote>
+<div><p>Maximum number of contacts per monomer.
+If total number of contacts exceeds maxContacts*N,
+program becomes uncontrollable.</p>
+</div></blockquote>
+<p><strong>method</strong> : &#8220;auto&#8221;, &#8220;continuous&#8221;, &#8220;any&#8221;</p>
+<blockquote>
+<div><p>Selects between a method suitable for a continuous polymer, and an auto method</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><strong>k by 2 array of contacts. Each row corresponds to a contact.</strong> :</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.giveDistanceMap">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">giveDistanceMap</tt><big>(</big><em>data</em>, <em>size=1000</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#giveDistanceMap"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.giveDistanceMap" title="Permalink to this definition">¶</a></dt>
+<dd><p>returns  a distance map of a polymer with a given size</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.rescalePoints">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">rescalePoints</tt><big>(</big><em>points</em>, <em>bins</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#rescalePoints"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.rescalePoints" title="Permalink to this definition">¶</a></dt>
+<dd><p>converts array of contacts to the reduced resolution contact map</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.rescaledMap">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">rescaledMap</tt><big>(</big><em>data</em>, <em>bins</em>, <em>cutoff=1.7</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#rescaledMap"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.rescaledMap" title="Permalink to this definition">¶</a></dt>
+<dd><p>calculates a rescaled contact map of a structure
+Parameters
+&#8212;&#8212;&#8212;-
+data : Nx3 or 3xN array</p>
+<blockquote>
+<div>polymer conformation</div></blockquote>
+<dl class="docutils">
+<dt>bins <span class="classifier-delimiter">:</span> <span class="classifier">Lx1 array</span></dt>
+<dd>bin starts</dd>
+<dt>cutoff <span class="classifier-delimiter">:</span> <span class="classifier">float, optional</span></dt>
+<dd>cutoff for contacts</dd>
+</dl>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><strong>resXres array with the contact map</strong> :</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.pureMap">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">pureMap</tt><big>(</big><em>data</em>, <em>cutoff=1.7</em>, <em>contactMap=None</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#pureMap"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.pureMap" title="Permalink to this definition">¶</a></dt>
+<dd><p>calculates an all-by-all contact map of a single polymer chain.
+Doesn&#8217;t work for multi-chain polymers!!!
+If contact map is supplied, it just updates it</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>data</strong> : Nx3 or 3xN array</p>
+<blockquote>
+<div><p>polymer conformation</p>
+</div></blockquote>
+<p><strong>cutoff</strong> : float</p>
+<blockquote>
+<div><p>cutoff for contacts</p>
+</div></blockquote>
+<p><strong>contactMap</strong> : NxN array, optional</p>
+<blockquote class="last">
+<div><p>contact map to update, if averaging is used</p>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.cool_trunk">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">cool_trunk</tt><big>(</big><em>data</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#cool_trunk"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.cool_trunk" title="Permalink to this definition">¶</a></dt>
+<dd><p>somehow trunkates the globule so that the ends are on the surface</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.averageBinnedContactMap">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">averageBinnedContactMap</tt><big>(</big><em>filenames</em>, <em>chains=None</em>, <em>binSize=None</em>, <em>cutoff=1.7</em>, <em>n=4</em>, <em>loadFunction=&lt;function load at 0x7f5aec8c9e60&gt;</em>, <em>exceptionsToIgnore=None</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#averageBinnedContactMap"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.averageBinnedContactMap" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns an average contact map of a set of conformations.
+Non-existing files are ignored if exceptionsToIgnore is set to IOError.
+example:</p>
+<p>An example:</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>filenames</strong> : list of strings</p>
+<blockquote>
+<div><p>Filenames to average map over</p>
+</div></blockquote>
+<p><strong>chains</strong> : list of tuples or Nx2 array</p>
+<blockquote>
+<div><p>(start,end+1) of each chain</p>
+</div></blockquote>
+<p><strong>binSize</strong> : int</p>
+<blockquote>
+<div><p>size of each bin in monomers</p>
+</div></blockquote>
+<p><strong>cutoff</strong> : float, optional</p>
+<blockquote>
+<div><p>Cutoff to calculate contacts</p>
+</div></blockquote>
+<p><strong>n</strong> : int, optional</p>
+<blockquote>
+<div><p>Number of threads to use.
+By default 4 to minimize RAM consumption.</p>
+</div></blockquote>
+<p><strong>exceptionsToIgnore</strong> : list of Exceptions</p>
+<blockquote>
+<div><p>List of exceptions to ignore when finding the contact map.
+Put IOError there if you want it to ignore missing files.</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first"><strong>tuple of two values:</strong> :</p>
+<p><strong>(i) MxM numpy array with the conntact map binned to binSize resolution.</strong> :</p>
+<p class="last"><strong>(ii) chromosomeStarts a list of start sites for binned map.</strong> :</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="contactmaps.averagePureContactMap">
+<tt class="descclassname">contactmaps.</tt><tt class="descname">averagePureContactMap</tt><big>(</big><em>filenames</em>, <em>cutoff=1.7</em>, <em>n=4</em>, <em>loadFunction=&lt;function load at 0x7f5aec8c9e60&gt;</em>, <em>exceptionsToIgnore=None</em><big>)</big><a class="reference internal" href="_modules/contactmaps.html#averagePureContactMap"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#contactmaps.averagePureContactMap" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>filenames</strong> : list of strings</p>
+<blockquote>
+<div><p>Filenames to average map over</p>
+</div></blockquote>
+<p><strong>cutoff</strong> : float, optional</p>
+<blockquote>
+<div><p>Cutoff to calculate contacts</p>
+</div></blockquote>
+<p><strong>n</strong> : int, optional</p>
+<blockquote>
+<div><p>Number of threads to use.
+By default 4 to minimize RAM consumption with pure maps.</p>
+</div></blockquote>
+<p><strong>exceptionsToIgnore</strong> : list of Exceptions</p>
+<blockquote>
+<div><p>List of exceptions to ignore when finding the contact map.
+Put IOError there if you want it to ignore missing files.</p>
+</div></blockquote>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last"><strong>An NxN (for pure map) numpy array with the contact map.</strong> :</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="openmmlib.html"
+                        title="previous chapter">Openmm-lib - a wrapper around Openmm to use with polymer simulations</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="knotAnalysis.html"
+                        title="next chapter">Knot complexity scripts</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/contactmaps.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="np-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="knotAnalysis.html" title="Knot complexity scripts"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="openmmlib.html" title="Openmm-lib - a wrapper around Openmm to use with polymer simulations"
+             >previous</a> |</li>
+        <li><a href="index.html">Wrapper for Openmm to perform polymer simulations and chromatin modelling 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2013, Maxim Imakaev, Anton Goloborodko, Geoffrey Fudenberg, Leonid Mirny.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.3.
+    </div>
+  </body>
+</html>
