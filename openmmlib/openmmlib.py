@@ -1,12 +1,3 @@
-# Licenced under MIT licence 
-#Copyright 2019 Massachusetts Institute of Technology
-
-#Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-#The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
 """
 Openmm-lib - a wrapper around Openmm to use with polymer simulations
 ====================================================================
@@ -20,10 +11,6 @@ You can find extensive description of openmm classes here:
 https://simtk.org/api_docs/openmm/api10/annotated.html
 
 The main library is located in openmmlib.Simulation
-
-A file knotAnalysis.py contains code needed to calculate Alexander's polynomials,
-a measure of knot complexity. It also uses OpenMM to help unwrap polymer and
-reduce time needed to calculate Alexander's polynomial
 
 A file polymerScalings.py has some utilities to calculate Rg(s) and Pc(s) for
 polymer conformations in a fast and efficient way.
@@ -66,13 +53,7 @@ Individual bonds can be added using :py:func:`addBond <Simulation.addBond>`,
 while polymer bonds can be added using
 :py:func:`addHarmonicPolymerBonds <Simulation.addHarmonicPolymerBonds>`, etc.
 
-Nonbonded (inter-monomer) force can be of many types. Three Lennard-Jones-based forces:
- simple repulsife force U = 1/r^12;
-Grosberg repulsive force - a faster and better implementation
-of repulsive force; and LennardJones Force, that can be attractive and
-allows to specify extra attraction/repulsion between any pairs of particles.
-
-There are also polynomial repulsive and attractive forces which are faster due to a shorter cutoff radius.
+Write about polynomial repulsive forces 
 
 Stiffness force can be harmonic, or the "special" Grosberg force, kept
 for compatibility with the systems used in Grosberg forces
