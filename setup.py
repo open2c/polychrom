@@ -10,11 +10,11 @@ cmdclass = {}
 cmdclass.update({'build_ext': build_ext} )
 
 setup(
-    name='openmmlib',
+    name='openmmlib2',
     url='http://mirnylab.bitbucket.org/hiclib/index.html',
     description=('Hi-C data analysis library.'),
       ext_modules=[],
       cmdclass = cmdclass,
-       packages=['openmmlib'],
+       packages=['openmmlib2'],
 
 )

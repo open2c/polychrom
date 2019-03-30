@@ -143,9 +143,7 @@ Select timestep or collision rate - :py:class:`Simulation`
 # http://www.opensource.org/licenses/mit-license.php
 
 from __future__ import absolute_import, division, print_function
-import numpy
 import numpy as np
-import pickle
 import sys
 import os
 import time
@@ -299,17 +297,17 @@ class Simulation():
         if self.PBC == True:  # if periodic boundary conditions
             if PBCbox is None:  # Automatically setting up PBC box
                 data = self.getData()
-                data -= numpy.min(data, axis=0)
+                data -= np.min(data, axis=0)
 
-                datasize = 1.1 * (2 + (numpy.max(self.getData(), axis=0) - \
-                                       numpy.min(self.getData(), axis=0)))
+                datasize = 1.1 * (2 + (np.max(self.getData(), axis=0) - \
+                                       np.min(self.getData(), axis=0)))
                 # size of the system plus some overhead
 
                 self.SolventGridSize = (datasize / 1.1) - 2
                 print("density is ", self.N / (datasize[0]
                     * datasize[1] * datasize[2]))
             else:
-                PBCbox = numpy.array(PBCbox)
+                PBCbox = np.array(PBCbox)
                 datasize = PBCbox
 
             self.metadata["PBCbox"] = PBCbox
@@ -449,29 +447,29 @@ class Simulation():
         else:
             data = filename
 
-        data = numpy.asarray(data, float)
+        data = np.asarray(data, float)
 
         if len(data) == 3:
-            data = numpy.transpose(data)
+            data = np.transpose(data)
         if len(data[0]) != 3:
             self._exitProgram("strange data file")
             
-        if numpy.isnan(data).any():
+        if np.isnan(data).any():
             self._exitProgram("\n!!!!!!!!!!file contains NANS!!!!!!!!!\n")
 
         if center is True:
-            av = numpy.mean(data, 0)
+            av = np.mean(data, 0)
             data -= av
 
         if center == "zero":
-            minvalue = numpy.min(data, 0)
+            minvalue = np.min(data, 0)
             data -= minvalue
 
         self.setData(data)
         self.randomizeData()
 
         if self.verbose == True:
-            print("center of mass is", numpy.mean(self.data, 0))
+            print("center of mass is", np.mean(self.data, 0))
             print("Radius of gyration is,", self.RG())
 
         if masses == None:
@@ -523,15 +521,15 @@ class Simulation():
             
     def getData(self):
         "Returns an Nx3 array of positions"
-        return numpy.asarray(self.data / nm, dtype=np.float32)
+        return np.asarray(self.data / nm, dtype=np.float32)
 
     def getScaledData(self):
         """Returns data, scaled back to PBC box """
         if self.PBC != True:
             return self.getData()
         alldata = self.getData()
-        boxsize = numpy.array(self.BoxSizeReal)
-        mults = numpy.floor(alldata / boxsize[None, :])
+        boxsize = np.array(self.BoxSizeReal)
+        mults = np.floor(alldata / boxsize[None, :])
         toRet = alldata - mults * boxsize[None, :]
         assert toRet.min() >= 0
         return toRet
@@ -550,7 +548,7 @@ class Simulation():
         data : Nx3 array-line
             Array of positions with distance ~1 between connected atoms.
         """
-        data = numpy.asarray(data, dtype="float")
+        data = np.asarray(data, dtype="float")
         self.data = units.Quantity(data, nm)
         self.N = len(self.data)
         if hasattr(self, "context"):
@@ -561,7 +559,7 @@ class Simulation():
         Runs automatically to offset data  (helps if data is integer based)
         """
         data = self.getData()
-        data = data + numpy.random.randn(*data.shape) * 0.0001
+        data = data + np.random.randn(*data.shape) * 0.0001
         self.setData(data)
 
     def RG(self):
@@ -573,7 +571,7 @@ class Simulation():
         """
         data = self.getScaledData()
         data = data - np.mean(data, axis=0)[None,:]
-        return numpy.sqrt(numpy.sum(numpy.var(numpy.array(data), 0)))
+        return np.sqrt(np.sum(np.var(np.array(data), 0)))
 
     def RMAX(self, percentile=None):
         """
@@ -583,11 +581,11 @@ class Simulation():
 
         """
         data = self.getScaledData()
-        dists = numpy.sqrt(numpy.sum((numpy.array(data)) ** 2, 1))
+        dists = np.sqrt(np.sum((np.array(data)) ** 2, 1))
         if percentile == None:
-            return numpy.max(dists)
+            return np.max(dists)
         else:
-            return numpy.percentile(dists, percentile)
+            return np.percentile(dists, percentile)
 
     def dist(self, i, j):
         """
@@ -595,7 +593,7 @@ class Simulation():
         """
         data = self.getData()
         dif = data[i] - data[j]
-        return numpy.sqrt(sum(dif ** 2))
+        return np.sqrt(sum(dif ** 2))
 
 
     def _initHarmonicBondForce(self):
@@ -750,7 +748,7 @@ class Simulation():
         try:
             k[0]
         except:
-            k = numpy.zeros(self.N, float) + k
+            k = np.zeros(self.N, float) + k
         stiffForce = self.mm.CustomAngleForce(
             "kT*angK * (theta - 3.141592) * (theta - 3.141592) * (0.5)")
         self.forceDict["AngleForce"] = stiffForce
@@ -1164,8 +1162,8 @@ class Simulation():
         print("Number of exceptions:", len(exc))
 
         if len(exc) > 0:
-            exc = numpy.array(exc)
-            exc = numpy.sort(exc, axis=1)
+            exc = np.array(exc)
+            exc = np.sort(exc, axis=1)
             exc = [tuple(i) for i in exc]
             exc = list(set(exc))  # only unique pairs are left
 
@@ -1212,7 +1210,7 @@ class Simulation():
 
         sigma = units.sqrt(self.kT / self.system.getParticleMass(
             1))  # calculating mean velocity
-        velocs = units.Quantity(mult * numpy.random.normal(
+        velocs = units.Quantity(mult * np.random.normal(
             size=(self.N, 3)), units.meter) * (sigma / units.meter)
         # Guide to simtk.unit: 1. Always use units.quantity.
         # 2. Avoid dimensionless shit.
@@ -1337,16 +1335,16 @@ class Simulation():
             if not checkFunction(newcoords):
                 checkFail = True
 
-        if ((numpy.isnan(newcoords).any()):
+        if np.isnan(newcoords).any():
             raise integrationFailError("Coordinates are NANs")
         if (eK > self.eKcritical):
             raise eKExceedsError("Ek exceeds {0}".format(eKcritical))
-        if  (numpy.isnan(eK)) or (numpy.isnan(eP))):
+        if  (np.isnan(eK)) or (np.isnan(eP)):
             raise integrationFailError("Energy is NAN)")
         if checkFail:
             raise integrationFailError("Custom checks failed")
 
-        dif = numpy.sqrt(numpy.mean(numpy.sum((newcoords -
+        dif = np.sqrt(np.mean(np.sum((newcoords -
             self.getData()) ** 2, axis=1)))
         print("dr=%.2lf" % (dif,), end=' ')
         self.data = coords
@@ -1376,24 +1374,24 @@ class Simulation():
             getVelocities=True, getEnergy=True)
 
         eP = state.getPotentialEnergy()
-        pos = numpy.array(state.getPositions() / nm)
-        bonds = numpy.sqrt(numpy.sum(numpy.diff(pos, axis=0) ** 2, axis=1))
-        sbonds = numpy.sort(bonds)
+        pos = np.array(state.getPositions() / nm)
+        bonds = np.sqrt(np.sum(np.diff(pos, axis=0) ** 2, axis=1))
+        sbonds = np.sort(bonds)
         vel = state.getVelocities()
         mass = self.system.getParticleMass(1)
-        vkT = numpy.array(vel / units.sqrt(self.kT / mass), dtype=float)
+        vkT = np.array(vel / units.sqrt(self.kT / mass), dtype=float)
         self.velocs = vkT
-        EkPerParticle = 0.5 * numpy.sum(vkT ** 2, axis=1)
+        EkPerParticle = 0.5 * np.sum(vkT ** 2, axis=1)
 
-        cm = numpy.mean(pos, axis=0)
+        cm = np.mean(pos, axis=0)
         centredPos = pos - cm[None, :]
-        dists = numpy.sqrt(numpy.sum(centredPos ** 2, axis=1))
-        per95 = numpy.percentile(dists, 95)
-        den = (0.95 * self.N) / ((4. * numpy.pi * per95 ** 3) / 3)
-        per5 = numpy.percentile(dists, 5)
-        den5 = (0.05 * self.N) / ((4. * numpy.pi * per5 ** 3) / 3)
+        dists = np.sqrt(np.sum(centredPos ** 2, axis=1))
+        per95 = np.percentile(dists, 95)
+        den = (0.95 * self.N) / ((4. * np.pi * per95 ** 3) / 3)
+        per5 = np.percentile(dists, 5)
+        den5 = (0.05 * self.N) / ((4. * np.pi * per5 ** 3) / 3)
         x, y, z = pos[:, 0], pos[:, 1], pos[:, 2]
-        minmedmax = lambda x: (x.min(), numpy.median(x), x.mean(), x.max())
+        minmedmax = lambda x: (x.min(), np.median(x), x.mean(), x.max())
 
         print()
         print("Statistics for the simulation %s, number of particles: %d, "\
@@ -1401,9 +1399,9 @@ class Simulation():
             self.name, self.N, len(self.chains)))
         print()
         print("Statistics for particle position")
-        print("     mean position is: ", numpy.mean(
+        print("     mean position is: ", np.mean(
             pos, axis=0), "  Rg = ", self.RG())
-        print("     median bond size is ", numpy.median(bonds))
+        print("     median bond size is ", np.median(bonds))
         print("     three shortest/longest (<10)/ bonds are ", sbonds[
             :3], "  ", sbonds[sbonds < 10][-3:])
         if (sbonds > 10).sum() > 0:
@@ -1418,9 +1416,9 @@ class Simulation():
         print("     z: %.2lf, %.2lf, %.2lf, %.2lf" % minmedmax(z))
         print()
         print("Statistics for velocities:")
-        print("     mean kinetic energy is: ", numpy.mean(
+        print("     mean kinetic energy is: ", np.mean(
             EkPerParticle), "should be:", 1.5)
-        print("     fastest particles are (in kT): ", numpy.sort(
+        print("     fastest particles are (in kT): ", np.sort(
             EkPerParticle)[-5:])
 
         print()
@@ -1441,14 +1439,14 @@ class Simulation():
 
         data = self.getData()
         if len(data[0]) != 3:
-            data = numpy.transpose(data)
+            data = np.transpose(data)
         if len(data[0]) != 3:
             print("wrong data!")
             return
         # determining the 95 percentile distance between particles,
         if scale == "auto":
-            meandist = numpy.percentile(numpy.sqrt(
-                numpy.sum(numpy.diff(data, axis=0) ** 2, axis=1)), 95)
+            meandist = np.percentile(np.sqrt(
+                np.sum(np.diff(data, axis=0) ** 2, axis=1)), 95)
             # rescaling the data, so that bonds are of the order of 1.
             # This is because rasmol spheres are of the fixed diameter.
             data /= meandist
@@ -1458,8 +1456,8 @@ class Simulation():
         if self.N > 1000:  # system is sufficiently large
             count = 0
             for _ in range(100):
-                a, b = numpy.random.randint(0, self.N, 2)
-                dist = numpy.sqrt(numpy.sum((data[a] - data[b]) ** 2))
+                a, b = np.random.randint(0, self.N, 2)
+                dist = np.sqrt(np.sum((data[a] - data[b]) ** 2))
                 if dist < 1.3:
                     count += 1
             if count > 100:
@@ -1478,11 +1476,11 @@ class Simulation():
 
         # creating the array, linearly chanhing from -225 to 225
         # to serve as an array of colors
-        colors = numpy.array([int((j * 450.) / (len(data))) -
+        colors = np.array([int((j * 450.) / (len(data))) -
             225 for j in range(len(data))])
 
         # creating spheres along the trajectory
-        newData = numpy.zeros(
+        newData = np.zeros(
             (len(data) * len(shifts) - (len(shifts) - 1), 4))
         for i in range(len(shifts)):
             newData[i:-1:len(shifts), :3] = data[:-1] * shifts[
