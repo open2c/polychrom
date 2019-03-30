@@ -318,8 +318,9 @@ class Simulation():
         self.GPU = str(GPU)  # setting default GPU
         properties = {}
         if self.GPU.lower() != "default":
-            properties["DeviceIndex"] = str(GPU)
-            properties["Precision"] = precision
+            if platform.lower() in ["cuda", "opencl"]:
+                properties["DeviceIndex"] = str(GPU)
+                properties["Precision"] = precision
         self.properties = properties
 
         if platform.lower() == "opencl":

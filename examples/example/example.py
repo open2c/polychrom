@@ -4,8 +4,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 import os,sys
 sys.path.insert(0, os.path.abspath(".."))
-from openmmlib.openmmlib import Simulation
-from openmmlib import polymerutils
+from openmmlib2.openmmlib import Simulation
+from openmmlib2 import polymerutils
 import os
 
 def exampleOpenmm():
@@ -30,7 +30,7 @@ def exampleOpenmm():
     # If simulation blows up, decrease errorTol by a factor of two and try again
     a = Simulation(thermostat=0.02)  # timestep not necessary for variableLangevin
 
-    a.setup(platform="CUDA", integrator="variableLangevin", errorTol=0.01,  GPU = "0")
+    a.setup(platform="CPU", integrator="variableLangevin", errorTol=0.01,  GPU = "0")
 
     a.saveFolder("trajectory")  # folder where to save trajectory
 
@@ -46,7 +46,7 @@ def exampleOpenmm():
     # polymer = polymerutils.create_spiral(r1=4, r2=10, N=8000)
     # Creates a compact polymer arranged in a cylinder of radius 10, 8000 monomers long
 
-    polymer = polymerutils.create_random_walk(1, 80000)
+    polymer = polymerutils.create_random_walk(1, 1000)
     # Creates an extended "random walk" conformation of length 8000
 
     a.load(polymer, center=True)  # loads a polymer, puts a center of mass at zero
@@ -67,7 +67,7 @@ def exampleOpenmm():
     a.addHarmonicPolymerBonds(wiggleDist=0.05)
     # Bond distance will fluctuate +- 0.05 on average
 
-    a.addGrosbergRepulsiveForce(trunc=50)
+    a.addPolynomialRepulsiveForce(trunc=10)
     # this will resolve chain crossings and will not let chain cross anymore
 
     # a.addGrosbergRepulsiveForce(trunc=5)
@@ -83,8 +83,7 @@ def exampleOpenmm():
     # A very efficient algorithm to reach local energy minimum
     # Use it to minimize energy if you're doing diffusion simulations
     # If you're simulating dynamics of collapse or expansion, please do not use it
-
-    a.energyMinimization(stepsPerIteration=10)  # increase to 100 for larger or more complex systems
+    
     # An algorithm to start a simulation
     # Which works only with langevin integrator (but will not throw an error otherwise)
     # Decreases a timestep, and then increases it slowly back to normal
