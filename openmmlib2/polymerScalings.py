@@ -2,7 +2,7 @@
 
 from . import polymerutils
 from . import contactmaps
-from .contactmaps import load, giveContacts
+from .contactmaps import load, calculate_contacts
 import pickle
 from math import sqrt
 import random
@@ -11,7 +11,15 @@ import numpy as np
 from copy import copy
 
 
-def Cp_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
+
+def generate_bins(N, start=4, bins_per_order_magn=10):
+    lstart = np.log(start)
+    lend = np.log(N)
+    num = np.ceil((lend - lstart) * bins_per_order_magn)
+    
+    
+
+def contact_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
                   ring=False, verbose=False):
 
     """
@@ -48,9 +56,12 @@ def Cp_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
 
     N = len(data[0])
     
+    if bins0 is None: 
+        bins0 = generate_bins(N)
+    
     bins0 = np.array(bins0)
     bins = [(bins0[i], bins0[i + 1]) for i in range(len(bins0) - 1)]
-    contacts = np.array(giveContacts(data, cutoff))
+    contacts = np.array(calculate_contacts(data, cutoff))
 
     contacts = contacts[:, 1] - contacts[:, 0]  # contact lengthes
 
@@ -81,7 +92,7 @@ def Cp_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
     return (a, connections)
 
 
-def end_to_end_distance_subchains(data, bins, ring=False):
+def R2_scaling(data, bins, ring=False):
     """
     Returns end-to-end distance scaling of a given polymer conformation.
     ..warning:: This method averages end-to-end scaling over bins to make better average
@@ -111,12 +122,12 @@ def end_to_end_distance_subchains(data, bins, ring=False):
         else:
             rads[i] = np.mean(np.sqrt(np.sum((data[:, :-
                                             length] - data[:, length:]) ** 2, 0)))
-    return (bins, rads)
+    return (np.array(bins), rads)
 
 
 
 
-def giveRgScaling(data, bins=None, ring=False):
+def Rg2_scaling(data, bins=None, ring=False):
     "main working horse for radius of gyration"
     "uses dymanic programming algorithm"
 
@@ -153,7 +164,7 @@ def giveRgScaling(data, bins=None, ring=False):
     rads = [0. for i in range(len(bins))]
     for i in range(len(bins)):
         rads[i] = radius_gyration(int(bins[i]))
-    return (copy(bins), rads)
+    return (np.array(bins), rads)
 
 
 

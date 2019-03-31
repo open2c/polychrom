@@ -52,11 +52,6 @@ a = np.random.random((100, 3)) * 3
 #matplotlib.rcParams.update({'font.size': 8})
 
 
-def giveContactsCKDTree(X, cutoff=1.7):
-    tree = ckdtree.cKDTree(X)
-
-    pairs = tree.query_pairs(cutoff, output_type="ndarray")
-    return pairs
 
 def condensed_to_pair_indices(n, k):
     x = n - (4. * n ** 2 - 4 * n - 8 * k + 1) ** .5 / 2 - .5
@@ -96,48 +91,8 @@ def rad2(data):
     return give_radius_scaling(data)
 
 
-def giveIntContacts(data):
-    """give all contacts of a polymer on a cubic lattice
-    Intersections are not counted as contacts. Sorry :(
 
-    Parameters
-    ----------
-    data : Nx3 or 3xN array of ints
-    """
-
-    data = np.asarray(data, dtype=int)
-
-    if len(data.shape) != 2:
-        raise ValueError("Wrong dimensions of data")
-    if 3 not in data.shape:
-        raise ValueError("Wrong size of data: %s,%s" % data.shape)
-    if data.shape[0] == 3:
-        data = data.T
-
-    data -= np.min(data, axis=0)[None, :]
-
-    M = np.max(data) + 1
-    if M > 1500:
-        raise ValueError("Polymer is to big, can't create bounding box!")
-
-    N = len(data)
-    tocheck = np.zeros(M * M * M, dtype=np.int32) - 1
-    tocheck[data[:, 0] + data[:, 1] * M + data[:, 2] * M *
-            M] = np.arange(N, dtype=np.int32)
-    tocheck.shape = (M, M, M)
-    contacts1 = np.concatenate([tocheck[1:, :, :].ravel(), tocheck[
-                                                           :, 1:, :].ravel(), tocheck[:, :, 1:].ravel()])
-    contacts2 = np.concatenate([tocheck[:-1, :, :].ravel(), tocheck[
-                                                            :, :-1, :].ravel(), tocheck[:, :, :-1].ravel()])
-    mask = (contacts1 != -1) * (contacts2 != -1)
-    contacts1 = contacts1[mask]
-    contacts2 = contacts2[mask]
-    contacts3 = np.minimum(contacts1, contacts2)
-    contacts4 = np.maximum(contacts1, contacts2)
-    return np.concatenate([contacts3[:, None], contacts4[:, None]], 1)
-
-
-def giveContacts(data, cutoff=1.7, method="auto"):
+def calculate_contacts(data, cutoff=1.7, method="auto"):
     """Returns contacts of a single polymer with a given cutoff
 
     .. warning:: Use this only to find contacts of a single polymer chain
@@ -158,11 +113,13 @@ def giveContacts(data, cutoff=1.7, method="auto"):
     """
     if data.shape[1] != 3:
         data = data.T
-    data = np.ascontiguousarray(data, dtype=np.double)
+
     if np.isnan(data).any():
         raise RuntimeError("Data contains NANs")
 
-    return giveContactsCKDTree(data, cutoff)
+    tree = ckdtree.cKDTree(data)
+    pairs = tree.query_pairs(cutoff, output_type="ndarray")
+    return pairs
 
 
 
