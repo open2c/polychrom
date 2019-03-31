@@ -1,14 +1,40 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 
 from . import polymerutils
-from . import contactmaps
-from .contactmaps import load, calculate_contacts
-import pickle
 from math import sqrt
+
 import random
 import numpy as np
+from scipy.spatial import ckdtree
 
-from copy import copy
+
+def calculate_contacts(data, cutoff=1.7, method="auto"):
+    """Returns contacts of a single polymer with a given cutoff
+
+    .. warning:: Use this only to find contacts of a single polymer chain
+    with distance between monomers of 1.
+    Multiple chains will lead to silent bugs.
+
+    Parameters
+    ----------
+    data : Nx3 or 3xN array
+        Polymer configuration. One chaon only.
+    cutoff : float , optional
+        Cutoff distance that defines contact
+
+    Returns
+    -------
+    k by 2 array of contacts. Each row corresponds to a contact.
+    """
+    if data.shape[1] != 3:
+        raise ValueError("Incorrect polymer data shape. Must be Nx3.")
+
+    if np.isnan(data).any():
+        raise RuntimeError("Data contains NANs")
+
+    tree = ckdtree.cKDTree(data)
+    pairs = tree.query_pairs(cutoff, output_type="ndarray")
+    return pairs
 
 
 
@@ -252,4 +278,54 @@ def subchainDensityFunction(filenames, bins, normalize="Rg", maxLength=3, Nbins=
 
     return dict(list(zip(midbins, results)))
 
+                             
+def kabsch_rmsd(P, Q):
+    """
+    Calculates RMSD between two vectors using Kabash alcorithm 
+    Borrowed from https://github.com/charnley/rmsd  with some changes 
+    
+    rmsd is licenced with  a 2-clause BSD licence 
+    
+    Copyright (c) 2013, Jimmy Charnley Kromann <jimmy@charnley.dk> & Lars Bratholm
+    All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are met:
+
+    1. Redistributions of source code must retain the above copyright notice, this
+       list of conditions and the following disclaimer.
+    2. Redistributions in binary form must reproduce the above copyright notice,
+       this list of conditions and the following disclaimer in the documentation
+       and/or other materials provided with the distribution.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+    DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+    ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+    
+    """
+    P = P - np.mean(P, axis=0)
+    Q = Q - np.mean(Q, axis=0)    
+
+    C = np.dot(np.transpose(P), Q)
+
+    V, S, W = np.linalg.svd(C)
+    d = (np.linalg.det(V) * np.linalg.det(W)) < 0.0
+
+    if d:
+        S[-1] = -S[-1]
+        V[:, -1] = -V[:, -1]
+
+    # Create Rotation matrix U
+    U = np.dot(V, W)
+    
+    dist = np.mean((np.dot(P, U) - Q)**2)  * 3
+
+    return dist
 
