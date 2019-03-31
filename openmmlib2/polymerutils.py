@@ -16,12 +16,13 @@ import gzip
 
 import io
 
+
+
 def scanBlocks(folder, assertContinuous=True):
     if not os.path.exists(folder):
         files = []
     else:
-        files = os.listdir(folder)
-        files = [i for i in files if i.startswith("block") and i.endswith("dat")]
+        files = [i for i in os.listdir(folder) if i.startswith("block") and i.endswith("dat")]
         files = sorted(files, key=lambda x: int(x[5:-4]))
 
     keys = np.array([int(i[5:-4]) for i in files])
@@ -38,88 +39,50 @@ def scanBlocks(folder, assertContinuous=True):
 def load(filename, h5dictKey=None):
     """Universal load function for any type of data file"""
    
-
     if not os.path.exists(filename):
         raise IOError("File not found :( \n %s" % filename)
 
-    try:
-        "loading from a joblib file here"
-        mydict = dict(joblib.load(filename))
-        data = mydict.pop("data")
-        return data
+    try: #loading from a joblib file here
+        return dict(joblib.load(filename)).pop("data")
+    except: #checking for a text file
+        data_file = open(filename)
+        line0 = data_file.readline()
+        try:
+            N = int(line0)
+        except (ValueError, UnicodeDecodeError):
+            raise TypeError("Could not read the file. Not text or joblib.")
+        # data = Cload(filename, center=False)
+        data = [list(map(float, i.split())) for i in data_file.readlines()]
 
-    except:
-        pass
-    
-    "checking for a text file"
-    data_file = open(filename)
-    line0 = data_file.readline()
-    try:
-        N = int(line0)
-    except (ValueError, UnicodeDecodeError):
-        raise TypeError("Cannot read text file... reading pickle file")
-    # data = Cload(filename, center=False)
-    data = [list(map(float, i.split())) for i in data_file.readlines()]
-
-    if len(data) != N:
-        raise ValueError("N does not correspond to the number of lines!")
-    return np.array(data)
-
-    
-
-    #try:
-    #    data = loadJson(filename)
-    #    return data["data"]
-    #except:
-    #    print("Could not load json")
-    #    pass
-
-    #h5dict loading deleted
+        if len(data) != N:
+            raise ValueError("N does not correspond to the number of lines!")
+        return np.array(data)
 
 
 
-def save(data, filename, mode="txt", h5dictKey="1", pdbGroups=None):
+def save(data, filename, mode="txt",  pdbGroups=None):
     data = np.asarray(data, dtype=np.float32)
-
-    h5dictKey = str(h5dictKey)
-    mode = mode.lower()
-
-    if mode == "h5dict":
-        from mirnylib.h5dict import h5dict
-        mydict = h5dict(filename, mode="w")
-        mydict[h5dictKey] = data
-        del mydict
+    
+    if mode.lower() == "joblib":                
+        joblib.dump({"data":data}, filename=filename, compress=9)
         return
 
-    elif mode in ["joblib", "json"]:
-        metadata = {}
-        metadata["data"] = data
-        if mode == "joblib":
-            joblib.dump(metadata, filename=filename, compress=9)
-        else:
-
-            with gzip.open(filename, 'wb') as myfile:
-                mystr = json.dumps(metadata,  cls=NumpyEncoder)
-                mybytes = mystr.encode("ascii")
-                myfile.write(mybytes)
-
-        return
-
-    elif mode == "txt":
-        lines = []
-        lines.append(str(len(data)) + "\n")
+    if mode.lower() == "txt":
+        lines = [str(len(data)) + "\n"]
 
         for particle in data:
             lines.append("{0:.3f} {1:.3f} {2:.3f}\n".format(*particle))
         if filename == None:
             return lines
+        
         elif isinstance(filename, six.string_types):
             with open(filename, 'w') as myfile:
                 myfile.writelines(lines)
         elif hasattr(filename, "writelines"):
             filename.writelines(lines)
         else:
-            return lines
+            raise ValueError("Not sure what to do with filename {0}".format(filename))
+                             
 
     elif mode == 'pdb':
         data = data - np.minimum(np.min(data, axis=0), np.zeros(3, float) - 100)[None, :]
@@ -168,6 +131,7 @@ def save(data, filename, mode="txt", h5dictKey="1", pdbGroups=None):
 
     else:
         raise ValueError("Unknown mode : %s, use h5dict, joblib, txt or pdb" % mode)
+                            
 
 
 def rotation_matrix(rotate):
@@ -178,10 +142,6 @@ def rotation_matrix(rotate):
     Rz = np.array([[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]])
     return np.dot(Rx, np.dot(Ry, Rz))
 
-
-def bondLengths(data):
-    bonds = np.diff(data, axis=0)
-    return np.sqrt((bonds ** 2).sum(axis=1))
 
 
 def persistenceLength(data):
@@ -198,7 +158,7 @@ def persistenceLength(data):
 
 def create_spiral(r1, r2, N):
     """
-    Creates a "propagating spiral", often used as a starting conformation.
+    Creates a "propagating spiral", often used as an easy mitotic-like starting conformation.
     Run it with r1=10, r2 = 13, N=5000, and see what it does.
     """
     Pi = 3.141592
@@ -265,7 +225,7 @@ def create_spiral(r1, r2, N):
     add_point(fullcoord(curphi, z))
     while True:
         if finished[0] == True:
-            return np.transpose(points)
+            return np.array(points)
         if forward == True:
             curphi = nextphi(curphi)
             add_point(fullcoord(curphi, z))
@@ -282,13 +242,16 @@ def create_spiral(r1, r2, N):
                 add_point(fullcoord(curphi, z))
 
 
-def create_random_walk(step_size, N, segment_length=1):
-    theta = np.repeat(np.random.uniform(0., 1., N // segment_length + 1),
-                      segment_length)
-    theta = 2.0 * np.pi * theta[:N]
-    u = np.repeat(np.random.uniform(0., 1., N // segment_length + 1),
-                  segment_length)
-    u = 2.0 * u[:N] - 1.0
+def create_random_walk(step_size, N):
+    """
+    Creates a freely joined chain of length N with step step_size 
+    """
+    theta = np.random.uniform(0., 1., N)
+    theta = 2.0 * np.pi * theta
+    
+    u = np.random.uniform(0., 1., N)
+    
+    u = 2.0 * u - 1.0
     x = step_size * np.sqrt(1. - u * u) * numpy.cos(theta)
     y = step_size * np.sqrt(1. - u * u) * numpy.sin(theta)
     z = step_size * u
@@ -296,50 +259,73 @@ def create_random_walk(step_size, N, segment_length=1):
     return np.vstack([x, y, z]).T
 
 
-matlabImported = False
-
-
-
-def grow_rw(step, size, method="line"):
-    """This does not grow a random walk, but the name stuck.
-
-    What it does - it grows a polymer in the middle of the sizeXsizeXsize box.
-    It can start with a small ring in the middle (method="standart"),
-    or it can start with a line ("method=line").
+                             
+def grow_cubic(N, boxSize, method="standard"):
+    """
+    This function grows a ring or linear polymer on a cubic lattice 
+    in the cubic box of size boxSize. 
+    
+    If method=="standard, grows a ring starting with a 4-monomer ring in the middle 
+    
+    if method =="extended", it grows a ring starting with a long ring 
+    going from z=0, center of XY face, to z=boxSize center of XY face, and back. 
+    
     If method="linear", then it grows a linearly organized chain from 0 to size.
+    The chain may stick out of the box by one, (N%2 != boxSize%2), or be flush with the box otherwise
 
-    step has to be less than size^3
+    Parameters
+    ----------
+    N: chain length. Must be even for rings. 
+    boxSize: size of a box where polymer is generated.
+    method: "standard", "linear" or "extended"
+
 
     """
+    if N > boxSize**3:
+        raise ValueError("Steps ahs to be less than size^3")
+    if N > 0.9 * boxSize**3:
+        warnings.warn("N > 0.9 * boxSize**3. It will be slow")                      
+    if (N % 2 != 0) and (method != "linear"):
+        raise ValueError("N has to be multiple of 2 for rings")    
+                                                          
     numpy = np
-    t = size // 2
+    t = boxSize // 2
     if method == "standard":
         a = [(t, t, t), (t, t, t + 1), (t, t + 1, t + 1), (t, t + 1, t)]
-    elif method == "line":
+        
+    elif method == "extended":
         a = []
-        for i in range(1, size):
+        for i in range(1, boxSize):
             a.append((t, t, i))
 
-        for i in range(size - 1, 0, -1):
+        for i in range(boxSize - 1, 0, -1):
             a.append((t, t - 1, i))
+        if len(a) > N:
+            raise ValueError("polymer too short for the box size")
 
     elif method == "linear":
         a = []
-        for i in range(0, size + 1):
+        for i in range(0, boxSize + 1):
             a.append((t, t, i))
-        if (len(a) % 2) != (step % 2):
-            a = a[:-1]
+        if (len(a) % 2) != (N % 2):
+            a = a[1:]        
+        if len(a) > N:
+            raise ValueError("polymer too short for the box size")
 
     else:
-        raise ValueError("select methon from line, standard, linear")
+        raise ValueError("select methon from standard, extended, or linear")
 
-    b = numpy.zeros((size + 1, size + 1, size + 1), int)
+    b = numpy.zeros((boxSize + 2, boxSize + 2, boxSize + 2), int)
     for i in a:
         b[i] = 1
-    for i in range((step - len(a)) // 2):
-        # print len(a)
+        
+    for i in range((N - len(a)) // 2):
         while True:
-            t = numpy.random.randint(0, len(a))
+            if method == "linear":
+                t = numpy.random.randint(0, len(a)-1)
+            else: 
+                t = numpy.random.randint(0, len(a))
+            
             if t != len(a) - 1:
                 c = numpy.abs(numpy.array(a[t]) - numpy.array(a[t + 1]))
                 t0 = numpy.array(a[t])
@@ -362,175 +348,23 @@ def grow_rw(step, size, method="line"):
             t3 = t0 + shiftar
             t4 = t1 + shiftar
             if (b[tuple(t3)] == 0) and (b[tuple(t4)] == 0) and (numpy.min(t3) >= 1) and (numpy.min(t4) >= 1) and (
-                numpy.max(t3) < size) and (numpy.max(t4) < size):
+                numpy.max(t3) < boxSize+1) and (numpy.max(t4) < boxSize+1):
                 a.insert(t + 1, tuple(t3))
                 a.insert(t + 2, tuple(t4))
                 b[tuple(t3)] = 1
                 b[tuple(t4)] = 1
                 break
                 # print a
-    return numpy.array(a)
+    return numpy.array(a) - 1
 
+def grow_rw(step, size, method="line"):
+    raise DeprecationWarning("grow_rw is being renamed to grow_cubic")
+    return grow_cubic(N, boxSize, method="line")
+                         
+                         
+                             
 
-def _test():
-    print("testing save/load")
-    a = np.random.random((20000, 3))
-    save(a, "bla", mode="txt")
-    b = load("bla")
-    print(a)
-    print(b)
-    assert abs(b.mean() - a.mean()) < 0.00001
-
-    save(a, "bla", mode="joblib")
-    b = load("bla")
-    assert abs(b.mean() - a.mean()) < 0.00001
-
-    #save(a, "bla.json", mode="json")
-    #b = loadJson("bla.json")["data"]
-    #assert abs(b.mean() - a.mean()) < 0.00001
-
-
-    #save(a, "bla.json.gz", mode="json")
-    #b = load("bla.json.gz")
-    #assert abs(b.mean() - a.mean()) < 0.00001
-
-    #save(a, "bla.json", mode="json")
-    #b = load("bla.json")
-    #assert abs(b.mean() - a.mean()) < 0.00001
-
-    #save(a, "bla", mode="h5dict")
-    #b = load("bla")
-    #assert abs(b.mean() - a.mean()) < 0.00001
-
-    os.remove("bla")
-    os.remove("bla.json.gz")
-
-    print("Finished testing save/load, successful")
-
-
-def createSpiralRing(N, twist, r=0, offsetPerParticle=np.pi, offset=0):
-    """
-    Creates a ring of length N. Then creates a spiral
-    """
-    from mirnylib import numutils
-    if not numutils.isInteger(N * offsetPerParticle / (2 * np.pi)):
-        print(N * offsetPerParticle / (2 * np.pi))
-        raise ValueError("offsetPerParticle*N should be multitudes of 2*Pi")
-    totalTwist = twist * N
-    totalTwist = np.floor(totalTwist / (2 * np.pi)) * 2 * np.pi
-    alpha = np.linspace(0, 2 * np.pi, N + 1)[:-1]
-    # print alpha
-    twistPerParticle = totalTwist / float(N) + offsetPerParticle
-    R = float(N) / (2 * np.pi)
-    twist = np.cumsum(np.ones(N, dtype=float) * twistPerParticle) + offset
-    # print twist
-    x0 = R + r * np.cos(twist)
-    z = 0 + r * np.sin(twist)
-    x = x0 * np.cos(alpha)
-    y = x0 * np.sin(alpha)
-    return np.array(np.array([x, y, z]).T, order="C")
-
-
-def smooth_conformation(conformation, n_avg):
-    """Smooth a conformation using moving average.
-    """
-    if conformation.shape[0] == 3:
-        conformation = conformation.T
-    new_conformation = np.zeros(shape=conformation.shape)
-    N = conformation.shape[0]
-
-    for i in range(N):
-        if i < n_avg:
-            new_conformation[i] = conformation[:i + n_avg].mean(axis=0)
-        elif i >= N - n_avg:
-            new_conformation[i] = conformation[-(N - i + n_avg):].mean(axis=0)
-        else:
-            new_conformation[i] = conformation[i - n_avg:i + n_avg].mean(axis=0)
-    return new_conformation
-
-
-
-
-def getCloudGeometry(d, frac=0.05, numSegments=1, widthPercentile=50, delta=0):
-    """Trace the centerline of an extended cloud of points and determine
-    its length and width.
-
-    The function switches to the principal axes of the cloud (e1,e2,e3)
-    and applies LOWESS to define the centerline as (x2,x3)=f(x1).
-    The length is then determined as the total length of the centerline.
-    The width is determined as the median shortest distance from the points of
-    clouds to the centerline.
-    On top of that, the cloud can be chopped into `numSegments` in the order
-    of data entries in `d`. The centerline is then determined independently for
-    each segment.
-
-    Parameters
-    ----------
-
-    d : np.array, 3xN
-        an array of coordinates
-
-    frac : float
-        The fraction of all points used to determine the local position and
-        slope of the centerline in LOWESS.
-
-    numSegments : int
-        The number of segments to split `d` into. The centerline in fit
-        independently for each data segment.
-
-    widthPercentile : float
-        The width is determined at `widthPercentile` of shortest distances
-        from the points to the centerline. The default value is 50, i.e. the
-        width is the median distance to the centerline.
-
-    delta : float
-        The parameter of LOWESS. According to the documentation:
-        "delta can be used to save computations. For each x_i, regressions are
-        skipped for points closer than delta. The next regression is fit for the
-        farthest point within delta of x_i and all points in between are
-        estimated by linearly interpolating between the two regression fits."
-
-    Return
-    ------
-
-        (length, width) : (float, float)
-
-    """
-
-    import statsmodels
-    import statsmodels.nonparametric
-    import statsmodels.nonparametric.smoothers_lowess
-    from mirnylib import numutils
-
-    dists = []
-    length = 0.0
-    for segm in range(numSegments):
-        segmd = d[segm * (d.shape[0] // numSegments): (segm + 1) * (d.shape[0] // numSegments)]
-        (e1, e2), _ = numutils.PCA(segmd, 2)
-        e3 = np.cross(e1, e2)
-        xs = np.dot(segmd, e1)
-        ys = np.vstack([np.dot(segmd, e2), np.dot(segmd, e3)])
-        ys_pred = np.vstack([
-            statsmodels.nonparametric.smoothers_lowess.lowess(
-                    ys[0], xs, frac=frac, return_sorted=False, delta=10),
-            statsmodels.nonparametric.smoothers_lowess.lowess(
-                    ys[1], xs, frac=frac, return_sorted=False,
-                    delta=10)])
-        order = np.argsort(xs)
-        fit_d = np.vstack([xs[order],
-                           ys_pred[0][order],
-                           ys_pred[1][order]]).T
-
-        for i in range(len(xs)):
-            dists.append(
-                    (((fit_d - np.array([xs[i], ys[0][i], ys[1][i]])) ** 2).sum(axis=1) ** 0.5).min())
-
-        length += (((fit_d[1:] - fit_d[:-1]) ** 2).sum(axis=1) ** 0.5).sum()
-    width = np.percentile(dists, widthPercentile)
-
-    return length, width
-
-
+                             
 def kabsch(P, Q):
     """
     Calculates RMSD between two vectors using Kabash alcorithm 
@@ -580,5 +414,3 @@ def kabsch(P, Q):
     dist = np.sqrt(np.mean((np.dot(P, U) - Q)**2)  * 3)
 
     return dist
-
-

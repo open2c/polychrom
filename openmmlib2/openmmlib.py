@@ -274,9 +274,7 @@ class Simulation():
         """
 
         self.step = 0
-        if PBC == True:
-            self.metadata["PBC"] = True
-
+        
         precision = precision.lower()
         if precision not in ["mixed", "single", "double"]:
             raise ValueError("Presision must be mixed, single or double")
@@ -309,8 +307,7 @@ class Simulation():
             else:
                 PBCbox = np.array(PBCbox)
                 datasize = PBCbox
-
-            self.metadata["PBCbox"] = PBCbox
+            
             self.system.setDefaultPeriodicBoxVectors([datasize[0], 0.,
                 0.], [0., datasize[1], 0.], [0., 0., datasize[2]])
             self.BoxSizeReal = datasize
