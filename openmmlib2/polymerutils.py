@@ -144,18 +144,6 @@ def rotation_matrix(rotate):
 
 
 
-def persistenceLength(data):
-    bonds = np.diff(data, axis=0)
-    lens = np.sqrt((bonds ** 2).sum(axis=1))
-    bondCosines = np.dot(bonds, bonds.T) / lens[:, None] / lens[:, None].T
-    avgCosines = np.array([np.diag(bondCosines, i).mean() for i in range(lens.size)])
-    truncCosines = avgCosines[:np.where(avgCosines < 1.0 / np.e / np.e)[0][0]]
-    slope, intercept, _, _, _ = scipy.stats.linregress(
-            list(range(truncCosines.size)), np.log(truncCosines))
-    return -1.0 / slope
-
-
-
 def create_spiral(r1, r2, N):
     """
     Creates a "propagating spiral", often used as an easy mitotic-like starting conformation.

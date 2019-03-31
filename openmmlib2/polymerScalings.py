@@ -11,8 +11,8 @@ import numpy as np
 from copy import copy
 
 
-def giveCpScaling(data, bins0, cutoff=1.1, integrate=False,
-                  ring=False, intContacts=False, verbose=False):
+def Cp_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
+                  ring=False, verbose=False):
 
     """
     Returns contact probability scaling for a given polymer conformation
@@ -37,7 +37,7 @@ def giveCpScaling(data, bins0, cutoff=1.1, integrate=False,
 
     Returns
     -------
-    (bins, contact probabilities) where "bins" are centers of bins in the input bins0 array.
+    (mids, contact probabilities) where "mids" are centers of bins in the input bins0 array in logspace.
 
     """
 
@@ -47,21 +47,17 @@ def giveCpScaling(data, bins0, cutoff=1.1, integrate=False,
         raise ValueError("Wrong data shape")
 
     N = len(data[0])
-
+    
     bins0 = np.array(bins0)
     bins = [(bins0[i], bins0[i + 1]) for i in range(len(bins0) - 1)]
-    if intContacts == False:
-        contacts = np.array(giveContacts(data, cutoff))
-
-    else:
-        contacts = contactmaps.giveIntContacts(
-            data)  # integer contacts are faster
+    contacts = np.array(giveContacts(data, cutoff))
 
     contacts = contacts[:, 1] - contacts[:, 0]  # contact lengthes
 
     if ring == True:
         mask = contacts > N // 2
         contacts[mask] = N - contacts[mask]
+        
     scontacts = np.sort(contacts)  # sorted contact lengthes
     connections = 1. * np.diff(np.searchsorted(
         scontacts, bins0, side="left"))  # binned contact lengthes
@@ -85,7 +81,7 @@ def giveCpScaling(data, bins0, cutoff=1.1, integrate=False,
     return (a, connections)
 
 
-def giveEndToEndScaling(data, bins, ring=False):
+def end_to_end_distance_subchains(data, bins, ring=False):
     """
     Returns end-to-end distance scaling of a given polymer conformation.
     ..warning:: This method averages end-to-end scaling over bins to make better average
@@ -117,41 +113,6 @@ def giveEndToEndScaling(data, bins, ring=False):
                                             length] - data[:, length:]) ** 2, 0)))
     return (bins, rads)
 
-
-def give_distance(data, bins=None, ring=False):
-    """
-    Returns end-to-end distance scaling of a given polymer conformation.
-    ..warning:: This method averages end-to-end scaling over bins to make better average
-
-    Parameters
-    ----------
-
-    data: 3xN array
-
-    """
-    N = len(data[0])
-    if ring == True:
-        data = np.concatenate([data, data], axis=1)
-    bins = [(bins[i], bins[i + 1]) for i in range(len(bins) - 1)]
-
-    rads = [0. for i in range(len(bins))]
-    for i in range(len(bins)):
-        oneBin = bins[i]
-        rad = 0.
-        count = 0
-        for j in range(oneBin[0], oneBin[1], (oneBin[1] - oneBin[0]) // 10 + 1):
-            length = j
-            if ring == True:
-                rad += np.mean(np.sqrt(np.sum((data[:, :N]
-                                               - data[:, length:length + N]) ** 2, 0)))
-            else:
-                rad += np.mean(np.sqrt(np.sum((data[:, :-
-                                                    length] - data[:, length:]) ** 2, 0)))
-            count += 1
-
-        rads[i] = rad / count
-    bins = [sqrt(i[0] * i[1]) for i in bins]
-    return (bins, rads)
 
 
 
@@ -194,13 +155,6 @@ def giveRgScaling(data, bins=None, ring=False):
         rads[i] = radius_gyration(int(bins[i]))
     return (copy(bins), rads)
 
-
-def give_radius_scaling(data, bins=None, ring=False):
-    "main working horse for radius of gyration"
-    "uses dymanic programming algorithm"
-    "This function is here just for backwards compatibility, with auto-assigned bins" 
-    bins = [int(sqrt(bins[i] * bins[i + 1])) for i in range(len(bins) - 1)]
-    return giveRgScaling(data, bins, ring)
 
 
 def subchainDensityFunction(filenames, bins, normalize="Rg", maxLength=3, Nbins=30, coverage=1., centerAt="mid", **kwargs):
