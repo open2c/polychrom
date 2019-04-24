@@ -281,6 +281,110 @@ def subchainDensityFunction(filenames, bins, normalize="Rg", maxLength=3, Nbins=
 
     return dict(list(zip(midbins, results)))
 
+def ndarray_groupby_aggregate(df, ndarray_cols, aggregate_cols, value_cols=[], 
+                              sample_cols=[], preset="sum",
+                               ndarray_agg = lambda x:np.sum(x, axis=0), value_agg = lambda x:x.sum()):
+    
+    """
+    A version of pd.groupby that is aware of numpy arrays as values of columns 
+    
+    It aggregates columns ndarray_cols using ndarray_agg aggregator
+    It aggregates value_cols using value_agg aggregator
+    It takes the first element in sample_cols
+    and aggregates over aggregate_cols 
+    
+    It has presets for sum, mean and nanmean. 
+    """
+
+    if preset == "sum":
+        ndarray_agg = lambda x:np.sum(x, axis=0)
+        value_agg = lambda x:x.sum()
+    elif preset == "mean":
+        ndarray_agg = lambda x:np.mean(x, axis=0)
+        value_agg = lambda x:x.mean()
+    elif preset == "nanmean":
+        ndarray_agg = lambda x:np.nanmean(x, axis=0)
+        value_agg = lambda x:x.mean()        
+    
+    def combine_values(in_df):        
+        "splits into ndarrays, 'normal' values, and samples; performs aggregation, and returns a Series"
+        average_arrs = pd.Series(index=ndarray_cols, 
+                data=[ndarray_agg([np.asarray(j) for j in in_df[i].values]) for i in ndarray_cols])
+        average_values = value_agg(in_df[value_cols])
+        sample_values = in_df[sample_cols].iloc[0]
+        agg_series = pd.concat([average_arrs, average_values, sample_values])        
+        return agg_series
+    
+    return  df.groupby(aggregate_cols).apply(combine_values)
+    
+
+    
+def streaming_ndarray_agg(in_stream,  ndarray_cols, aggregate_cols, value_cols=[],  sample_cols=[], 
+                  chunksize=30000, add_count_col=False, divide_by_count=False):
+    
+    """
+    Takes in_stream of dataframes
+    
+    Applies ndarray-aware groupby-sum or groupby-mean: treats ndarray_cols as numpy arrays, 
+    value_cols as normal values, for sample_cols takes the first element. 
+    
+    Does groupby over aggregate_cols 
+    
+    if add_count_col is True, adds column "count", if it's a string - adds column with add_count_col name     
+
+    if divide_by_counts is True, divides result by column "count". 
+    If it's a string, divides by divide_by_count column
+    
+    
+    """
+    value_cols_orig = [i for i in value_cols]
+    ndarray_cols, value_cols = list(ndarray_cols), list(value_cols)
+    aggregate_cols, sample_cols = list(aggregate_cols), list(sample_cols)
+    if add_count_col is not False:
+        if add_count_col is True:
+            add_count_col = "count"
+        value_cols.append(add_count_col)
+
+    
+    def agg_one(dfs, aggregate):
+        """takes a list of DataFrames and old aggregate
+        performs groupby and aggregation  and returns new aggregate"""
+        if add_count_col is not False:
+            for i in dfs:
+                i[add_count_col] = 1
+                
+        df = pd.concat(dfs + ([aggregate] if aggregate is not None else []) , sort=False)             
+        aggregate = ndarray_groupby_aggregate(df, ndarray_cols=ndarray_cols, aggregate_cols=aggregate_cols,
+                                    value_cols=value_cols,  sample_cols=sample_cols, preset="sum")                
+        return aggregate.reset_index()
+    
+    aggregate = None
+    cur = []
+    count = 0 
+    for i in in_stream:
+        cur.append(i)
+        count += len(i)
+        if count > chunksize:
+            aggregate = agg_one(cur, aggregate)
+            cur = []
+            count = 0 
+    if len(cur) > 0:
+        aggregate = agg_one(cur, aggregate)
+        
+    if divide_by_count is not False:
+        if divide_by_count is True:
+            divide_by_count = "count"
+        for i in ndarray_cols + value_cols_orig:
+            aggregate[i] = aggregate[i] / aggregate[divide_by_count]
+    
+    return aggregate
+
+
+
+
+
+            
+
                              
 def kabsch_rmsd(P, Q):
     """
