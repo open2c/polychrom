@@ -1,144 +1,3 @@
-"""
-Openmm-lib - a wrapper around Openmm to use with polymer simulations
-====================================================================
-
-Summary
--------
-
-This is a wrapper above a GPU-assisted molecular dynamics package Openmm.
-
-You can find extensive description of openmm classes here:
-https://simtk.org/api_docs/openmm/api10/annotated.html
-
-The main library is located in openmmlib.Simulation
-
-A file polymerScalings.py has some utilities to calculate Rg(s) and Pc(s) for
-polymer conformations in a fast and efficient way.
-
-A file contactmaps.py has code to quickly calculate contacts within a polymer structure,
-and organize them as contactmaps. It is used by polymerScalings.
-
-A file pymol_show has utilities to visualize polymer conformations using pymol
-
-
-Input/Output file format
-------------------------
-
-Polymer configuration is represented as a Nx3 numpy array of coordinates.
-Start/end of chains/rings are not directly specified in the file,
-and have to be added through method :py:func:`setLayout <Simulation.setLayout>`
-
-Input file may have the simplistic format, described in txtToJoblib.py (first line with
-number of particles, then N lines with three floats corresponding to x,y,z coordinates each).
-Input file can also be any of the output files.
-
-Output file format is a dictionary, saved with joblib.dump.
-Nx3 data array is stored under the key "data".
-The rest of the dictionary consists of metadata, describing details of the simulation.
-This metadata is for informative purpose only, and is ignored by the code.
-
-
-Implemented forces
-------------------
-
-All forces of the system are added by the code to the self.ForceDict dictionary.
-After the force is added, the class (or user) can get it out of the
-self.ForceDict and modify the force.
-Once the simulation is started, all forces are automatically applied
-and cannot be modified.
-
-Two types of bond forces are harmonic bond force
-and FENE-type bond as described in Grosberg papers.
-Individual bonds can be added using :py:func:`addBond <Simulation.addBond>`,
-while polymer bonds can be added using
-:py:func:`addHarmonicPolymerBonds <Simulation.addHarmonicPolymerBonds>`, etc.
-
-Write about polynomial repulsive forces 
-
-Stiffness force can be harmonic, or the "special" Grosberg force, kept
-for compatibility with the systems used in Grosberg forces
-
-External forces include spherical confinement, cylindrical confinement,
-attraction to "lamina"- surface of a cylinder, gravity, etc.
-
-Information, printed on current step
-------------------------------------
-
-A sample line of information printed on each step looks like this:
-
-minim  bl=5 (i)  pos[1]=[99.2 52.1 52.4] dr=0.54
-kin=3.65 pot=3.44 Rg=107.312 SPS=144:
-
-Let's go over it step by step.
-
-minim - simulation name (sim -default, minim - energy minimization.
-Other name can be provided in self.name).
-
-bl=5 - name of a current block
-
-(i) indicate that velocity reinitialization was done at this step.
-You will simultaneously see that Ek is more than 2.4
-
-pos[1] is a position of a first monomer
-
-dr is sqrt(mean square displacement) of monomers, i.e.
-how much did a monomer shift on average.
-
-kin=3.65 pot=3.44  - energies: kinetic, potential
-
-Rg=107.312 - current radius of gyration (size of the system)
-
-SPS - steps per second
-
-
-Functions
----------
-Functions depend on each other, and have to be applied in certain groups
-
-1.
-
-
-:py:func:`load <Simulation.load>`  ---    Mandatory
-
-:py:func:`setup <Simulation.setup>`  ---   Mandatory
-
-:py:func:`setLayout <Simulation.setLayout>` --- Mandatory, after self.load()
-
-:py:func:`saveFolder <Simulation.saveFolder>`  ---  Optional
-(default is folder with the code)
-
-2.
-
-self.add___Force()  --- Use any set of forces
-
-Then go all the addBond, and other modifications and tweaks of forces.
-
-3.
-
-Before running actual simulation, it is advised to resolve all possible
-conflict by doing :py:func:`energyMinimization <Simulation.energyMinimization>`
-
-4.
-
-
-:py:func:`doBlock <Simulation.doBlock>`  --- the actual simulation
-
-:py:func:`save <Simulation.save>` --- saves conformation
-
-
-Frequently-used settings - where to specify them?
--------------------------------------------------
-
-Select GPU ("0" or "1") - :py:func:`setup <Simulation.setup>`
-
-Select chain/ring - :py:func:`setLayout <Simulation.setLayout>`
-
-Select timestep or collision rate - :py:class:`Simulation`
-
-
--------------------------------------------------------------------------------
-
-"""
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license.php
 
@@ -171,10 +30,7 @@ class Simulation():
     """Base class for openmm simulations
 
     """
-    def __init__(
-        self, 
-        **kwargs): 
-        ):  # name to print out
+    def __init__(self,  **kwargs): 
         """
 
         Parameters
@@ -248,7 +104,7 @@ class Simulation():
         defaultArgs = {"platform":"CUDA", 
                        "GPU":"0",
                        "integrator":"variablelangevin", 
-                       "temperature":300,
+                       "temperature":300 * units.kelvin,
                        "PBC":False,
                         "length_scale":1.0,
                         "mass_scale":1.0, 
@@ -256,7 +112,8 @@ class Simulation():
                         "precision":"mixed", 
                         "verbose":False, 
                         "name":"sim"}
-        kwargs = defaultArgs.update(kwargs)
+        defaultArgs.update(kwargs)
+        kwargs = defaultArgs
 
         platform = kwargs["platform"]
         self.GPU = kwargs["GPU"]  # setting default GPU
@@ -269,39 +126,37 @@ class Simulation():
         self.properties = properties
 
         if platform.lower() == "opencl":
-            platformObject = self.mm.Platform.getPlatformByName('OpenCL')
+            platformObject = openmm.Platform.getPlatformByName('OpenCL')
         elif platform.lower() == "reference":
-            platformObject = self.mm.Platform.getPlatformByName('Reference')
+            platformObject = openmm.Platform.getPlatformByName('Reference')
         elif platform.lower() == "cuda":
-            platformObject = self.mm.Platform.getPlatformByName('CUDA')
+            platformObject = openmm.Platform.getPlatformByName('CUDA')
         elif platform.lower() == "cpu":
-            platformObject = self.mm.Platform.getPlatformByName('CPU')
+            platformObject = openmm.Platform.getPlatformByName('CPU')
         else:
             raise RuntimeError("Undefined platform: {0}".format(platform))
         self.platform = platformObject
         
-        self.integrator_type = kwargs["integrator"]
         self.temperature = kwargs["temperature"]
 
-        self.timestep = timestep * fs
-        self.collisionRate = thermostat * (1 / ps)
+        self.collisionRate = kwargs["collision_rate"] * (1 / ps)
 
-        
-        if isinstance(integrator, string_types):
-            integrator = str(integrator)
-            if integrator.lower() == "langevin":
-                self.integrator = self.mm.LangevinIntegrator(self.temperature,
+        self.integrator_type = kwargs["integrator"]                
+        if isinstance(self.integrator_type, string_types):
+            self.integrator_type = str(self.integrator_type)
+            if self.integrator_type.lower() == "langevin":
+                self.integrator = openmm.LangevinIntegrator(self.temperature,
                     kwargs["collision_rate"] * (1 / ps), kwargs["timestep"]* fs)
-            elif integrator.lower() == "variablelangevin":
-                self.integrator = self.mm.VariableLangevinIntegrator(self.temperature),
+            elif self.integrator_type.lower() == "variablelangevin":
+                self.integrator = openmm.VariableLangevinIntegrator(self.temperature,
                     kwargs["collision_rate"] * (1 / ps), kwargs["error_tol"])
-            elif integrator.lower() == "verlet":
-                self.integrator = self.mm.VariableVerletIntegrator(kwargs["timestep"]* fs)
-            elif integrator.lower() == "variableverlet":
-                self.integrator = self.mm.VariableVerletIntegrator(kwargs["error_tol"])
+            elif self.integrator_type.lower() == "verlet":
+                self.integrator = openmm.VariableVerletIntegrator(kwargs["timestep"]* fs)
+            elif self.integrator_type.lower() == "variableverlet":
+                self.integrator = openmm.VariableVerletIntegrator(kwargs["error_tol"])
 
-            elif integrator.lower() == 'brownian':
-                self.integrator = self.mm.BrownianIntegrator(self.temperature,
+            elif self.integrator_type.lower() == 'brownian':
+                self.integrator = openmm.BrownianIntegrator(self.temperature,
                    kwarg["collision_rate"] * (1 / ps), kwargs["timestep"])
             else:
                 print ('please select from "langevin", "variablelangevin", '
@@ -309,14 +164,14 @@ class Simulation():
                        '"brownian" or provide an integrator object')
                 self.integrator = integrator
         else:
-            self.integrator = integrator
+            self.integrator = self.integrator_type
             self.integrator_type = "UserDefined"
             kwargs["integrator"] = "user_defined"
         
         self.name = kwargs["name"]
         self.verbose = kwargs["verbose"]
-        self.temperature = temperature
-        self.verbose = verbose
+        self.temperature = kwargs["temperature"]
+        self.verbose = kwargs["verbose"]
         self.loaded = False  # check if the data is loaded
         self.forcesApplied = False
         self.folder = "."
@@ -334,10 +189,9 @@ class Simulation():
         # All masses are the same,
         # unless individual mass multipliers are specified in self.load()
         self.bondsForException = []
-        self.mm = openmm
         self.conlen = 1. * nm * self.length_scale
-        self.system = self.mm.System()
-        self.PBC = PBC
+        self.system = openmm.System()
+        self.PBC = kwargs["PBC"]
 
         if self.PBC == True:  # if periodic boundary conditions
             PBCbox = np.array(kwargs["PBCbox"])            
@@ -496,8 +350,6 @@ class Simulation():
 
         if mode == "joblib":
             self.metadata["data"] = self.getData()
-            self.metadata["timestep"] = repr(self.timestep / fs)
-            self.metadata["Collision rate"] = repr(self.collisionRate / ps)
             joblib.dump(self.metadata, filename=filename, compress=3)
 
         elif (mode == "txt") :
@@ -583,540 +435,10 @@ class Simulation():
         return np.sqrt(sum(dif ** 2))
 
 
-    def _initHarmonicBondForce(self):
-        "Internal, inits harmonic forse for polymer and non-polymer bonds"
-        if "HarmonicBondForce" not in list(self.forceDict.keys()):
-            self.forceDict["HarmonicBondForce"] = self.mm.HarmonicBondForce()
-        self.bondType = "Harmonic"
-
-
-    def _initAbsBondForce(self):
-        "inits abs(x) FENE bond force"
-        if "AbsBondForce" not in list(self.forceDict.keys()):
-            force = "(1. / ABSwiggle) * ABSunivK * "\
-            "(sqrt((r-ABSr0 * ABSconlen)* "\
-            " (r - ABSr0 * ABSconlen) + ABSa * ABSa) - ABSa)"
-
-            bondforceAbs = self.mm.CustomBondForce(force)
-            bondforceAbs.addPerBondParameter("ABSwiggle")
-            bondforceAbs.addPerBondParameter("ABSr0")
-            bondforceAbs.addGlobalParameter("ABSunivK", self.kT / self.conlen)
-            bondforceAbs.addGlobalParameter("ABSa", 0.02 * self.conlen)
-            bondforceAbs.addGlobalParameter("ABSconlen", self.conlen)
-            self.forceDict["AbsBondForce"] = bondforceAbs
-
-
-
-    def addBond(self,
-                i, j,  # particles connected by bond
-                bondWiggleDistance=0.2,
-                # Flexibility of the bond,
-                # measured in distance at which energy equals kT
-                distance=None,  # Equilibrium length of the bond, default = self.length_scale
-                bondType=None,  # Harmonic, Grosberg, ABS
-                verbose=None):  # Set this to False or True to override self.verbose for this function
-                # and don't want to contaminate output by 10000 messages
-        """Adds bond between two particles, allows to specify parameters
-
-        Parameters
-        ----------
-
-        i,j : int
-            Particle numbers
-
-        bondWiggleDistance : float
-            Average displacement from the equilibrium bond distance
-
-        bondType : "Harmonic" or "abs"
-            Type of bond. Distance and bondWiggleDistance can be
-            specified for harmonic bonds only
-
-        verbose : bool
-            Set this to False if you're in verbose mode and don't want to
-            print "bond added" message
-
-        """
-
-        if not hasattr(self, "bondLengths"):
-            self.bondLengths = []
-
-        if verbose is None:
-            verbose = self.verbose
-        if (i >= self.N) or (j >= self.N):
-            raise ValueError("\nCannot add bond with monomers %d,%d that"\
-            "are beyound the polymer length %d" % (i, j, self.N))
-        
-        bondSize = float(bondWiggleDistance)
-        
-        if distance is None:
-            distance = self.length_scale
-        else:
-            distance = self.length_scale * distance
-        distance = float(distance)
-
-        if not hasattr(self, "kbondScalingFactor"):  # caching kbondScalingFactor - performance improvement... 
-            self.kbondScalingFactor = float((2 * self.kT / (self.conlen) ** 2) / (units.kilojoule_per_mole / nm ** 2))
-        kbondScalingFactor = self.kbondScalingFactor  #... not to calculate it eevry time we add bond 
-        # this will be an integer, so we don't have to deal with slow simtk.units every time we add a bond 
-
-        if bondType is None:
-            bondType = self.bondType
-
-        if bondType.lower() == "harmonic":
-            self._initHarmonicBondForce()
-            kbond = kbondScalingFactor / (bondSize ** 2)  # using kbondScalingFactor because force accepts parameters with units
-            self.forceDict["HarmonicBondForce"].addBond(int(i), int(j), float(distance), float(kbond))
-            self.bondLengths.append([int(i), int(j), float(distance), float(bondSize)])
-        elif bondType.lower() == "abs":
-            self._initAbsBondForce()
-            self.forceDict["AbsBondForce"].addBond(int(i), int(
-                j), [float(bondWiggleDistance), float(distance)])  # force is initialized to accept floats already
-            self.bondLengths.append([int(i), int(j), float(distance), float(bondSize)])
-        else:
-            self._exitProgram("Bond type not known")
-        if verbose == True:
-            print("%s bond added between %d,%d, wiggle %lf dist %lf" % (
-                bondType, i, j, float(bondWiggleDistance), float(distance)))
-
-    def addHarmonicPolymerBonds(self,
-                                wiggleDist=0.05,
-                                bondLength=1.0,
-                                exceptBonds=True):
-        """Adds harmonic bonds connecting polymer chains
-
-        Parameters
-        ----------
-
-        wiggleDist : float
-            Average displacement from the equilibrium bond distance
-        bondLength : float
-            The length of the bond
-        exceptBonds : bool
-            If True then do not calculate non-bonded forces between the
-            particles connected by a bond. True by default.
-        """
-
-
-        for start, end, isRing in self.chains:
-            for j in range(start, end - 1):
-                self.addBond(j, j + 1, wiggleDist,
-                    distance=bondLength,
-                    bondType="Harmonic", verbose=False)
-                if exceptBonds:
-                    self.bondsForException.append((j, j + 1))
-
-            if isRing:
-                self.addBond(start, end - 1, wiggleDist,
-                    distance=bondLength, bondType="Harmonic")
-                if exceptBonds:
-                    self.bondsForException.append((start, end - 1))
-                if self.verbose == True:
-                    print("ring bond added", start, end - 1)
-
-        self.metadata["HarmonicPolymerBonds"] = repr(
-            {"wiggleDist": wiggleDist, 'bondLength':bondLength})
-
-
-    def addStiffness(self, k=1.5):
-        """Adds harmonic angle bonds. k specifies energy in kT at one radian
-        If k is an array, it has to be of the length N.
-        Xth value then specifies stiffness of the angle centered at
-        monomer number X.
-        Values for ends of the chain will be simply ignored.
-
-        Parameters
-        ----------
-
-        k : float or list of length N
-            Stiffness of the bond.
-            If list, then determines stiffness of the bond at monomer i.
-            Potential is k * alpha^2 * 0.5 * kT
-        """
-        try:
-            k[0]
-        except:
-            k = np.zeros(self.N, float) + k
-        stiffForce = self.mm.CustomAngleForce(
-            "kT*angK * (theta - 3.141592) * (theta - 3.141592) * (0.5)")
-        self.forceDict["AngleForce"] = stiffForce
-        for start, end, isRing in self.chains:
-            for j in range(start + 1, end - 1):
-                stiffForce.addAngle(j - 1, j, j + 1, [float(k[j])])
-            if isRing:
-                stiffForce.addAngle(int(end - 2),int( end - 1), int(start), [float(k[end - 1])  ])
-                stiffForce.addAngle(int(end - 1),int( start), int(start + 1), [float(k[start])  ])
-
-        stiffForce.addGlobalParameter("kT", self.kT)
-        stiffForce.addPerAngleParameter("angK")
-        self.metadata["AngleForce"] = repr({"stiffness": k})
-
-
-
-    def addPolynomialRepulsiveForce(self, trunc=3.0, radiusMult=1.):
-        """This is a simple polynomial repulsive potential. It has the value
-        of `trunc` at zero, stays flat until 0.6-0.7 and then drops to zero
-        together with its first derivative at r=1.0.
-
-        Parameters
-        ----------
-
-        trunc : float
-            the energy value around r=0
-
-        """
-        radius = self.conlen * radiusMult
-        self.metadata["PolynomialRepulsiveForce"] = repr({"trunc": trunc})
-        nbCutOffDist = radius
-        repul_energy = (
-            "rsc12 * (rsc2 - 1.0) * REPe / REPemin + REPe;"
-            "rsc12 = rsc4 * rsc4 * rsc4;"
-            "rsc4 = rsc2 * rsc2;"
-            "rsc2 = rsc * rsc;"
-            "rsc = r / REPsigma * REPrmin;")
-        self.forceDict["Nonbonded"] = self.mm.CustomNonbondedForce(
-            repul_energy)
-        repulforceGr = self.forceDict["Nonbonded"]
-
-        repulforceGr.addGlobalParameter('REPe', trunc * self.kT)
-        repulforceGr.addGlobalParameter('REPsigma', radius)
-        # Coefficients for x^8*(x*x-1)
-        # repulforceGr.addGlobalParameter('REPemin', 256.0 / 3125.0)
-        # repulforceGr.addGlobalParameter('REPrmin', 2.0 / np.sqrt(5.0))
-        # Coefficients for x^12*(x*x-1)
-        repulforceGr.addGlobalParameter('REPemin', 46656.0 / 823543.0)
-        repulforceGr.addGlobalParameter('REPrmin', np.sqrt(6.0 / 7.0))
-        for _ in range(self.N):
-            repulforceGr.addParticle(())
-
-        repulforceGr.setCutoffDistance(nbCutOffDist)
-
-    def addSmoothSquareWellForce(self,
-        repulsionEnergy=3.0, repulsionRadius=1.,
-        attractionEnergy=0.5, attractionRadius=2.0,
-        ):
-        """
-        This is a simple and fast polynomial force that looks like a smoothed
-        version of the square-well potential. The energy equals `repulsionEnergy`
-        around r=0, stays flat until 0.6-0.7, then drops to zero together
-        with its first derivative at r=1.0. After that it drop down to
-        `attractionEnergy` and gets back to zero at r=`attractionRadius`.
-
-        The energy function is based on polynomials of 12th power. Both the
-        function and its first derivative is continuous everywhere within its
-        domain and they both get to zero at the boundary.
-
-        Parameters
-        ----------
-
-        repulsionEnergy: float
-            the heigth of the repulsive part of the potential.
-            E(0) = `repulsionEnergy`
-        repulsionRadius: float
-            the radius of the repulsive part of the potential.
-            E(`repulsionRadius`) = 0,
-            E'(`repulsionRadius`) = 0
-        attractionEnergy: float
-            the depth of the attractive part of the potential.
-            E(`repulsionRadius`/2 + `attractionRadius`/2) = `attractionEnergy`
-        attractionEnergy: float
-            the maximal range of the attractive part of the potential.
-
-        """
-        nbCutOffDist = self.conlen * attractionRadius
-        self.metadata["PolynomialAttractiveForce"] = repr({"trunc": repulsionEnergy})
-        energy = (
-            "step(REPsigma - r) * Erep + step(r - REPsigma) * Eattr;"
-            ""
-            "Erep = rsc12 * (rsc2 - 1.0) * REPe / emin12 + REPe;"
-            "rsc12 = rsc4 * rsc4 * rsc4;"
-            "rsc4 = rsc2 * rsc2;"
-            "rsc2 = rsc * rsc;"
-            "rsc = r / REPsigma * rmin12;"
-            ""
-            "Eattr = - rshft12 * (rshft2 - 1.0) * ATTRe / emin12 - ATTRe;"
-            "rshft12 = rshft4 * rshft4 * rshft4;"
-            "rshft4 = rshft2 * rshft2;"
-            "rshft2 = rshft * rshft;"
-            "rshft = (r - REPsigma - ATTRdelta) / ATTRdelta * rmin12"
-
-            )
-        self.forceDict["Nonbonded"] = self.mm.CustomNonbondedForce(
-            energy)
-        repulforceGr = self.forceDict["Nonbonded"]
-
-        repulforceGr.addGlobalParameter('REPe', repulsionEnergy * self.kT)
-        repulforceGr.addGlobalParameter('REPsigma', repulsionRadius * self.conlen)
-
-        repulforceGr.addGlobalParameter('ATTRe', attractionEnergy * self.kT)
-        repulforceGr.addGlobalParameter('ATTRdelta',
-            self.conlen * (attractionRadius - repulsionRadius) / 2.0)
-        # Coefficients for the minimum of x^12*(x*x-1)
-        repulforceGr.addGlobalParameter('emin12', 46656.0 / 823543.0)
-        repulforceGr.addGlobalParameter('rmin12', np.sqrt(6.0 / 7.0))
-
-        for _ in range(self.N):
-            repulforceGr.addParticle(())
-
-        repulforceGr.setCutoffDistance(nbCutOffDist)
-
-    def addSelectiveSSWForce(self,
-        stickyParticlesIdxs,
-        extraHardParticlesIdxs,
-        repulsionEnergy=3.0,
-        repulsionRadius=1.,
-        attractionEnergy=3.0,
-        attractionRadius=1.5,
-        selectiveRepulsionEnergy=20.0,
-        selectiveAttractionEnergy=1.0):
-        """
-        This is a simple and fast polynomial force that looks like a smoothed
-        version of the square-well potential. The energy equals `repulsionEnergy`
-        around r=0, stays flat until 0.6-0.7, then drops to zero together
-        with its first derivative at r=1.0. After that it drop down to
-        `attractionEnergy` and gets back to zero at r=`attractionRadius`.
-
-        The energy function is based on polynomials of 12th power. Both the
-        function and its first derivative is continuous everywhere within its
-        domain and they both get to zero at the boundary.
-
-        This is a tunable version of SSW:
-        a) You can specify the set of "sticky" particles. The sticky particles
-        are attracted only to other sticky particles.
-        b) You can select a subset of particles and make them "extra hard".
-        
-        This force was used two-ways. First was to make a small subset of particles very sticky. 
-        In that case, it is advantageous to make the sticky particles and their neighbours
-        "extra hard" and thus prevent the system from collapsing.
-        
-        Another useage is to induce phase separation by making all B monomers sticky. In that case, 
-        extraHard particles may not be needed at all, because the system would not collapse on itself. 
-       
-
-        Parameters
-        ----------
-
-        stickyParticlesIdxs: list of int
-            the list of indices of the "sticky" particles. The sticky particles
-            are attracted to each other with extra `selectiveAttractionEnergy`
-        extraHardParticlesIdxs : list of int
-            the list of indices of the "extra hard" particles. The extra hard
-            particles repel all other particles with extra
-            `selectiveRepulsionEnergy`
-        repulsionEnergy: float
-            the heigth of the repulsive part of the potential.
-            E(0) = `repulsionEnergy`
-        repulsionRadius: float
-            the radius of the repulsive part of the potential.
-            E(`repulsionRadius`) = 0,
-            E'(`repulsionRadius`) = 0
-        attractionEnergy: float
-            the depth of the attractive part of the potential.
-            E(`repulsionRadius`/2 + `attractionRadius`/2) = `attractionEnergy`
-        attractionRadius: float
-            the maximal range of the attractive part of the potential.
-        selectiveRepulsionEnergy: float
-            the EXTRA repulsion energy applied to the "extra hard" particles
-        selectiveAttractionEnergy: float
-            the EXTRA attraction energy applied to the "sticky" particles
-        """
-
-        energy = (
-            "step(REPsigma - r) * Erep + step(r - REPsigma) * Eattr;"
-            ""
-            "Erep = rsc12 * (rsc2 - 1.0) * REPeTot / emin12 + REPeTot;"  # + ESlide;"
-            "REPeTot = REPe + (ExtraHard1 + ExtraHard2) * REPeAdd;"
-            "rsc12 = rsc4 * rsc4 * rsc4;"
-            "rsc4 = rsc2 * rsc2;"
-            "rsc2 = rsc * rsc;"
-            "rsc = r / REPsigma * rmin12;"
-            ""
-            "Eattr = - rshft12 * (rshft2 - 1.0) * ATTReTot / emin12 - ATTReTot;"
-            "ATTReTot = ATTRe + min(Sticky1, Sticky2) * ATTReAdd;"
-            "rshft12 = rshft4 * rshft4 * rshft4;"
-            "rshft4 = rshft2 * rshft2;"
-            "rshft2 = rshft * rshft;"
-            "rshft = (r - REPsigma - ATTRdelta) / ATTRdelta * rmin12;"
-            ""
-            )
-
-        if selectiveRepulsionEnergy == float('inf'):
-            energy += (
-            "REPeAdd = 4 * ((REPsigma / (2.0^(1.0/6.0)) / r)^12 - (REPsigma / (2.0^(1.0/6.0)) / r)^6) + 1;"
-            )
-
-        repulforceGr = self.mm.CustomNonbondedForce(energy)
-
-        repulforceGr.setCutoffDistance(attractionRadius * self.conlen)
-
-        self.metadata["PolynomialAttractiveForce"] = {"trunc": repulsionEnergy}
-
-        repulforceGr.addGlobalParameter('REPe', repulsionEnergy * self.kT)
-        if selectiveRepulsionEnergy != float('inf'):
-            repulforceGr.addGlobalParameter('REPeAdd', selectiveRepulsionEnergy * self.kT)
-        repulforceGr.addGlobalParameter('REPsigma', repulsionRadius * self.conlen)
-
-        repulforceGr.addGlobalParameter('ATTRe', attractionEnergy * self.kT)
-        repulforceGr.addGlobalParameter('ATTReAdd', selectiveAttractionEnergy * self.kT)
-        repulforceGr.addGlobalParameter('ATTRdelta',
-            self.conlen * (attractionRadius - repulsionRadius) / 2.0)
-
-        # Coefficients for x^12*(x*x-1)
-        repulforceGr.addGlobalParameter('emin12', 46656.0 / 823543.0)
-        repulforceGr.addGlobalParameter('rmin12', np.sqrt(6.0 / 7.0))
-
-        repulforceGr.addPerParticleParameter("Sticky")
-        repulforceGr.addPerParticleParameter("ExtraHard")
-        counts = np.bincount(stickyParticlesIdxs, minlength=self.N)
-
-        for i in range(self.N):
-            repulforceGr.addParticle(
-                (float(counts[i]),
-                 float(i in extraHardParticlesIdxs)))
-
-        self.forceDict["Nonbonded"] = repulforceGr
-
-
-
-    def addCylindricalConfinement(self, r, bottom=None, k=0.1, top=9999):
-        "As it says."
-
-        if bottom == True:
-            warnings.warn(DeprecationWarning(
-                "Use bottom=0 instead of bottom = True! "))
-            bottom = 0
-
-        self.metadata["CylindricalConfinement"] = repr({"r": r,
-            "bottom": bottom, "k": k, "top": top})
-
-        if bottom is not None:
-            extforce2 = self.mm.CustomExternalForce(
-                "step(r-CYLaa) * CYLkb * (sqrt((r-CYLaa)*(r-CYLaa) + CYLt*CYLt) - CYLt)"
-                "+ step(-z + CYLbot) * CYLkb * (sqrt((z - CYLbot)^2 + CYLt^2) - CYLt) "
-                "+ step(z - CYLtop) * CYLkb * (sqrt((z - CYLtop)^2 + CYLt^2) - CYLt);"
-                "r = sqrt(x^2 + y^2 + CYLtt^2)")
-        else:
-            extforce2 = self.mm.CustomExternalForce(
-                "step(r-CYLaa) * CYLkb * (sqrt((r-CYLaa)*(r-CYLaa) + CYLt*CYLt) - CYLt);"
-                "r = sqrt(x^2 + y^2 + CYLtt^2)")
-
-        self.forceDict["CylindricalConfinement"] = extforce2
-        for i in range(self.N):
-            extforce2.addParticle(i, [])
-        extforce2.addGlobalParameter("CYLkb", k * self.kT / nm)
-        extforce2.addGlobalParameter("CYLtop", top * self.conlen)
-        if bottom is not None:
-            extforce2.addGlobalParameter("CYLbot", bottom * self.conlen)
-        extforce2.addGlobalParameter("CYLkt", self.kT)
-        extforce2.addGlobalParameter("CYLweired", nm)
-        extforce2.addGlobalParameter("CYLaa", (r - 1. / k) * nm)
-        extforce2.addGlobalParameter("CYLt", (1. / (10 * k)) * nm)
-        extforce2.addGlobalParameter("CYLtt", 0.01 * nm)
-
-    def addSphericalConfinement(self,
-                r="density",  # radius... by default uses certain density
-                k=5.,  # How steep the walls are
-                density=.3):  # target density, measured in particles
-                                # per cubic nanometer (bond size is 1 nm)
-        """Constrain particles to be within a sphere.
-        With no parameters creates sphere with density .3
-
-        Parameters
-        ----------
-        r : float or "density", optional
-            Radius of confining sphere. If "density" requires density,
-            or assumes density = .3
-        k : float, optional
-            Steepness of the confining potential, in kT/nm
-        density : float, optional, <1
-            Density for autodetection of confining radius.
-            Density is calculated in particles per nm^3,
-            i.e. at density 1 each sphere has a 1x1x1 cube.
-        """
-        self.metadata["SphericalConfinement"] = repr({"r": r, "k": k,
-            "density": density})
-
-        spherForce = self.mm.CustomExternalForce(
-            "step(r-SPHaa) * SPHkb * (sqrt((r-SPHaa)*(r-SPHaa) + SPHt*SPHt) - SPHt) "
-            ";r = sqrt(x^2 + y^2 + z^2 + SPHtt^2)")
-        self.forceDict["SphericalConfinement"] = spherForce
-
-        for i in range(self.N):
-            spherForce.addParticle(i, [])
-        if r == "density":
-            r = (3 * self.N / (4 * 3.141592 * density)) ** (1 / 3.)
-
-        self.sphericalConfinementRadius = r
-        if self.verbose == True:
-            print("Spherical confinement with radius = %lf" % r)
-        # assigning parameters of the force
-        spherForce.addGlobalParameter("SPHkb", k * self.kT / nm)
-        spherForce.addGlobalParameter("SPHaa", (r - 1. / k) * nm)
-        spherForce.addGlobalParameter("SPHt", (1. / k) * nm / 10.)
-        spherForce.addGlobalParameter("SPHtt", 0.01 * nm)
-        return r
-
-
-
-
-    def tetherParticles(self, particles, k=30, positions="current"):
-        """tethers particles in the 'particles' array.
-        Increase k to tether them stronger, but watch the system!
-
-        Parameters
-        ----------
-
-        particles : list of ints
-            List of particles to be tethered (fixed in space)
-        k : int, optional
-            Steepness of the tethering potential.
-            Values >30 will require decreasing potential,
-            but will make tethering rock solid.
-        """
-        self.metadata["TetheredParticles"] = repr({"particles": particles, "k": k})
-        if "Tethering Force" not in self.forceDict:
-            tetherForce = self.mm.CustomExternalForce(
-              " TETHkb * ((x - TETHx0)^2 + (y - TETHy0)^2 + (z - TETHz0)^2)")
-            self.forceDict["Tethering Force"] = tetherForce
-        else:
-            tetherForce = self.forceDict["Tethering Force"]
-
-        # assigning parameters of the force
-        tetherForce.addGlobalParameter("TETHkb", k * self.kT / nm)
-        tetherForce.addPerParticleParameter("TETHx0")
-        tetherForce.addPerParticleParameter("TETHy0")
-        tetherForce.addPerParticleParameter("TETHz0")
-        if positions == "current":
-            positions = [self.data[i] for i in particles]
-        else:
-            positions = self.addUnits(positions)
-
-        for i, pos in zip(particles, positions):  # adding all the particles on which force acts
-            i = int(i)
-            tetherForce.addParticle(i, list(pos))
-            if self.verbose == True:
-                print("particle %d tethered! " % i)
-
-    def addPullForce(self, particles, forces):
-        """
-        adds force pulling on each particle
-        particles: list of particle indices
-        forces: list of forces [[f0x,f0y,f0z],[f1x,f1y,f1z], ...]
-        if there are fewer forces than particles forces are padded with forces[-1]
-        """
-        import itertools
-        pullForce = self.mm.CustomExternalForce(
-            "PULLx * x + PULLy * y + PULLz * z")
-        pullForce.addPerParticleParameter("PULLx")
-        pullForce.addPerParticleParameter("PULLy")
-        pullForce.addPerParticleParameter("PULLz")
-        for num, force in itertools.zip_longest(particles, forces, fillvalue=forces[-1]):
-            force = [float(i) * (self.kT / self.conlen) for i in force]
-            pullForce.addParticle(num, force)
-        self.forceDict["PullForce"] = pullForce
 
         
     def addCenterOfMassRemover(self):
-        remover = self.mm.CMMotionRemover(10)
+        remover = openmm.CMMotionRemover(10)
         self.forceDict["CoM_Remover"] = remover
         
 
@@ -1173,7 +495,7 @@ class Simulation():
                     force.setNonbondedMethod(force.CutoffNonPeriodic)
             print("adding force ", i, self.system.addForce(self.forceDict[i]))
 
-        self.context = self.mm.Context(self.system, self.integrator, self.platform, self.properties)
+        self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
         self.initPositions()
         self.initVelocities()
         self.forcesApplied = True
@@ -1250,7 +572,7 @@ class Simulation():
         locTime = self.state.getTime()
         print("before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
-        self.mm.LocalEnergyMinimizer.minimize(
+        openmm.LocalEnergyMinimizer.minimize(
             self.context, tolerance, maxIterations)
 
         self.state = self.context.getState(getPositions=False,

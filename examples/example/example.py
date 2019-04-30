@@ -3,9 +3,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 import os,sys
-sys.path.insert(0, os.path.abspath(".."))
-from openmmlib2.openmmlib import Simulation
-from openmmlib2 import polymerutils
+from polychrom.openmm_simulator import Simulation
+import polychrom.openmm_forces as forces 
+from polychrom import starting_conformations
+import simtk.openmm as openmm
 import os
 
 def exampleOpenmm():
@@ -28,9 +29,8 @@ def exampleOpenmm():
     #  which would automatically adjusts timestep
     # This is relevant, for example, for simulations of polymer collapse
     # If simulation blows up, decrease errorTol by a factor of two and try again
-    a = Simulation(thermostat=0.02)  # timestep not necessary for variableLangevin
-
-    a.setup(platform="CPU", integrator="variableLangevin", errorTol=0.01,  GPU = "0")
+    a = Simulation(platform="CPU", integrator="variableLangevin", error_tol=0.01,  GPU = "0", 
+                   collision_rate=0.02)  # timestep not necessary for variableLangevin
 
     a.saveFolder("trajectory")  # folder where to save trajectory
 
@@ -46,7 +46,7 @@ def exampleOpenmm():
     # polymer = polymerutils.create_spiral(r1=4, r2=10, N=8000)
     # Creates a compact polymer arranged in a cylinder of radius 10, 8000 monomers long
 
-    polymer = polymerutils.create_random_walk(1, 1000)
+    polymer = starting_conformations.create_random_walk(1, 1000)
     # Creates an extended "random walk" conformation of length 8000
 
     a.load(polymer, center=True)  # loads a polymer, puts a center of mass at zero
@@ -58,22 +58,22 @@ def exampleOpenmm():
 
 
     # -----------Adding forces ---------------
-    a.addSphericalConfinement(density=0.85, k=1)
+    forces.sphericalConfinement(a, density=0.85, k=1)
     # Specifying density is more intuitive than radius
     # k is the slope of confinement potential, measured in kT/mon
     # set k=5 for harsh confinement
     # and k = 0.2 or less for collapse simulation
 
-    a.addHarmonicPolymerBonds(wiggleDist=0.05)
+    forces.harmonicPolymerBonds(a, wiggleDist=0.05)
     # Bond distance will fluctuate +- 0.05 on average
 
-    a.addPolynomialRepulsiveForce(trunc=10)
+    forces.polynomialRepulsiveForce(a, trunc=10)
     # this will resolve chain crossings and will not let chain cross anymore
 
     # a.addGrosbergRepulsiveForce(trunc=5)
     # this will let chains cross sometimes
 
-    a.addStiffness(k=4)
+    forces.angleForce(a, k=4)
     # K is more or less arbitrary, k=4 corresponds to presistence length of 4,
     # k=1.5 is recommended to make polymer realistically flexible; k=8 is very stiff
 
