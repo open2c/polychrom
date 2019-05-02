@@ -347,15 +347,9 @@ class Simulation():
         if filename is None:
             filename = "block%d.dat" % self.step
             filename = os.path.join(self.folder, filename)
+            
+           
 
-        if mode == "joblib":
-            self.metadata["data"] = self.getData()
-            joblib.dump(self.metadata, filename=filename, compress=3)
-
-        elif (mode == "txt") :
-            polymerutils.save(data, filename, mode=mode)
-        else:
-            raise ValueError("Unknown mode : %s, use  joblib or txt" % mode)
 
             
     def getData(self):

@@ -1,4 +1,6 @@
 import simtk.openmm as openmm
+import numpy as np 
+
 
 """
 This is a collection of old forces that are likely no longer used 
@@ -39,7 +41,7 @@ def addGrosbergPolymerBonds(sim_object, k=30):
 
     for start, end, isRing in sim_object.chains:
         for j in range(start, end - 1):
-            bondforceGraddBond( j, j + 1, [])
+            bondforceGr.addBond( j, j + 1, [])
             sim_object.bondsForException.append((j, j + 1))
 
         if isRing:
@@ -76,7 +78,7 @@ def addGrosbergStiffness(sim_object, k=1.5):
     try:
         k[0]
     except:
-        k = numpy.zeros(sim_object.N, float) + k
+        k = np.zeros(sim_object.N, float) + k
     stiffForce = openmm.CustomAngleForce(
         "GRk * kT * (1 - cos(theta - 3.141592))")
     sim_object.forceDict["AngleForce"] = stiffForce
@@ -368,7 +370,7 @@ def addLennardJonesForce(
     for i in range(sim_object.N):
         particleParameters = [0., 0., 0.]
 
-        if numpy.random.random() > blindFraction:
+        if np.random.random() > blindFraction:
             particleParameters[1] = (sigmaRep)
             particleParameters[2] = (epsilonRep)
 
@@ -573,7 +575,7 @@ def addDoubleRandomLengthBonds(sim_object, bondlength, bondRange, distance):
     while True:
         past
         b1 = begin
-        b2 = begin + numpy.random.randint(
+        b2 = begin + np.random.randint(
             0.5 * bondlength, 1.7 * bondlength)
         if b2 > sim_object.N - 4:
             break
@@ -595,21 +597,21 @@ def addConsecutiveRandomBonds(sim_object, loopSize, bondWiggle, bondLength=0.,
     shift = int(loopSize * smeerLoopSize)
     if shift == 0:
         shift = 1
-    begin = numpy.random.randint(distanceBetweenBonds)
+    begin = np.random.randint(distanceBetweenBonds)
     consecutiveRandomBondList = []
     while True:
         b1 = begin
-        b2 = begin + loopSize + numpy.random.randint(shift)
+        b2 = begin + loopSize + np.random.randint(shift)
         if b2 > sim_object.N - 3:
             if (sim_object.N - b1) > (5 * distanceBetweenBonds + 5):
-                b2 = sim_object.N - 1 - numpy.random.randint(distanceBetweenBonds)
+                b2 = sim_object.N - 1 - np.random.randint(distanceBetweenBonds)
             else:
                 break
 
         addBond(sim_object, b1, b2, bondWiggle, bondLength,
                      verbose=verbose)
         consecutiveRandomBondList.append([b1, b2])
-        begin = b2 + numpy.random.randint(distanceBetweenBonds)
+        begin = b2 + np.random.randint(distanceBetweenBonds)
         if sim_object.verbose == True:
             print("bond added between %d and %d" % (b1, b2))
     sim_object.metadata['consecutiveRandomBondList'] = consecutiveRandomBondList
@@ -682,72 +684,73 @@ def addSphericalWell(sim_object, r=10, depth=1):
     extforce4.addGlobalParameter("WELLtt", 0.01 * nm)
 
 
+## from class "yeast simulation" 
 
-class YeastSimulation(Simulation):
-    """
-    This class is maintained by Geoff to do simulations for the Yeast project
-    """
 
-    def addNucleolus(sim_object, k=1, r=None):
-        "method"
-        if r is None:
-            r = sim_object.sphericalConfinementRadius
+def addNucleolus(sim_object, k=1, r=None):
+    "method"
+    if r is None:
+        r = sim_object.sphericalConfinementRadius
 
-        extforce3 = openmm.CustomExternalForce(
-            "step(r-NUCaa) * NUCkb * (sqrt((r-NUCaa)*(r-NUCaa) + NUCt*NUCt) - NUCt);"
-            "r = sqrt(x^2 + y^2 + (z + NUCoffset )^2 + NUCtt^2)")
+    extforce3 = openmm.CustomExternalForce(
+        "step(r-NUCaa) * NUCkb * (sqrt((r-NUCaa)*(r-NUCaa) + NUCt*NUCt) - NUCt);"
+        "r = sqrt(x^2 + y^2 + (z + NUCoffset )^2 + NUCtt^2)")
 
-        sim_object.forceDict["NucleolusConfinement"] = extforce3
-        # adding all the particles on which force acts
-        if sim_object.verbose == True:
-            print("NUCleolus confinement from radius = %lf" % r)
-        # assigning parameters of the force
-        extforce3.addGlobalParameter("NUCkb", k * sim_object.kT / nm)
-        extforce3.addGlobalParameter("NUCaa", (r - 1. / k) * nm * 1.75)
-        extforce3.addGlobalParameter("NUCoffset", (r - 1. / k) * nm * 1.1)
-        extforce3.addGlobalParameter("NUCt", (1. / k) * nm / 10.)
-        extforce3.addGlobalParameter("NUCtt", 0.01 * nm)
+    sim_object.forceDict["NucleolusConfinement"] = extforce3
+    # adding all the particles on which force acts
+    if sim_object.verbose == True:
+        print("NUCleolus confinement from radius = %lf" % r)
+    # assigning parameters of the force
+    extforce3.addGlobalParameter("NUCkb", k * sim_object.kT / nm)
+    extforce3.addGlobalParameter("NUCaa", (r - 1. / k) * nm * 1.75)
+    extforce3.addGlobalParameter("NUCoffset", (r - 1. / k) * nm * 1.1)
+    extforce3.addGlobalParameter("NUCt", (1. / k) * nm / 10.)
+    extforce3.addGlobalParameter("NUCtt", 0.01 * nm)
+    for i in range(sim_object.N):
+        extforce3.addParticle(i, [])
+
+def addLaminaAttraction(sim_object, width=1, depth=1, r=None, particles=None):
+    extforce3 = openmm.CustomExternalForce(
+        "-1 * step(LAMr-LAMaa + LAMwidth) * step(LAMaa + LAMwidth - LAMr) * LAMdepth"
+        "* abs( (LAMr-LAMaa + LAMwidth) * (LAMaa + LAMwidth - LAMr)) / (LAMwidth * LAMwidth);"
+        "LAMr = sqrt(x^2 + y^2 + z^2 + LAMtt^2)")
+    sim_object.forceDict["Lamina attraction"] = extforce3
+
+    # re-defines lamina attraction based on particle index instead of domains.
+
+    # adding all the particles on which force acts
+    if particles is None:
         for i in range(sim_object.N):
             extforce3.addParticle(i, [])
+            if sim_object.verbose == True:
+                print("particle %d laminated! " % i)
 
-    def addLaminaAttraction(sim_object, width=1, depth=1, r=None, particles=None):
-        extforce3 = openmm.CustomExternalForce(
-            "-1 * step(LAMr-LAMaa + LAMwidth) * step(LAMaa + LAMwidth - LAMr) * LAMdepth"
-            "* abs( (LAMr-LAMaa + LAMwidth) * (LAMaa + LAMwidth - LAMr)) / (LAMwidth * LAMwidth);"
-            "LAMr = sqrt(x^2 + y^2 + z^2 + LAMtt^2)")
-        sim_object.forceDict["Lamina attraction"] = extforce3
+    else:
+        for i in particles:
+            extforce3.addParticle(i, [])
+            if sim_object.verbose == True:
+                print("particle %d laminated! " % i)
 
-        # re-defines lamina attraction based on particle index instead of domains.
+    if r is None:
+        try:
+            r = sim_object.sphericalConfinementRadius
+        except:
+            exit("No spherical confinement radius defined yet."\
+                 "Apply spherical confinement first!")
 
-        # adding all the particles on which force acts
-        if particles is None:
-            for i in range(sim_object.N):
-                extforce3.addParticle(i, [])
-                if sim_object.verbose == True:
-                    print("particle %d laminated! " % i)
+    if sim_object.verbose == True:
+        print("Lamina attraction added with r = %d" % r)
 
-        else:
-            for i in particles:
-                extforce3.addParticle(i, [])
-                if sim_object.verbose == True:
-                    print("particle %d laminated! " % i)
+    # assigning parameters of the force
+    extforce3.addGlobalParameter("LAMaa", r * nm)
+    extforce3.addGlobalParameter("LAMwidth", width * nm)
+    extforce3.addGlobalParameter("LAMdepth", depth * sim_object.kT)
+    extforce3.addGlobalParameter("LAMtt", 0.01 * nm)
 
-        if r is None:
-            try:
-                r = sim_object.sphericalConfinementRadius
-            except:
-                exit("No spherical confinement radius defined yet."\
-                     "Apply spherical confinement first!")
-
-        if sim_object.verbose == True:
-            print("Lamina attraction added with r = %d" % r)
-
-        # assigning parameters of the force
-        extforce3.addGlobalParameter("LAMaa", r * nm)
-        extforce3.addGlobalParameter("LAMwidth", width * nm)
-        extforce3.addGlobalParameter("LAMdepth", depth * sim_object.kT)
-        extforce3.addGlobalParameter("LAMtt", 0.01 * nm)
-
+    
+    
+    
+# old energy minimization 
 
 def energyMinimization(sim_object, stepsPerIteration=100,
                        maxIterations=1000,
@@ -831,20 +834,20 @@ def checkConnectivity(sim_object, newcoords=None, maxBondSizeMultipler=10):
     else: printPositiveResult = False
 
     # sim_object.bondLengths is a list of lists (see above) [..., [int(i), int(j), float(distance), float(bondSize)], ...]
-    bondArray = numpy.array(sim_object.bondLengths)
-    bondDists = numpy.sqrt(numpy.sum((newcoords[  numpy.array(bondArray[:, 0], dtype=int) ] - newcoords[ numpy.array(bondArray[:, 1], dtype=int) ]) ** 2, axis=1))
-    bondDistsSorted = numpy.sort(bondDists)
+    bondArray = np.array(sim_object.bondLengths)
+    bondDists = np.sqrt(np.sum((newcoords[  np.array(bondArray[:, 0], dtype=int) ] - newcoords[ np.array(bondArray[:, 1], dtype=int) ]) ** 2, axis=1))
+    bondDistsSorted = np.sort(bondDists)
     if (bondDists > (bondArray[:, 2] + maxBondSizeMultipler * bondArray[:, 3])).any():
         isConnected = False
         print("!! connectivity check failed !!")
-        print("median bond size is ", numpy.median(bondDists))
+        print("median bond size is ", np.median(bondDists))
         print("longest 10 bonds are", bondDistsSorted[-10:])
 
     else:
         isConnected = True
         if printPositiveResult:
             print("connectivity check passed.")
-            print("median bond size is ", numpy.median(bondDists))
+            print("median bond size is ", np.median(bondDists))
             print("longest 10 bonds are", bondDistsSorted[-10:])
 
     return isConnected

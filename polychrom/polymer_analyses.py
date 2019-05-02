@@ -50,14 +50,14 @@ def generate_bins(N, start=4, bins_per_order_magn=10):
     
 
 def contact_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
-                  ring=False, verbose=False):
+                  ring=False):
 
     """
     Returns contact probability scaling for a given polymer conformation
 
     Parameters
     ----------
-    data : 3xN array of ints/floats
+    data : Nx3 array of ints/floats
         Input polymer conformation
     bins0 : list
         Bins to calculate scaling.
@@ -78,8 +78,10 @@ def contact_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
     (mids, contact probabilities) where "mids" are centers of bins in the input bins0 array in logspace.
 
     """
-
-    N = len(data)
+    data = np.asarray(data, float)
+    N = data.shape[0]
+    assert data.shape[1] == 3 
+    
     if bins0 is None: 
         bins0 = generate_bins(N)
     
@@ -94,26 +96,17 @@ def contact_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
         contacts[mask] = N - contacts[mask]
         
     scontacts = np.sort(contacts)  # sorted contact lengthes
-    connections = 1. * np.diff(np.searchsorted(
-        scontacts, bins0, side="left"))  # binned contact lengthes
+    connumbers = np.diff(np.searchsorted(scontacts, bins0, side="left")) # count of contacts
 
     if ring == True:
         possible = np.diff(N * bins0)
     else:
         possible = np.diff(N * bins0 + 0.5 * bins0 - 0.5 * (bins0 ** 2))
 
-    if verbose:
-        print("average contacts per monomer:", connections.sum() / N)
-
-    if integrate == False:
-        connections /= possible
-    if integrate == True:
-        connections = np.cumsum(connections) / connections.sum()
+    connumbers = connumbers / possible
 
     a = [sqrt(i[0] * (i[1] - 1)) for i in bins]
-    if verbose:
-        print(list(connections))
-    return (a, connections)
+    return (a, connumbers)
 
 
 def R2_scaling(data, bins=None, ring=False):
@@ -124,16 +117,14 @@ def R2_scaling(data, bins=None, ring=False):
     Parameters
     ----------
 
-    data: 3xN array
+    data: Nx3 array
     bins: the same as in giveCpScaling
 
     """
-    if len(data) != 3:
-        data = data.T
-    if len(data) != 3:
-        raise ValueError("Wrong data shape")
-
-    N = data.shape[1]
+    data = np.asarray(data, float)    
+    N = data.shape[0]
+    assert data.shape[1] == 3 
+    data = data.T
     
     if bins is None:
         bins = generate_bins(N)
@@ -154,48 +145,103 @@ def R2_scaling(data, bins=None, ring=False):
 
 
 
+def Rg2(data):
+    """
+    Calculates gyration radius of a polymer chain.
+    """
+    assert data.shape[1] == 3
+    return np.mean((data - np.mean(data, axis=0))**2) * 3
+
+def Rg2_matrix(data):
+    """
+    Uses dynamic programming and vectorizing to calculate Rg for each subchain of the matrix 
+    element [i,j] in resulting matrix is Rg of a subchain from i to j including  i and j 
+    """
+    
+    assert data.shape[1] == 3
+    N = data.shape[0]
+    data = np.concatenate([[[0,0,0]], data])
+
+    coms = np.cumsum(data, 0)  # cumulative sum of locations to calculate COM
+    coms2 = np.cumsum(data ** 2, 0)  # cumulative sum of locations^2 to calculate RG
+
+    dists = np.abs(np.arange(N)[:,None] - np.arange(N)[None,:])+1
+    coms2d = (-coms2[ :-1,None,:] +coms2[ None,1::,:]) /  dists[:,:,None]
+    comsd = ((coms[ :-1,None,:] - coms[ None,1:,:]) / dists[:,:,None]) ** 2 
+    sums = np.sum(coms2d - comsd, 2)
+    np.fill_diagonal(sums, 0)
+    mask = np.arange(N)[:,None] > np.arange(N)[None,:]
+    sums[mask] = sums.T[mask]
+    return sums
+
+
+
 def Rg2_scaling(data, bins=None, ring=False):
     "main working horse for radius of gyration"
     "uses dymanic programming algorithm"
-
-    if len(data) != 3:
-        data = data.T
-    if len(data) != 3:
-        raise ValueError("Wrong data shape")
-
-    data = np.array(data, float)
-    N = data.shape[1]
+    
+    data = np.asarray(data, float)
+    N = data.shape[0]
+    assert data.shape[1] == 3 
+    
+    data = np.concatenate([[[0,0,0]], data])    
+    
     if bins is None:
         bins = generate_bins(N)
         
-    coms = np.cumsum(data, 1)  # cumulative sum of locations to calculate COM
-    coms2 = np.cumsum(
-        data ** 2, 1)  # cumulative sum of locations^2 to calculate RG
+    coms = np.cumsum(data, 0)  # cumulative sum of locations to calculate COM
+    coms2 = np.cumsum(data ** 2, 0)  # cumulative sum of locations^2 to calculate RG
 
     def radius_gyration(len2):
         data
         if ring == True:
-            comsadd = coms[:, :len2].copy()
-            coms2add = coms2[:, :len2].copy()
-            comsadd += coms[:, -1][:, None]
-            coms2add += coms2[:, -1][:, None]
-            comsw = np.concatenate([coms, comsadd], axis=1)
-            coms2w = np.concatenate([coms2, coms2add],
-                                    axis=1)  # for rings we extend need longer chain
+            comsadd = coms[1:len2, :].copy()
+            coms2add = coms2[1:len2, :].copy()
+            comsadd += coms[-1, :][None,:]
+            coms2add += coms2[-1,:][None,:]
+            comsw = np.concatenate([coms, comsadd], axis=0)
+            coms2w = np.concatenate([coms2, coms2add], axis=0)              
         else:
             comsw = coms
             coms2w = coms2
 
-        coms2d = (-coms2w[:, :-len2] + coms2w[:, len2:]) / len2
-        comsd = ((comsw[:, :-len2] - comsw[:, len2:]) / len2) ** 2
-        diffs = coms2d - comsd
-        sums = (np.sum(diffs, 0))
+        coms2d = (-coms2w[:-len2, :] + coms2w[len2:, :]) / (len2)
+        comsd = ((comsw[:-len2, :] - comsw[len2:, :]) / (len2 )) ** 2
+        diffs = coms2d - comsd        
+        sums = (np.sum(diffs, 1))
         return np.mean(sums)
 
     rads = [0. for i in range(len(bins))]
     for i in range(len(bins)):
         rads[i] = radius_gyration(int(bins[i]))
     return (np.array(bins), rads)
+
+
+
+
+def _test_Rg_scalings():
+    a = np.random.lognormal(1,1,size=(30,3))  # array for testing 
+
+    gr = Rg2_matrix(a)  # calculate Rg matrix in a normal way 
+   
+    for i in range(len(a)+1):  # fill on eside of it with manually calculated Rg(i:j)
+        for j in range(i+1,len(a)):
+            gr[j,i] = Rg2(a[i:j+1])
+            pass
+
+    assert np.allclose(gr, gr.T)
+
+
+    scal = Rg2_scaling(a, bins = [5])  # 5th diagonal here means s=5 (5-monomer chains)
+    d1 = np.diagonal(gr, 4).mean()  # here Nth diagonal means N+1 monomer chain, so that the corner = whole chain    
+    assert np.allclose(scal[1][0], d1)  # compare P(s) to manually calculated from Rg matrix 
+    
+    scal = Rg2_scaling(a, bins=[3], ring=True)  # now we are testing ring there are (N-s+1) subchains of length s. 
+    d1 = (np.diagonal(gr,2).sum() + Rg2(np.array([a[0],a[-1], a[-2]])) + Rg2(np.array([a[0],a[1], a[-1]]))) / len(a)
+    assert np.allclose(scal[1][0], d1)  
+    # compare with manually calculated rg(i,j) plus Rg of two 3-monomer subchains crossing the boundary
+
+
 
 
 
@@ -383,10 +429,6 @@ def streaming_ndarray_agg(in_stream,  ndarray_cols, aggregate_cols, value_cols=[
 
 
 
-
-
-            
-
                              
 def kabsch_rmsd(P, Q):
     """
@@ -437,4 +479,29 @@ def kabsch_rmsd(P, Q):
     dist = np.mean((np.dot(P, U) - Q)**2)  * 3
 
     return dist
+
+
+
+def _test_Rg_scalings():
+    a = np.random.lognormal(1,1,size=(30,3))  # array for testing 
+
+    gr = Rg2_matrix(a)  # calculate Rg matrix in a normal way 
+   
+    for i in range(len(a)+1):  # fill on eside of it with manually calculated Rg(i:j)
+        for j in range(i+1,len(a)):
+            gr[j,i] = Rg2(a[i:j+1])
+            pass
+
+    assert np.allclose(gr, gr.T)
+
+
+    scal = Rg2_scaling(a, bins = [5])  # 5th diagonal here means s=5 (5-monomer chains)
+    d1 = np.diagonal(gr, 4).mean()  # here Nth diagonal means N+1 monomer chain, so that the corner = whole chain    
+    assert np.allclose(scal[1][0], d1)  # compare P(s) to manually calculated from Rg matrix 
+    
+    scal = Rg2_scaling(a, bins=[3], ring=True)  # now we are testing ring there are (N-s+1) subchains of length s. 
+    d1 = (np.diagonal(gr,2).sum() + Rg2(np.array([a[0],a[-1], a[-2]])) + Rg2(np.array([a[0],a[1], a[-1]]))) / len(a)
+    assert np.allclose(scal[1][0], d1)  
+    # compare with manually calculated rg(i,j) plus Rg of two 3-monomer subchains crossing the boundary
+
 
