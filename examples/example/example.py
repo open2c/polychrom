@@ -5,6 +5,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os,sys
 from polychrom.openmm_simulator import Simulation
 import polychrom.openmm_forces as forces 
+import polychrom.extra_openmm_forces as extra_forces
 from polychrom import starting_conformations
 import simtk.openmm as openmm
 import os
@@ -29,8 +30,8 @@ def exampleOpenmm():
     #  which would automatically adjusts timestep
     # This is relevant, for example, for simulations of polymer collapse
     # If simulation blows up, decrease errorTol by a factor of two and try again
-    a = Simulation(platform="CPU", integrator="variableLangevin", error_tol=0.01,  GPU = "0", 
-                   collision_rate=0.02)  # timestep not necessary for variableLangevin
+    a = Simulation(platform="CUDA", integrator="variableLangevin", error_tol=0.002,  GPU = "0", 
+                   collision_rate=0.02, N = 10000)  # timestep not necessary for variableLangevin
 
     a.saveFolder("trajectory")  # folder where to save trajectory
 
@@ -46,10 +47,10 @@ def exampleOpenmm():
     # polymer = polymerutils.create_spiral(r1=4, r2=10, N=8000)
     # Creates a compact polymer arranged in a cylinder of radius 10, 8000 monomers long
 
-    polymer = starting_conformations.create_random_walk(1, 1000)
+    polymer = starting_conformations.grow_cubic(10000, 100)
     # Creates an extended "random walk" conformation of length 8000
 
-    a.load(polymer, center=True)  # loads a polymer, puts a center of mass at zero
+    a.setData(polymer, center=True)  # loads a polymer, puts a center of mass at zero
 
     # -----------Initialize conformation of the chains--------
     # By default the library assumes you have one polymer chain
@@ -64,10 +65,11 @@ def exampleOpenmm():
     # set k=5 for harsh confinement
     # and k = 0.2 or less for collapse simulation
 
-    forces.harmonicPolymerBonds(a, wiggleDist=0.05)
+    extra_forces.addGrosbergPolymerBonds(a)
     # Bond distance will fluctuate +- 0.05 on average
 
     forces.polynomialRepulsiveForce(a, trunc=10)
+    extra_forces.addGrosbergStiffness(a)
     # this will resolve chain crossings and will not let chain cross anymore
 
     # a.addGrosbergRepulsiveForce(trunc=5)
@@ -90,7 +92,10 @@ def exampleOpenmm():
 
     # -----------Running a simulation ---------
 
+    
+    
     a.save()  # save original conformationz
+    
     for _ in range(10):  # Do 10 blocks
         a.doBlock(2000)  # Of 2000 timesteps each
         a.save()  # and save data every block

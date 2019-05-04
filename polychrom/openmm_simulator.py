@@ -6,12 +6,9 @@ import numpy as np
 import sys
 import os
 import time
-import joblib
 import tempfile
 import warnings
 from six import string_types
-
-os.environ["LD_LIBRARY_PATH"] = os.environ.get("LD_LIBRARY_PATH", "") + ":/usr/local/cuda/lib64"
 
 import simtk.openmm as openmm
 import simtk.unit as units
@@ -35,6 +32,9 @@ class Simulation():
 
         Parameters
         ----------
+        
+        N : int
+            number of particles 
         
         errorTol : float, optional
             Error tolerance parameter for variableLangevin integrator
@@ -61,8 +61,10 @@ class Simulation():
         integrator : "langevin", "variableLangevin", "verlet", "variableVerlet",
                      "brownian", optional Integrator to use
                      (see Openmm class reference)
-
-
+                     
+        mass : number or np.array
+            Particle mass (default 100 amu)
+            
 
         temperature : simtk.units.quantity(units.kelvin), optional
             Temperature of the simulation. Devault value is 300 K.
@@ -81,9 +83,6 @@ class Simulation():
             By default, length_scale=1.0 and harmonic bonds and repulsive
             forces have the scale of 1 nm.
 
-        mass_scale : float, optional
-            The scaling factor of the mass of the system.
-           
         maxEk: float, optional
             raise error if kinetic energy in (kT/particle) exceeds this value 
 
@@ -107,13 +106,14 @@ class Simulation():
                        "temperature":300 * units.kelvin,
                        "PBC":False,
                         "length_scale":1.0,
-                        "mass_scale":1.0, 
+                        "mass":100, 
                         "maxEk":10 , 
                         "precision":"mixed", 
                         "verbose":False, 
                         "name":"sim"}
         defaultArgs.update(kwargs)
         kwargs = defaultArgs
+        self.kwargs = kwargs
 
         platform = kwargs["platform"]
         self.GPU = kwargs["GPU"]  # setting default GPU
@@ -168,7 +168,7 @@ class Simulation():
             self.integrator_type = "UserDefined"
             kwargs["integrator"] = "user_defined"
         
-        self.name = kwargs["name"]
+        self.N = kwargs["N"]
         self.verbose = kwargs["verbose"]
         self.temperature = kwargs["temperature"]
         self.verbose = kwargs["verbose"]
@@ -176,7 +176,6 @@ class Simulation():
         self.forcesApplied = False
         self.folder = "."
         self.length_scale = kwargs["length_scale"]
-        self.mass_scale = kwargs["mass_scale"]
         self.eKcritical = kwargs["maxEk"]  # Max allowed kinetic energy
         self.nm = nm
         self.metadata = {}
@@ -184,8 +183,7 @@ class Simulation():
 
         self.kB = units.BOLTZMANN_CONSTANT_kB * \
             units.AVOGADRO_CONSTANT_NA  # Boltzmann constant
-        self.kT = self.kB * self.temperature  # thermal energy
-        self.mass = 100.0 * units.amu * self.mass_scale
+        self.kT = self.kB * self.temperature  # thermal energy        
         # All masses are the same,
         # unless individual mass multipliers are specified in self.load()
         self.bondsForException = []
@@ -260,66 +258,6 @@ class Simulation():
 
 
 
-    def load(self, filename,  # Input filename, or input data array
-             center=False,  # Shift center of mass to zero?
-             masses=None,
-             ):
-        """loads data from file.
-        Accepts text files, joblib files or pure data as Nx3 or 3xN array
-        
-        Parameters
-        ----------
-
-        filename : joblib file, or text file name, or Nx3 or 3xN numpy array
-            Input filename or array with data
-
-        center : bool or "zero", optional
-            Move center of mass to zero before starting the simulation
-            if center == "zero", then center the data such as all positions are positive and start at zero
-
-        masses : array
-            Masses of each atom, measured in self.mass (default: 100 AMU,
-            but could be modified by self.mass_scale)
-        """
-
-        if type(filename) == str:
-            data = polymerutils.load(filename)
-            
-        else:
-            data = filename
-
-        data = np.asarray(data, float)
-
-        if len(data) == 3:
-            data = np.transpose(data)
-        if len(data[0]) != 3:
-            self._exitProgram("strange data file")
-            
-        if np.isnan(data).any():
-            self._exitProgram("\n!!!!!!!!!!file contains NANS!!!!!!!!!\n")
-
-        if center is True:
-            av = np.mean(data, 0)
-            data -= av
-
-        if center == "zero":
-            minvalue = np.min(data, 0)
-            data -= minvalue
-
-        self.setData(data)
-        self.randomizeData()
-
-        if self.verbose == True:
-            print("center of mass is", np.mean(self.data, 0))
-            print("Radius of gyration is,", self.RG())
-
-        if masses == None:
-            self.masses = [1. for _ in range(self.N)]
-        else:
-            self.masses = masses
-
-        if not hasattr(self, "chains"):
-            self.setChains()
 
     def save(self, filename=None, mode="joblib"):
         """Saves conformation plus some metadata.
@@ -347,9 +285,6 @@ class Simulation():
         if filename is None:
             filename = "block%d.dat" % self.step
             filename = os.path.join(self.folder, filename)
-            
-           
-
 
             
     def getData(self):
@@ -367,33 +302,55 @@ class Simulation():
         assert toRet.min() >= 0
         return toRet
 
-    def addUnits(self, coords):
-        coords = np.asarray(coords, dtype="float")
-        coords = units.Quantity(coords, nm)
-        return coords
-
-    def setData(self, data):
+    def setData(self, data, center=False, random_offset = 1e-5):
         """Sets particle positions
 
         Parameters
         ----------
 
         data : Nx3 array-line
-            Array of positions with distance ~1 between connected atoms.
-        """
-        data = np.asarray(data, dtype="float")
-        self.data = units.Quantity(data, nm)
-        self.N = len(self.data)
-        if hasattr(self, "context"):
-            self.initPositions()
+            Array of positions 
 
-    def randomizeData(self):
-        """
-        Runs automatically to offset data  (helps if data is integer based)
-        """
-        data = self.getData()
-        data = data + np.random.randn(*data.shape) * 0.0001
-        self.setData(data)
+        center : bool or "zero", optional
+            Move center of mass to zero before starting the simulation
+            if center == "zero", then center the data such as all positions are positive and start at zero
+            
+        random_offset: float or None
+            add random offset to each particle
+            Recommended for integer starting conformations and in general 
+
+         """
+
+        
+        data = np.asarray(data, dtype="float")
+        if len(data) != self.N: 
+            raise ValueError(f"length of data, {len(self.data)} does not match N, {self.N}")
+
+        if data.shape[1] != 3:
+            raise ValueError("Data is not shaped correctly. Needs (N,3), provided: {0}".format(data.shape))
+        if np.isnan(data).any():
+            raise ValueError("Data contains NANs")
+            
+        if random_offset:
+            data = data + (np.random.random(data.shape) * 2 - 1) * random_offset
+
+        if center is True:
+            av = np.mean(data, axis=0)
+            data -= av
+        elif center == "zero":
+            minvalue = np.min(data, axis=0)
+            data -= minvalue
+        
+        self.data = units.Quantity(data, nm)
+        
+        
+        
+        if not hasattr(self, "chains"):
+            self.setChains()
+
+        if hasattr(self, "context"):
+            self.initPositions()        
+        
 
     def RG(self):
         """
@@ -404,21 +361,7 @@ class Simulation():
         """
         data = self.getScaledData()
         data = data - np.mean(data, axis=0)[None,:]
-        return np.sqrt(np.sum(np.var(np.array(data), 0)))
-
-    def RMAX(self, percentile=None):
-        """
-        Returns
-        -------
-        Distance to the furthest from the origin particle.
-
-        """
-        data = self.getScaledData()
-        dists = np.sqrt(np.sum((np.array(data)) ** 2, 1))
-        if percentile == None:
-            return np.max(dists)
-        else:
-            return np.percentile(dists, percentile)
+        return np.sqrt(np.sum(np.var(np.array(data), 0)))    
 
     def dist(self, i, j):
         """
@@ -427,26 +370,6 @@ class Simulation():
         data = self.getData()
         dif = data[i] - data[j]
         return np.sqrt(sum(dif ** 2))
-
-
-
-        
-    def addCenterOfMassRemover(self):
-        remover = openmm.CMMotionRemover(10)
-        self.forceDict["CoM_Remover"] = remover
-        
-
-        
-    def _loadParticles(self):
-        if not hasattr(self, "system"):
-            return
-        if not self.loaded:
-            for mass in self.masses:
-                self.system.addParticle(self.mass * mass)
-            if self.verbose == True:
-                print("%d particles loaded" % self.N)
-            self.loaded = True
-        
         
     def _applyForces(self):
         """Adds all particles to the system.
@@ -456,16 +379,15 @@ class Simulation():
 
         if self.forcesApplied == True:
             return
-        self._loadParticles()
+        
+        self.masses = np.zeros(self.N, dtype=float) + self.kwargs["mass"]
+        for mass in self.masses:
+            self.system.addParticle(mass)
 
-        exc = self.bondsForException
-        print("Number of exceptions:", len(exc))
+        print("Number of exceptions:", len(self.bondsForException))
 
-        if len(exc) > 0:
-            exc = np.array(exc)
-            exc = np.sort(exc, axis=1)
-            exc = [tuple(i) for i in exc]
-            exc = list(set(exc))  # only unique pairs are left
+        if len(self.bondsForException) > 0:
+            exc = list(set([tuple(i) for i in np.sort(np.array(self.bondsForException), axis=1)]))
 
         for i in list(self.forceDict.keys()):  # Adding exceptions
             force = self.forceDict[i]
@@ -479,9 +401,8 @@ class Simulation():
                 for pair in exc:
                     # force.addExclusion(*pair)
                     force.addExclusion(int(pair[0]), int(pair[1]))
-
-            if hasattr(force, "CutoffNonPeriodic") and hasattr(
-                                                    force, "CutoffPeriodic"):
+                    
+            if hasattr(force, "CutoffNonPeriodic") and hasattr(force, "CutoffPeriodic"):
                 if self.PBC:
                     force.setNonbondedMethod(force.CutoffPeriodic)
                     print("Using periodic boundary conditions!!!!")
@@ -494,70 +415,55 @@ class Simulation():
         self.initVelocities()
         self.forcesApplied = True
 
-    def initVelocities(self, mult=1):
+    def initVelocities(self,  temperature="current"):
         """Initializes particles velocities
 
         Parameters
         ----------
-        mult : float, optional
-            Multiply velosities by this. Is good for a cold/hot start.
+        temperature: temperature to set velocities (default: temerature of the simulation)        
         """
         try:
             self.context
         except:
             raise ValueError("No context, cannot set velocs."\
                              "Initialize context before that")
-
-        sigma = units.sqrt(self.kT / self.system.getParticleMass(
-            1))  # calculating mean velocity
-        velocs = units.Quantity(mult * np.random.normal(
-            size=(self.N, 3)), units.meter) * (sigma / units.meter)
-        # Guide to simtk.unit: 1. Always use units.quantity.
-        # 2. Avoid dimensionless shit.
-        # 3. If you have to, create fake units, as done here with meters
-        self.context.setVelocities(velocs)
-
+            
+        if temperature == "current":
+            temperature=self.temperature        
+            
+        self.context.setVelocitiesToTemperature(temperature)
+    
     def initPositions(self):
         """Sends particle coordinates to OpenMM system.
         If system has exploded, this is
          used in the code to reset coordinates. """
 
-        print("Positions... ")
         try:
             self.context
         except:
             raise ValueError("No context, cannot set positions."\
                              " Initialize context before that")
 
-        self.context.setPositions(self.data)
-        print(" loaded!")
-        state = self.context.getState(getPositions=True, getEnergy=True)
-            # get state of a system: positions, energies
-        eP = state.getPotentialEnergy() / self.N / self.kT
-        print("potential energy is %lf" % eP)
+        self.context.setPositions(self.data)        
+        eP = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
+        print("Particles loaded. Potential energy is %lf" % eP)
 
-    def reinitialize(self, mult=1):
+    def reinitialize(self):
         """Reinitializes the OpenMM context object.
         This should be called if low-level parameters,
-        such as forces, have changed.
-
-        Parameters
-        ----------
-        mult : float, optional
-            mult to be passed to
-             :py:func:'initVelocities <Simulation.initVelocities>'
-        """
+        such as forces, have changed"""
+        
         self.context.reinitialize()
         self.initPositions()
-        self.initVelocities(mult)
+        self.initVelocities()
+        
 
     def localEnergyMinimization(self, tolerance=0.3, maxIterations=0):
         "A wrapper to the build-in OpenMM Local Energy Minimization"
+
         print("Performing local energy minimization")
 
         self._applyForces()
-        oldName = self.name
-        self.name = "minim"
 
         self.state = self.context.getState(getPositions=False,
                                            getEnergy=True)
@@ -566,18 +472,13 @@ class Simulation():
         locTime = self.state.getTime()
         print("before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
-        openmm.LocalEnergyMinimizer.minimize(
-            self.context, tolerance, maxIterations)
+        openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)
 
-        self.state = self.context.getState(getPositions=False,
-                                           getEnergy=True)
+        self.state = self.context.getState(getPositions=False, getEnergy=True)
         eK = (self.state.getKineticEnergy() / self.N / self.kT)
         eP = self.state.getPotentialEnergy() / self.N / self.kT
         locTime = self.state.getTime()
         print("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
-
-        self.name = oldName
-
 
 
     def doBlock(self, steps=None, increment=True,  reinitialize=True, maxIter=0, checkFunctions=[]):
@@ -693,11 +594,8 @@ class Simulation():
         x, y, z = pos[:, 0], pos[:, 1], pos[:, 2]
         minmedmax = lambda x: (x.min(), np.median(x), x.mean(), x.max())
 
-        print()
-        print("Statistics for the simulation %s, number of particles: %d, "\
-        " number of chains: %d" % (
-            self.name, self.N, len(self.chains)))
-        print()
+        
+        print("\n Statistics: number of particles: %d, number of chains: %d\n" % (self.N, len(self.chains)))        
         print("Statistics for particle position")
         print("     mean position is: ", np.mean(
             pos, axis=0), "  Rg = ", self.RG())
