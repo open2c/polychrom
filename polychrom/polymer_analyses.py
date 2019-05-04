@@ -54,6 +54,8 @@ def contact_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
 
     """
     Returns contact probability scaling for a given polymer conformation
+    Contact between monomers X and X+1 is counted as s=1 
+    
 
     Parameters
     ----------
@@ -75,10 +77,11 @@ def contact_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
 
     Returns
     -------
-    (mids, contact probabilities) where "mids" are centers of bins in the input bins0 array in logspace.
+    (mids, contact probabilities) where "mids" contains geometric means of bin start/end 
+    
 
     """
-    data = np.asarray(data, float)
+    data = np.asarray(data)
     N = data.shape[0]
     assert data.shape[1] == 3 
     
@@ -112,7 +115,7 @@ def contact_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
 def R2_scaling(data, bins=None, ring=False):
     """
     Returns end-to-end distance scaling of a given polymer conformation.
-    ..warning:: This method averages end-to-end scaling over bins to make better average
+    ..warning:: This method averages end-to-end scaling over all possible subchains of given length
 
     Parameters
     ----------
@@ -147,8 +150,9 @@ def R2_scaling(data, bins=None, ring=False):
 
 def Rg2(data):
     """
-    Calculates gyration radius of a polymer chain.
+    Simply calculates gyration radius of a polymer chain.
     """
+    data = np.asarray(data)
     assert data.shape[1] == 3
     return np.mean((data - np.mean(data, axis=0))**2) * 3
 
@@ -158,6 +162,7 @@ def Rg2_matrix(data):
     element [i,j] in resulting matrix is Rg of a subchain from i to j including  i and j 
     """
     
+    data = np.asarray(data, float)
     assert data.shape[1] == 3
     N = data.shape[0]
     data = np.concatenate([[[0,0,0]], data])
@@ -177,8 +182,16 @@ def Rg2_matrix(data):
 
 
 def Rg2_scaling(data, bins=None, ring=False):
-    "main working horse for radius of gyration"
-    "uses dymanic programming algorithm"
+    """Calculates average gyration radius of subchains a function of s
+    
+    Parameters
+    ----------
+    
+    data: Nx3 array
+    bins: subchain lengths at which to calculate Rg
+    ring: treat polymer as a ring (default: False) 
+    """
+    
     
     data = np.asarray(data, float)
     N = data.shape[0]
@@ -243,91 +256,7 @@ def _test_Rg_scalings():
 
 
 
-
-
-def subchainDensityFunction(filenames, bins, normalize="Rg", maxLength=3, Nbins=30, coverage=1., centerAt="mid", **kwargs):
-    """Calculates density function of subchains
-    That is, for each bin size, it calculates an average density profile
-    for subchains of the size within the bin.
-    Density profile is how density of a subchain depends on a distance from the center.
-
-    filenames : str
-        Filenames to average density function
-    bins : iterable
-         List of positions of bins (lengthes at which to evaluate).
-    normalize : str, not implemented
-        How to normalize the subchain density function
-    lengthmult : int, optional
-        Calculate distribution to lengthmult*Rg distance only (default = 3)
-    Nbins : int, optional
-        Number of bins for each distribution (default = 30)
-    coverage : float, optional
-        Use each monomer 'coverage' times (on average) to calculate each distribution. Default = 1.
-
-
-    """
-    normalize = normalize.lower()
-    centerAt = centerAt.lower()
-    results = []
-    newbins = [(i - 2, i + 2) for i in bins]
-    binsForRg = sum([list(i) for i in newbins], [])
-    midbins = [(i[0] + i[1]) // 2 for i in newbins]
-    rgs = []
-    for filename in filenames:
-        rgs.append(give_radius_scaling(polymerutils.load(filename).T, binsForRg, ring=False)[1][::2])
-    rgs = np.mean(rgs, axis=0)
-    for filename in filenames:
-        data = polymerutils.load(filename)
-        N = len(data)
-
-
-        curresults = []
-        labels = []
-        for onebin, rg in zip(newbins, rgs):
-            labels.append("S = %.1lf; " % (np.mean(onebin)) + " Rg=%.2lf" % rg)
-            if normalize == "rg":
-                lengthbins = np.linspace(1, maxLength * rg, Nbins)
-            else:
-                lengthbins = np.linspace(1, maxLength, Nbins)
-
-            lengthBinMids = (lengthbins[:-1] + lengthbins[1:]) * 0.5
-            volumes = (4. / 3.) * 3.141592 * (lengthbins ** 3)
-            volumes = np.diff(volumes)
-            count = int(N * coverage / np.mean(onebin) + 1)
-            sphereCounts = np.zeros(len(volumes), float)
-
-            for i in range(count):
-                size = np.random.randint(onebin[0], onebin[1])
-                start = np.random.randint(0, N - size)
-                subchain = data[start:start + size]
-                if centerAt == "com":
-                    com = np.mean(subchain, axis=0)
-                elif centerAt == "mid":
-                    com = subchain[len(subchain) // 2]
-                else:
-                    raise ValueError("Provide correct centerAt: com or mid")
-                shifted = subchain - com[None, :]
-                # print shifted
-                dists = np.sqrt(np.sum(shifted ** 2, axis=1))
-                sphereCounts += np.histogram(dists, lengthbins)[0]
-            sphereCounts /= (volumes * count)
-            # curresults.append(np.array([lengthBinMids/rg,sphereCounts]))
-            if normalize == "rg":
-                curresults.append(np.array([lengthBinMids / rg, sphereCounts]))
-            elif normalize == "none":
-                curresults.append(np.array([lengthBinMids, sphereCounts]))
-            else:
-                print("Normalize=", normalize, "is not implemented")
-                raise NotImplementedError()
-        results.append(curresults)
-    results = np.mean(np.array(results, float), axis=0)
-    for i, label in zip(results, labels):
-        if "label" not in kwargs:
-            kwargs["label"] = label
-        import matplotlib.pyplot as plt
-        plt.plot(i[0], i[1], **kwargs)
-
-    return dict(list(zip(midbins, results)))
+   
 
 def ndarray_groupby_aggregate(df, ndarray_cols, aggregate_cols, value_cols=[], 
                               sample_cols=[], preset="sum",
