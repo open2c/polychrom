@@ -17,11 +17,14 @@ nm = units.meter * 1e-9
 fs = units.second * 1e-15
 ps = units.second * 1e-12
 
+
 class integrationFailError(Exception):
     pass
 
+
 class eKExceedsError(Exception):
     pass 
+
 
 class Simulation():
     """Base class for openmm simulations
@@ -184,10 +187,12 @@ class Simulation():
         self.kB = units.BOLTZMANN_CONSTANT_kB * \
             units.AVOGADRO_CONSTANT_NA  # Boltzmann constant
         self.kT = self.kB * self.temperature  # thermal energy        
+        
         # All masses are the same,
         # unless individual mass multipliers are specified in self.load()
-        self.bondsForException = []
         self.conlen = 1. * nm * self.length_scale
+        
+        self.kbondScalingFactor = float((2 * self.kT / (self.conlen) ** 2) / (units.kilojoule_per_mole / nm ** 2))
         self.system = openmm.System()
         self.PBC = kwargs["PBC"]
 
@@ -200,10 +205,6 @@ class Simulation():
 
         self.forceDict = {}  # Dictionary to store forces
         
-
-
-
-
 
     def saveFolder(self, folder):
         """
@@ -219,44 +220,11 @@ class Simulation():
             os.mkdir(folder)
         self.folder = folder
 
+        
     def _exitProgram(self, line):
         print(line)
         print("--------------> Bye <---------------")
         exit()
-
-
-    def setChains(self, chains=[(0, None, 0)]):
-        """
-        Sets configuration of the chains in the system. This information is
-        later used by the chain-forming methods, e.g. addHarmonicPolymerBonds()
-        and addStiffness().
-        This method supersedes the less general getLayout().
-
-        Parameters
-        ----------
-
-        chains: list of tuples
-            The list of chains in format [(start, end, isRing)]. The particle
-            range should be semi-open, i.e. a chain (0,3,0) links
-            the particles 0, 1 and 2. If bool(isRing) is True than the first
-            and the last particles of the chain are linked into a ring.
-            The default value links all particles of the system into one chain.
-        """
-
-        if not hasattr(self, "N"):
-            raise ValueError("Load the chain first, or provide chain length")
-
-        self.chains = [i for i in chains]  # copy
-        for i in range(len(self.chains)):
-            start, end, isRing = self.chains[i]
-            end = self.N if (end is None) else end
-            self.chains[i] = (start, end, isRing)
-
-    def getChains(self):
-        "returns configuration of chains"
-        return self.chains
-
-
 
 
     def save(self, filename=None, mode="joblib"):
@@ -291,6 +259,7 @@ class Simulation():
         "Returns an Nx3 array of positions"
         return np.asarray(self.data / nm, dtype=np.float32)
 
+    
     def getScaledData(self):
         """Returns data, scaled back to PBC box """
         if self.PBC != True:
@@ -302,6 +271,7 @@ class Simulation():
         assert toRet.min() >= 0
         return toRet
 
+    
     def setData(self, data, center=False, random_offset = 1e-5):
         """Sets particle positions
 
@@ -344,10 +314,6 @@ class Simulation():
         self.data = units.Quantity(data, nm)
         
         
-        
-        if not hasattr(self, "chains"):
-            self.setChains()
-
         if hasattr(self, "context"):
             self.initPositions()        
         
@@ -363,6 +329,7 @@ class Simulation():
         data = data - np.mean(data, axis=0)[None,:]
         return np.sqrt(np.sum(np.var(np.array(data), 0)))    
 
+    
     def dist(self, i, j):
         """
         Calculates distance between particles i and j
@@ -370,6 +337,7 @@ class Simulation():
         data = self.getData()
         dif = data[i] - data[j]
         return np.sqrt(sum(dif ** 2))
+        
         
     def _applyForces(self):
         """Adds all particles to the system.
@@ -384,30 +352,17 @@ class Simulation():
         for mass in self.masses:
             self.system.addParticle(mass)
 
-        print("Number of exceptions:", len(self.bondsForException))
 
-        if len(self.bondsForException) > 0:
-            exc = list(set([tuple(i) for i in np.sort(np.array(self.bondsForException), axis=1)]))
-
-        for i in list(self.forceDict.keys()):  # Adding exceptions
+        for i in list(self.forceDict.keys()):  # Adding forces
             force = self.forceDict[i]
-            if hasattr(force, "addException"):
-                print('Add exceptions for {0} force'.format(i))
-                for pair in exc:
-                    force.addException(int(pair[0]),
-                        int(pair[1]), 0, 0, 0, True)
-            elif hasattr(force, "addExclusion"):
-                print('Add exclusions for {0} force'.format(i))
-                for pair in exc:
-                    # force.addExclusion(*pair)
-                    force.addExclusion(int(pair[0]), int(pair[1]))
                     
             if hasattr(force, "CutoffNonPeriodic") and hasattr(force, "CutoffPeriodic"):
                 if self.PBC:
                     force.setNonbondedMethod(force.CutoffPeriodic)
-                    print("Using periodic boundary conditions!!!!")
+                    print("Using periodic boundary conditions!!!")
                 else:
                     force.setNonbondedMethod(force.CutoffNonPeriodic)
+                    
             print("adding force ", i, self.system.addForce(self.forceDict[i]))
 
         self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
@@ -415,6 +370,7 @@ class Simulation():
         self.initVelocities()
         self.forcesApplied = True
 
+        
     def initVelocities(self,  temperature="current"):
         """Initializes particles velocities
 
@@ -448,6 +404,7 @@ class Simulation():
         eP = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
         print("Particles loaded. Potential energy is %lf" % eP)
 
+        
     def reinitialize(self):
         """Reinitializes the OpenMM context object.
         This should be called if low-level parameters,
@@ -595,7 +552,7 @@ class Simulation():
         minmedmax = lambda x: (x.min(), np.median(x), x.mean(), x.max())
 
         
-        print("\n Statistics: number of particles: %d, number of chains: %d\n" % (self.N, len(self.chains)))        
+        print("\n Statistics: number of particles: %d\n" % (self.N, ))        
         print("Statistics for particle position")
         print("     mean position is: ", np.mean(
             pos, axis=0), "  Rg = ", self.RG())
@@ -622,10 +579,10 @@ class Simulation():
         print()
         print("Statistics for the system:")
         print("     Forces are: ", list(self.forceDict.keys()))
-        print("     Number of exceptions:  ", len(self.bondsForException))
         print()
         print("Potential Energy Ep = ", eP / self.N / self.kT)
 
+        
     def show(self, shifts=[0., 0.2, 0.4, 0.6, 0.8], scale="auto"):
         """shows system in rasmol by drawing spheres
         draws 4 spheres in between any two points (5 * N spheres total)

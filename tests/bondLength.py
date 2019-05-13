@@ -2,7 +2,7 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 import matplotlib.pyplot as plt 
 import numpy as np 
-from openmmlib import Simulation
+from polychrom import simulation, forces, forcekits
 import polymerutils
 import os
 
