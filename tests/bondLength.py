@@ -57,7 +57,7 @@ def exampleOpenmm():
 
 
     # -----------Adding forces ---------------
-#    sim.sphericalConfinement(density=0.85, k=1)
+#    forces.sphericalConfinement(sim, density=0.85, k=1)
     # Specifying density is more intuitive than radius
     # k is the slope of confinement potential, measured in kT/mon
     # set k=5 for harsh confinement
