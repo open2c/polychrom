@@ -54,10 +54,6 @@ def exampleOpenmm():
 
     sim.setData(polymer, center=True)  # loads a polymer, puts a center of mass at zero
 
-    # -----------Initialize conformation of the chains--------
-    # By default the library assumes you have one polymer chain
-    # If you want to make it a ring, or more than one chain, use self.setChains
-    # self.setChains([(0,50,1),(50,None,0)]) will set a 50-monomer ring and a chain from monomer 50 to the end
 
 
     # -----------Adding forces ---------------
@@ -69,6 +65,12 @@ def exampleOpenmm():
 
     forcekits.polymerChains(
         sim,
+        # By default the library assumes you have one polymer chain
+        # If you want to make it a ring, or more than one chain, provide a chains parameter
+        # chains = [(0, 50, True), (50, None, False)], # set a 50-monomer ring and a chain from monomer 50 to the end
+        
+        #bondForceFunc=forces.FENEBonds, # uncomment to bind particles in the chains with 
+                                         # a constant force (i.e. use a linear potential instead of harmonic)
         bondForceKwags={'wiggleDist':0.05}, # Bond distance will fluctuate +- 0.05 on average
         
         #angleForceFunc=None, # uncomment to disable stiffness 
