@@ -57,12 +57,6 @@ def exampleOpenmm():
 
 
     # -----------Adding forces ---------------
-#    forces.sphericalConfinement(sim, density=0.85, k=1)
-    # Specifying density is more intuitive than radius
-    # k is the slope of confinement potential, measured in kT/mon
-    # set k=5 for harsh confinement
-    # and k = 0.2 or less for collapse simulation
-
     forcekits.polymerChains(
         sim,
         # By default the library assumes you have one polymer chain
@@ -81,6 +75,12 @@ def exampleOpenmm():
         #nonbondedForceFunc=None, # uncomment to disable particle repulsion
         nonbondedForceKwargs={'trunc':1.5},
         )
+
+#    forces.sphericalConfinement(sim, density=0.85, k=1)
+    # Specifying density is more intuitive than radius
+    # k is the slope of confinement potential, measured in kT/mon
+    # set k=5 for harsh confinement
+    # and k = 0.2 or less for collapse simulation
 
 
     # If your simulation does not start, consider using energy minimization below
