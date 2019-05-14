@@ -2,7 +2,7 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 import matplotlib.pyplot as plt 
 import numpy as np 
-from polychrom import simulation, forces, forcekits
+from polychrom import simulation, forces, forcekits, starting_conformation
 import polymerutils
 import os
 
@@ -26,8 +26,13 @@ def exampleOpenmm():
     #  which would automatically adjusts timestep
     # This is relevant, for example, for simulations of polymer collapse
     # If simulation blows up, decrease errorTol by a factor of two and try again
-    a = Simulation(thermostat=0.02)  # timestep not necessary for variableLangevin
-    a.setup(platform="cuda", integrator="variableLangevin", errorTol=0.06, verbose=True)
+    a = simulation.Simulation(
+        thermostat=0.02,
+        platform="cuda", 
+        integrator="variableLangevin", 
+        errorTol=0.06, # a variableLangevin thermostat automatically calculates the timestep
+                       # for a given error level 
+        verbose=True)
 
     a.saveFolder("trajectory")  # folder where to save trajectory
 
@@ -43,10 +48,10 @@ def exampleOpenmm():
     # polymer = polymerutils.create_spiral(r1=4, r2=10, N=8000)
     # Creates a compact polymer arranged in a cylinder of radius 10, 8000 monomers long
 
-    polymer = polymerutils.create_random_walk(1, 8000)
+    polymer = starting_conformation.create_random_walk(1, 8000)
     # Creates an extended "random walk" conformation of length 8000
 
-    a.load(polymer, center=True)  # loads a polymer, puts a center of mass at zero
+    a.setData(polymer, center=True)  # loads a polymer, puts a center of mass at zero
 
     # -----------Initialize conformation of the chains--------
     # By default the library assumes you have one polymer chain
@@ -55,24 +60,23 @@ def exampleOpenmm():
 
 
     # -----------Adding forces ---------------
-#    a.addSphericalConfinement(density=0.85, k=1)
+#    a.sphericalConfinement(density=0.85, k=1)
     # Specifying density is more intuitive than radius
     # k is the slope of confinement potential, measured in kT/mon
     # set k=5 for harsh confinement
     # and k = 0.2 or less for collapse simulation
 
-    a.addHarmonicPolymerBonds(wiggleDist=0.05)
+    forcekits.polymerChains(
+        a,
+        wiggleDist=0.05,
+        #angleForceFunc=None,
+        angleForceKwargs={'k':4},
+        # K is more or less arbitrary, k=4 corresponds to presistence length of 4,
+        # k=1.5 is recommended to make polymer realistically flexible; k=8 is very stiff
+        #nonbondedForceFunc=None,
+        )
     # Bond distance will fluctuate +- 0.05 on average
 
-    #a.addGrosbergRepulsiveForce(trunc=50)
-    # this will resolve chain crossings and will not let chain cross anymore
-
-    # a.addGrosbergRepulsiveForce(trunc=5)
-    # this will let chains cross sometimes
-
-    #a.addStiffness(k=4)
-    # K is more or less arbitrary, k=4 corresponds to presistence length of 4,
-    # k=1.5 is recommended to make polymer realistically flexible; k=8 is very stiff
 
     # If your simulation does not start, consider using energy minimization below
 
