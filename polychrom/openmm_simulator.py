@@ -29,6 +29,8 @@ class Simulation():
     """
     def __init__(self,  **kwargs): 
         """
+        
+        All parameters here are floats. Units specified in a parameter. 
 
         Parameters
         ----------
@@ -103,7 +105,7 @@ class Simulation():
         defaultArgs = {"platform":"CUDA", 
                        "GPU":"0",
                        "integrator":"variablelangevin", 
-                       "temperature":300 * units.kelvin,
+                       "temperature":300,
                        "PBC":False,
                         "length_scale":1.0,
                         "mass":100, 
@@ -174,7 +176,6 @@ class Simulation():
         self.verbose = kwargs["verbose"]
         self.loaded = False  # check if the data is loaded
         self.forcesApplied = False
-        self.folder = "."
         self.length_scale = kwargs["length_scale"]
         self.eKcritical = kwargs["maxEk"]  # Max allowed kinetic energy
         self.nm = nm
@@ -183,7 +184,7 @@ class Simulation():
 
         self.kB = units.BOLTZMANN_CONSTANT_kB * \
             units.AVOGADRO_CONSTANT_NA  # Boltzmann constant
-        self.kT = self.kB * self.temperature  # thermal energy        
+        self.kT = self.kB * self.temperature * units.kelvin # thermal energy        
         # All masses are the same,
         # unless individual mass multipliers are specified in self.load()
         self.bondsForException = []
@@ -195,35 +196,8 @@ class Simulation():
             PBCbox = np.array(kwargs["PBCbox"])            
             self.system.setDefaultPeriodicBoxVectors([PBCbox[0], 0.,
                 0.], [0., PBCbox[1], 0.], [0., 0., PBCbox[2]])
-            self.BoxSizeReal = datasize
-
 
         self.forceDict = {}  # Dictionary to store forces
-        
-
-
-
-
-
-    def saveFolder(self, folder):
-        """
-        sets the folder where to save data.
-
-        Parameters
-        ----------
-            folder : string
-                folder to save the data
-
-        """
-        if os.path.exists(folder) == False:
-            os.mkdir(folder)
-        self.folder = folder
-
-    def _exitProgram(self, line):
-        print(line)
-        print("--------------> Bye <---------------")
-        exit()
-
 
     def setChains(self, chains=[(0, None, 0)]):
         """
@@ -255,37 +229,6 @@ class Simulation():
     def getChains(self):
         "returns configuration of chains"
         return self.chains
-
-
-
-
-    def save(self, filename=None, mode="joblib"):
-        """Saves conformation plus some metadata.
-        Metadata is not interpreted by this library, and is for your reference
-
-        If data is saved to the .vtf format,
-        the same filename should be specified each time.
-        .vtf format is then viewable by VMD.
-
-        Parameters:
-            mode : str
-                "h5dict" : use build-in h5dict storage
-                "joblib" : use joblib storage
-                "txt" : use text file storage
-
-            filename : str or None
-                Filename not needed for h5dict storage
-                (use initStorage command) for joblib and txt,
-                if filename not provided, it is created automatically.
-
-        """
-        mode = mode.lower()
-
-
-        if filename is None:
-            filename = "block%d.dat" % self.step
-            filename = os.path.join(self.folder, filename)
-
             
     def getData(self):
         "Returns an Nx3 array of positions"
@@ -296,7 +239,7 @@ class Simulation():
         if self.PBC != True:
             return self.getData()
         alldata = self.getData()
-        boxsize = np.array(self.BoxSizeReal)
+        boxsize = np.array(self.kwargs["PBCbox"])
         mults = np.floor(alldata / boxsize[None, :])
         toRet = alldata - mults * boxsize[None, :]
         assert toRet.min() >= 0
@@ -324,7 +267,7 @@ class Simulation():
         
         data = np.asarray(data, dtype="float")
         if len(data) != self.N: 
-            raise ValueError(f"length of data, {len(self.data)} does not match N, {self.N}")
+            raise ValueError(f"length of data, {len(data)} does not match N, {self.N}")
 
         if data.shape[1] != 3:
             raise ValueError("Data is not shaped correctly. Needs (N,3), provided: {0}".format(data.shape))
@@ -343,11 +286,8 @@ class Simulation():
         
         self.data = units.Quantity(data, nm)
         
-        
-        
         if not hasattr(self, "chains"):
             self.setChains()
-
         if hasattr(self, "context"):
             self.initPositions()        
         
@@ -481,7 +421,7 @@ class Simulation():
         print("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
 
-    def doBlock(self, steps=None, increment=True,  reinitialize=True, maxIter=0, checkFunctions=[]):
+    def doBlock(self, steps=None, increment=True,  reinitialize=True, maxIter=0, checkFunctions=[], getVelocities = False):
         """performs one block of simulations, doing steps timesteps,
         or steps_per_block if not specified.
 
@@ -500,33 +440,22 @@ class Simulation():
                 sys.stdout.flush()
             self._applyForces()
             self.forcesApplied = True
-            
-        if increment == True:
-            self.step += 1
 
-        if (increment == True) and ((self.step % 50) == 25):
-            self.printStats()
-
-        print("bl=%d" % (self.step), end=' ')
-        sys.stdout.flush()
-        if self.verbose:
-            print()
-            sys.stdout.flush()
 
         a = time.time()
         self.integrator.step(steps)  # integrate!
-
-        # get state of a system: positions, energies
-        self.state = self.context.getState(getPositions=True,
+        
+        self.state = self.context.getState(getPositions=True,getVelocities=getVelocities,
                                            getEnergy=True)
-
-        b = time.time()
+            
+        b = time.time()        
         coords = self.state.getPositions(asNumpy=True)
         newcoords = coords / nm
 
         # calculate energies in KT/particle
         eK = (self.state.getKineticEnergy() / self.N / self.kT)
         eP = self.state.getPotentialEnergy() / self.N / self.kT
+        curtime = self.state.getTime() / units.picosecond
 
         print("pos[1]=[%.1lf %.1lf %.1lf]" % tuple(newcoords[0]), end=' ')
 
@@ -539,19 +468,17 @@ class Simulation():
         if np.isnan(newcoords).any():
             raise integrationFailError("Coordinates are NANs")
         if (eK > self.eKcritical):
-            raise eKExceedsError("Ek exceeds {0}".format(eKcritical))
+            raise eKExceedsError("Ek exceeds {0}".format(self.eKcritical))
         if  (np.isnan(eK)) or (np.isnan(eP)):
             raise integrationFailError("Energy is NAN)")
         if checkFail:
             raise integrationFailError("Custom checks failed")
 
-        dif = np.sqrt(np.mean(np.sum((newcoords -
-            self.getData()) ** 2, axis=1)))
+        dif = np.sqrt(np.mean(np.sum((newcoords - self.getData()) ** 2, axis=1)))
         print("dr=%.2lf" % (dif,), end=' ')
         self.data = coords
         print("t=%2.1lfps" % (self.state.getTime() / ps), end=' ')
-        print("kin=%.2lf pot=%.2lf" % (eK,
-            eP), "Rg=%.3lf" % self.RG(), end=' ')
+        print("kin=%.2lf pot=%.2lf" % (eK,eP), "Rg=%.3lf" % self.RG(), end=' ')
         print("SPS=%.0lf" % (steps / (float(b - a))), end=' ')
 
         if (self.integrator_type.lower() == 'variablelangevin'
@@ -561,11 +488,13 @@ class Simulation():
             mass = self.system.getParticleMass(1)
             dx = (units.sqrt(2.0 * eK * self.kT / mass) * dt)
             print('dx=%.2lfpm' % (dx / nm * 1000.0), end=' ')
+          
 
-        print("")
-
-        return {"Ep":eP, "Ek":eK}
-
+        result =  {"coordinates":newcoords, "potentialEnergy":eP, "kineticEnergy":eK, "time":curtime}
+        if getVelocities:
+            result["velocities"] = self.state.getVelocities() / (units.nanometer / units.picosecond)
+        return result
+    
 
     def printStats(self):
         """Prints detailed statistics of a system.
@@ -600,8 +529,7 @@ class Simulation():
         print("     mean position is: ", np.mean(
             pos, axis=0), "  Rg = ", self.RG())
         print("     median bond size is ", np.median(bonds))
-        print("     three shortest/longest (<10)/ bonds are ", sbonds[
-            :3], "  ", sbonds[sbonds < 10][-3:])
+        print("     three shortest/longest (<10)/ bonds are ", sbonds[:3], "  ", sbonds[sbonds < 10][-3:])
         if (sbonds > 10).sum() > 0:
             print("longest 10 bonds are", sbonds[-10:])
 

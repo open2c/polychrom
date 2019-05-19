@@ -197,9 +197,8 @@ def polynomialRepulsiveForce(sim_object, trunc=3.0, radiusMult=1.):
         "rsc4 = rsc2 * rsc2;"
         "rsc2 = rsc * rsc;"
         "rsc = r / REPsigma * REPrmin;")
-    sim_object.forceDict["Nonbonded"] = openmm.CustomNonbondedForce(
-        repul_energy)
-    repulforceGr = sim_object.forceDict["Nonbonded"]
+    sim_object.forceDict["polynomialRepulsiveForce"] = openmm.CustomNonbondedForce(repul_energy)
+    repulforceGr = sim_object.forceDict["polynomialRepulsiveForce"]
 
     repulforceGr.addGlobalParameter('REPe', trunc * sim_object.kT)
     repulforceGr.addGlobalParameter('REPsigma', radius)
