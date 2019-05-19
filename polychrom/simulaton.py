@@ -17,11 +17,14 @@ nm = units.meter * 1e-9
 fs = units.second * 1e-15
 ps = units.second * 1e-12
 
+
 class integrationFailError(Exception):
     pass
 
+
 class eKExceedsError(Exception):
     pass 
+
 
 class Simulation():
     """Base class for openmm simulations
@@ -184,11 +187,17 @@ class Simulation():
 
         self.kB = units.BOLTZMANN_CONSTANT_kB * \
             units.AVOGADRO_CONSTANT_NA  # Boltzmann constant
+<<<<<<< HEAD:polychrom/openmm_simulator.py
         self.kT = self.kB * self.temperature * units.kelvin # thermal energy        
+=======
+        self.kT = self.kB * self.temperature  # thermal energy        
+        
+>>>>>>> origin/ag_rework:polychrom/simulaton.py
         # All masses are the same,
         # unless individual mass multipliers are specified in self.load()
-        self.bondsForException = []
         self.conlen = 1. * nm * self.length_scale
+        
+        self.kbondScalingFactor = float((2 * self.kT / (self.conlen) ** 2) / (units.kilojoule_per_mole / nm ** 2))
         self.system = openmm.System()
         self.PBC = kwargs["PBC"]
 
@@ -198,6 +207,7 @@ class Simulation():
                 0.], [0., PBCbox[1], 0.], [0., 0., PBCbox[2]])
 
         self.forceDict = {}  # Dictionary to store forces
+<<<<<<< HEAD:polychrom/openmm_simulator.py
 
     def setChains(self, chains=[(0, None, 0)]):
         """
@@ -229,11 +239,64 @@ class Simulation():
     def getChains(self):
         "returns configuration of chains"
         return self.chains
+=======
+        
+
+    def saveFolder(self, folder):
+        """
+        sets the folder where to save data.
+
+        Parameters
+        ----------
+            folder : string
+                folder to save the data
+
+        """
+        if os.path.exists(folder) == False:
+            os.mkdir(folder)
+        self.folder = folder
+
+        
+    def _exitProgram(self, line):
+        print(line)
+        print("--------------> Bye <---------------")
+        exit()
+
+
+    def save(self, filename=None, mode="joblib"):
+        """Saves conformation plus some metadata.
+        Metadata is not interpreted by this library, and is for your reference
+
+        If data is saved to the .vtf format,
+        the same filename should be specified each time.
+        .vtf format is then viewable by VMD.
+
+        Parameters:
+            mode : str
+                "h5dict" : use build-in h5dict storage
+                "joblib" : use joblib storage
+                "txt" : use text file storage
+
+            filename : str or None
+                Filename not needed for h5dict storage
+                (use initStorage command) for joblib and txt,
+                if filename not provided, it is created automatically.
+
+        """
+        mode = mode.lower()
+
+
+        if filename is None:
+            filename = "block%d.dat" % self.step
+            filename = os.path.join(self.folder, filename)
+
+>>>>>>> origin/ag_rework:polychrom/simulaton.py
             
     def getData(self):
         "Returns an Nx3 array of positions"
         return np.asarray(self.data / nm, dtype=np.float32)
 
+    
     def getScaledData(self):
         """Returns data, scaled back to PBC box """
         if self.PBC != True:
@@ -245,6 +308,7 @@ class Simulation():
         assert toRet.min() >= 0
         return toRet
 
+    
     def setData(self, data, center=False, random_offset = 1e-5):
         """Sets particle positions
 
@@ -286,8 +350,12 @@ class Simulation():
         
         self.data = units.Quantity(data, nm)
         
+<<<<<<< HEAD:polychrom/openmm_simulator.py
         if not hasattr(self, "chains"):
             self.setChains()
+=======
+        
+>>>>>>> origin/ag_rework:polychrom/simulaton.py
         if hasattr(self, "context"):
             self.initPositions()        
         
@@ -303,6 +371,7 @@ class Simulation():
         data = data - np.mean(data, axis=0)[None,:]
         return np.sqrt(np.sum(np.var(np.array(data), 0)))    
 
+    
     def dist(self, i, j):
         """
         Calculates distance between particles i and j
@@ -310,6 +379,7 @@ class Simulation():
         data = self.getData()
         dif = data[i] - data[j]
         return np.sqrt(sum(dif ** 2))
+        
         
     def _applyForces(self):
         """Adds all particles to the system.
@@ -324,30 +394,17 @@ class Simulation():
         for mass in self.masses:
             self.system.addParticle(mass)
 
-        print("Number of exceptions:", len(self.bondsForException))
 
-        if len(self.bondsForException) > 0:
-            exc = list(set([tuple(i) for i in np.sort(np.array(self.bondsForException), axis=1)]))
-
-        for i in list(self.forceDict.keys()):  # Adding exceptions
+        for i in list(self.forceDict.keys()):  # Adding forces
             force = self.forceDict[i]
-            if hasattr(force, "addException"):
-                print('Add exceptions for {0} force'.format(i))
-                for pair in exc:
-                    force.addException(int(pair[0]),
-                        int(pair[1]), 0, 0, 0, True)
-            elif hasattr(force, "addExclusion"):
-                print('Add exclusions for {0} force'.format(i))
-                for pair in exc:
-                    # force.addExclusion(*pair)
-                    force.addExclusion(int(pair[0]), int(pair[1]))
                     
             if hasattr(force, "CutoffNonPeriodic") and hasattr(force, "CutoffPeriodic"):
                 if self.PBC:
                     force.setNonbondedMethod(force.CutoffPeriodic)
-                    print("Using periodic boundary conditions!!!!")
+                    print("Using periodic boundary conditions!!!")
                 else:
                     force.setNonbondedMethod(force.CutoffNonPeriodic)
+                    
             print("adding force ", i, self.system.addForce(self.forceDict[i]))
 
         self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
@@ -355,6 +412,7 @@ class Simulation():
         self.initVelocities()
         self.forcesApplied = True
 
+        
     def initVelocities(self,  temperature="current"):
         """Initializes particles velocities
 
@@ -388,6 +446,7 @@ class Simulation():
         eP = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
         print("Particles loaded. Potential energy is %lf" % eP)
 
+        
     def reinitialize(self):
         """Reinitializes the OpenMM context object.
         This should be called if low-level parameters,
@@ -524,7 +583,7 @@ class Simulation():
         minmedmax = lambda x: (x.min(), np.median(x), x.mean(), x.max())
 
         
-        print("\n Statistics: number of particles: %d, number of chains: %d\n" % (self.N, len(self.chains)))        
+        print("\n Statistics: number of particles: %d\n" % (self.N, ))        
         print("Statistics for particle position")
         print("     mean position is: ", np.mean(
             pos, axis=0), "  Rg = ", self.RG())
@@ -550,10 +609,10 @@ class Simulation():
         print()
         print("Statistics for the system:")
         print("     Forces are: ", list(self.forceDict.keys()))
-        print("     Number of exceptions:  ", len(self.bondsForException))
         print()
         print("Potential Energy Ep = ", eP / self.N / self.kT)
 
+        
     def show(self, shifts=[0., 0.2, 0.4, 0.6, 0.8], scale="auto"):
         """shows system in rasmol by drawing spheres
         draws 4 spheres in between any two points (5 * N spheres total)

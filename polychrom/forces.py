@@ -1,149 +1,121 @@
 import simtk.openmm as openmm
 import simtk.unit as units
 
+import itertools
+
 nm = units.meter * 1e-9
 fs = units.second * 1e-15
 ps = units.second * 1e-12
 
 import numpy as np 
 
-def _initHarmonicBondForce(sim_object):
-    "Internal, inits harmonic forse for polymer and non-polymer bonds"
-    if "HarmonicBondForce" not in list(sim_object.forceDict.keys()):
-        sim_object.forceDict["HarmonicBondForce"] = openmm.HarmonicBondForce()
-    sim_object.bondType = "Harmonic"
 
-
-def _initAbsBondForce(sim_object):
-    "inits abs(x) FENE bond force"
-    if "AbsBondForce" not in list(sim_object.forceDict.keys()):
-        force = "(1. / ABSwiggle) * ABSunivK * "\
-        "(sqrt((r-ABSr0 * ABSconlen)* "\
-        " (r - ABSr0 * ABSconlen) + ABSa * ABSa) - ABSa)"
-
-        bondforceAbs = openmm.CustomBondForce(force)
-        bondforceAbs.addPerBondParameter("ABSwiggle")
-        bondforceAbs.addPerBondParameter("ABSr0")
-        bondforceAbs.addGlobalParameter("ABSunivK", sim_object.kT / sim_object.conlen)
-        bondforceAbs.addGlobalParameter("ABSa", 0.02 * sim_object.conlen)
-        bondforceAbs.addGlobalParameter("ABSconlen", sim_object.conlen)
-        sim_object.forceDict["AbsBondForce"] = bondforceAbs
-
-
-
-def addBond(sim_object,
-            i, j,  # particles connected by bond
-            bondWiggleDistance=0.2,
-            # Flexibility of the bond,
-            # measured in distance at which energy equals kT
-            distance=None,  # Equilibrium length of the bond, default = sim_object.length_scale
-            bondType=None,  # Harmonic, Grosberg, ABS
-            verbose=None):  # Set this to False or True to override sim_object.verbose for this function
-            # and don't want to contaminate output by 10000 messages
-    """Adds bond between two particles, allows to specify parameters
-
-    Parameters
-    ----------
-
-    i,j : int
-        Particle numbers
-
-    bondWiggleDistance : float
-        Average displacement from the equilibrium bond distance
-
-    bondType : "Harmonic" or "abs"
-        Type of bond. Distance and bondWiggleDistance can be
-        specified for harmonic bonds only
-
-    verbose : bool
-        Set this to False if you're in verbose mode and don't want to
-        print "bond added" message
-
-    """
-
-    if not hasattr(sim_object, "bondLengths"):
-        sim_object.bondLengths = []
-
-    if verbose is None:
-        verbose = sim_object.verbose
-    if (i >= sim_object.N) or (j >= sim_object.N):
-        raise ValueError("\nCannot add bond with monomers %d,%d that"\
-        "are beyound the polymer length %d" % (i, j, sim_object.N))
-
-    bondSize = float(bondWiggleDistance)
-
-    if distance is None:
-        distance = sim_object.length_scale
+def _to_array_1d(scalar_or_array, arrlen, dtype=float):
+    if not hasattr(bondLength, "__iter__"):
+        outarr = np.full(arrlen, scalar_or_array, dtype)
     else:
-        distance = sim_object.length_scale * distance
-    distance = float(distance)
-
-    if not hasattr(sim_object, "kbondScalingFactor"):  # caching kbondScalingFactor - performance improvement... 
-        t = (2 * sim_object.kT / (sim_object.conlen) ** 2) / (units.kilojoule_per_mole / nm ** 2)
-        print(t)
-        sim_object.kbondScalingFactor = float((2 * sim_object.kT / (sim_object.conlen) ** 2) / (units.kilojoule_per_mole / nm ** 2))
+        outarr = np.asarray(scalar_or_array, dtype=dtype)
     
-    kbondScalingFactor = sim_object.kbondScalingFactor  #... not to calculate it eevry time we add bond 
-    # this will be an integer, so we don't have to deal with slow simtk.units every time we add a bond 
-
-    if bondType is None:
-        bondType = sim_object.bondType
-
-    if bondType.lower() == "harmonic":
-        _initHarmonicBondForce(sim_object)
-        kbond = kbondScalingFactor / (bondSize ** 2)  # using kbondScalingFactor because force accepts parameters with units
-        sim_object.forceDict["HarmonicBondForce"].addBond(int(i), int(j), float(distance), float(kbond))
-        sim_object.bondLengths.append([int(i), int(j), float(distance), float(bondSize)])
-    elif bondType.lower() == "abs":
-        _initAbsBondForce(sim_object)
-        sim_object.forceDict["AbsBondForce"].addBond(int(i), int(
-            j), [float(bondWiggleDistance), float(distance)])  # force is initialized to accept floats already
-        sim_object.bondLengths.append([int(i), int(j), float(distance), float(bondSize)])
-    else:
-        sim_object._exitProgram("Bond type not known")
-    if verbose == True:
-        print("%s bond added between %d,%d, wiggle %lf dist %lf" % (
-            bondType, i, j, float(bondWiggleDistance), float(distance)))
+    if len(outarr) != arrlen
+        raise ValueError('The length of the array differs from the expected one!')
+        
+    return outarr
 
 
-
-def harmonicPolymerBonds(sim_object,
-                            wiggleDist=0.05,
-                            bondLength=1.0,
-                            exceptBonds=True):
-    """Adds harmonic bonds connecting polymer chains
+def harmonicBonds(sim_object,
+                  bonds,
+                  bondWiggleDistance=0.05,
+                  bondLength=1.0):
+    """Adds harmonic bonds
 
     Parameters
     ----------
-
-    wiggleDist : float
-        Average displacement from the equilibrium bond distance
-    bondLength : float
-        The length of the bond
-    exceptBonds : bool
-        If True then do not calculate non-bonded forces between the
-        particles connected by a bond. True by default.
+    
+    bonds : iterable of (int, int)
+        Pairs of particle indices to be connected with a bond.
+    bondWiggleDistance : float or iterable of float
+        Average displacement from the equilibrium bond distance.
+        Can be provided per-particle.
+    bondLength : float or iterable of float
+        The length of the bond.
+        Can be provided per-particle.
     """
+    
+    bondForce =  openmm.HarmonicBondForce()
+
+    bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
+    bondWiggleDistance = _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
+    
+    # using kbondScalingFactor because force accepts parameters with units
+    kbond = sim_object.kbondScalingFactor / (bondWiggleDistance ** 2)  
+
+    for bond_idx, (i, j) in enumerate(bonds):
+        if (i >= sim_object.N) or (j >= sim_object.N):
+            raise ValueError("\nCannot add bond with monomers %d,%d that"\
+            "are beyound the polymer length %d" % (i, j, sim_object.N))
+        
+        bondForce.addBond(int(i), 
+                          int(j), 
+                          float(bondLength[bond_idx]), 
+                          float(kbond[bond_idx]))
+        
+    sim_object.forceDict["HarmonicBondForce"] = bondForce
+    
+    return bondForce
+    
+    
+def FENEBonds(sim_object,
+              bonds,
+              bondWiggleDistance=0.05,
+              bondLength=1.0):
+    """Adds harmonic bonds
+
+    Parameters
+    ----------
+    
+    bonds : iterable of (int, int)
+        Pairs of particle indices to be connected with a bond.
+    bondWiggleDistance : float
+        Average displacement from the equilibrium bond distance.
+        Can be provided per-particle.
+    bondLength : float
+        The length of the bond.
+        Can be provided per-particle.
+    """
+    
+    forceExpr = "(1. / ABSwiggle) * ABSunivK * "\
+                "(sqrt((r-ABSr0 * ABSconlen)* "\
+                " (r - ABSr0 * ABSconlen) + ABSa * ABSa) - ABSa)"
+    bondforceAbs = openmm.CustomBondForce(force)
+    
+    bondforceAbs.addPerBondParameter("ABSwiggle")
+    bondforceAbs.addPerBondParameter("ABSr0")
+    bondforceAbs.addGlobalParameter("ABSunivK", sim_object.kT / sim_object.conlen)
+    bondforceAbs.addGlobalParameter("ABSa", 0.02 * sim_object.conlen)
+    bondforceAbs.addGlobalParameter("ABSconlen", sim_object.conlen)
+
+    bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
+    bondWiggleDistance = _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
+    
+    for bond_idx, (i, j) in enumerate(bonds):
+        if (i >= sim_object.N) or (j >= sim_object.N):
+            raise ValueError("\nCannot add bond with monomers %d,%d that"\
+            "are beyound the polymer length %d" % (i, j, sim_object.N))
+        
+        bondforceAbs.addBond(int(i), 
+                             int(j), 
+                             [float(bondWiggleDistance[bond_idx]), 
+                              float(bondLength[bond_idx])]) 
+        
+    sim_object.forceDict["AbsBondForce"] = bondforceAbs
+    
+    return bondforceAbs
 
 
-    for start, end, isRing in sim_object.chains:
-        for j in range(start, end - 1):
-            addBond(sim_object, j, j + 1, wiggleDist,
-                distance=bondLength,
-                bondType="Harmonic", verbose=False)
-            if exceptBonds:
-                sim_object.bondsForException.append((j, j + 1))
-
-        if isRing:
-            addBond(sim_object, start, end - 1, wiggleDist,
-                distance=bondLength, bondType="Harmonic")
-            if exceptBonds:
-                sim_object.bondsForException.append((start, end - 1))
-            if sim_object.verbose == True:
-                print("ring bond added", start, end - 1)
-
-
-def angleForce(sim_object, k=1.5):
+def angleForce(
+        sim_object, 
+        triplets,
+        k=1.5):
     """Adds harmonic angle bonds. k specifies energy in kT at one radian
     If k is an array, it has to be of the length N.
     Xth value then specifies stiffness of the angle centered at
@@ -155,29 +127,30 @@ def angleForce(sim_object, k=1.5):
 
     k : float or list of length N
         Stiffness of the bond.
-        If list, then determines stiffness of the bond at monomer i.
+        If list, then determines the stiffness of the i-th triplet
         Potential is k * alpha^2 * 0.5 * kT
     """
-    try:
-        k[0]
-    except:
-        k = np.zeros(sim_object.N, float) + k
+    
+    k = _to_array_1d(k, len(triples)) 
+        
     stiffForce = openmm.CustomAngleForce(
         "kT*angK * (theta - 3.141592) * (theta - 3.141592) * (0.5)")
-    sim_object.forceDict["AngleForce"] = stiffForce
-    for start, end, isRing in sim_object.chains:
-        for j in range(start + 1, end - 1):
-            stiffForce.addAngle(j - 1, j, j + 1, [float(k[j])])
-        if isRing:
-            stiffForce.addAngle(int(end - 2),int( end - 1), int(start), [float(k[end - 1])  ])
-            stiffForce.addAngle(int(end - 1),int( start), int(start + 1), [float(k[start])  ])
-
+    
     stiffForce.addGlobalParameter("kT", sim_object.kT)
     stiffForce.addPerAngleParameter("angK")
+    
+    for triplet_idx, (p1, p2, p3) in enumerate(triplets):
+        stiffForce.addAngle(p1, p2, p3, [k[triplet_idx]])
+    
+    sim_object.forceDict["AngleForce"] = stiffForce
+    
+    return stiffForce
 
 
-
-def polynomialRepulsiveForce(sim_object, trunc=3.0, radiusMult=1.):
+def polynomialRepulsiveForce(
+        sim_object, 
+        trunc=3.0, 
+        radiusMult=1.):
     """This is a simple polynomial repulsive potential. It has the value
     of `trunc` at zero, stays flat until 0.6-0.7 and then drops to zero
     together with its first derivative at r=1.0.
@@ -197,8 +170,12 @@ def polynomialRepulsiveForce(sim_object, trunc=3.0, radiusMult=1.):
         "rsc4 = rsc2 * rsc2;"
         "rsc2 = rsc * rsc;"
         "rsc = r / REPsigma * REPrmin;")
+<<<<<<< HEAD:polychrom/openmm_forces.py
     sim_object.forceDict["polynomialRepulsiveForce"] = openmm.CustomNonbondedForce(repul_energy)
     repulforceGr = sim_object.forceDict["polynomialRepulsiveForce"]
+=======
+    repulforceGr = openmm.CustomNonbondedForce(repul_energy)
+>>>>>>> origin/ag_rework:polychrom/forces.py
 
     repulforceGr.addGlobalParameter('REPe', trunc * sim_object.kT)
     repulforceGr.addGlobalParameter('REPsigma', radius)
@@ -212,6 +189,11 @@ def polynomialRepulsiveForce(sim_object, trunc=3.0, radiusMult=1.):
         repulforceGr.addParticle(())
 
     repulforceGr.setCutoffDistance(nbCutOffDist)
+    
+    sim_object.forceDict["Nonbonded"] = repulforceGr
+    
+    return repulforceGr
+
 
 def smoothSquareWellForce(sim_object,
     repulsionEnergy=3.0, repulsionRadius=1.,
@@ -262,9 +244,8 @@ def smoothSquareWellForce(sim_object,
         "rshft = (r - REPsigma - ATTRdelta) / ATTRdelta * rmin12"
 
         )
-    sim_object.forceDict["Nonbonded"] = openmm.CustomNonbondedForce(
-        energy)
-    repulforceGr = sim_object.forceDict["Nonbonded"]
+    
+    repulforceGr =  openmm.CustomNonbondedForce( energy)
 
     repulforceGr.addGlobalParameter('REPe', repulsionEnergy * sim_object.kT)
     repulforceGr.addGlobalParameter('REPsigma', repulsionRadius * sim_object.conlen)
@@ -280,7 +261,12 @@ def smoothSquareWellForce(sim_object,
         repulforceGr.addParticle(())
 
     repulforceGr.setCutoffDistance(nbCutOffDist)
+    
+    sim_object.forceDict["Nonbonded"] = repulforceGr
+    
+    return repulforceGr
 
+    
 def selectiveSSWForce(sim_object,
     stickyParticlesIdxs,
     extraHardParticlesIdxs,
@@ -394,7 +380,8 @@ def selectiveSSWForce(sim_object,
              float(i in extraHardParticlesIdxs)))
 
     sim_object.forceDict["Nonbonded"] = repulforceGr
-
+    
+    return repulforceGr
 
 
 def cylindricalConfinement(sim_object, r, bottom=None, k=0.1, top=9999):
@@ -416,7 +403,6 @@ def cylindricalConfinement(sim_object, r, bottom=None, k=0.1, top=9999):
             "step(r-CYLaa) * CYLkb * (sqrt((r-CYLaa)*(r-CYLaa) + CYLt*CYLt) - CYLt);"
             "r = sqrt(x^2 + y^2 + CYLtt^2)")
 
-    sim_object.forceDict["CylindricalConfinement"] = extforce2
     for i in range(sim_object.N):
         extforce2.addParticle(i, [])
     extforce2.addGlobalParameter("CYLkb", k * sim_object.kT / nm)
@@ -428,7 +414,12 @@ def cylindricalConfinement(sim_object, r, bottom=None, k=0.1, top=9999):
     extforce2.addGlobalParameter("CYLaa", (r - 1. / k) * nm)
     extforce2.addGlobalParameter("CYLt", (1. / (10 * k)) * nm)
     extforce2.addGlobalParameter("CYLtt", 0.01 * nm)
+    
+    sim_object.forceDict["CylindricalConfinement"] = extforce2
+    
+    return extforce2
 
+    
 def sphericalConfinement(sim_object,
             r="density",  # radius... by default uses certain density
             k=5.,  # How steep the walls are
@@ -453,14 +444,12 @@ def sphericalConfinement(sim_object,
     spherForce = openmm.CustomExternalForce(
         "step(r-SPHaa) * SPHkb * (sqrt((r-SPHaa)*(r-SPHaa) + SPHt*SPHt) - SPHt) "
         ";r = sqrt(x^2 + y^2 + z^2 + SPHtt^2)")
-    sim_object.forceDict["SphericalConfinement"] = spherForce
 
     for i in range(sim_object.N):
         spherForce.addParticle(i, [])
     if r == "density":
         r = (3 * sim_object.N / (4 * 3.141592 * density)) ** (1 / 3.)
 
-    sim_object.sphericalConfinementRadius = r
     if sim_object.verbose == True:
         print("Spherical confinement with radius = %lf" % r)
     # assigning parameters of the force
@@ -468,9 +457,12 @@ def sphericalConfinement(sim_object,
     spherForce.addGlobalParameter("SPHaa", (r - 1. / k) * nm)
     spherForce.addGlobalParameter("SPHt", (1. / k) * nm / 10.)
     spherForce.addGlobalParameter("SPHtt", 0.01 * nm)
-    return r
-
-
+    
+    ## TODO: move 'r' elsewhere?..
+    sim_object.sphericalConfinementRadius = r
+    sim_object.forceDict["SphericalConfinement"] = spherForce
+    
+    return spherForce
 
 
 def tetherParticles(sim_object, particles, k=30, positions="current"):
@@ -487,12 +479,9 @@ def tetherParticles(sim_object, particles, k=30, positions="current"):
         Values >30 will require decreasing potential,
         but will make tethering rock solid.
     """
-    if "Tethering Force" not in sim_object.forceDict:
-        tetherForce = openmm.CustomExternalForce(
-          " TETHkb * ((x - TETHx0)^2 + (y - TETHy0)^2 + (z - TETHz0)^2)")
-        sim_object.forceDict["Tethering Force"] = tetherForce
-    else:
-        tetherForce = sim_object.forceDict["Tethering Force"]
+    
+    tetherForce = openmm.CustomExternalForce(
+          "TETHkb * ((x - TETHx0)^2 + (y - TETHy0)^2 + (z - TETHz0)^2)")
 
     # assigning parameters of the force
     tetherForce.addGlobalParameter("TETHkb", k * sim_object.kT / nm)
@@ -510,6 +499,11 @@ def tetherParticles(sim_object, particles, k=30, positions="current"):
         if sim_object.verbose == True:
             print("particle %d tethered! " % i)
 
+    sim_object.forceDict["Tethering Force"] = tetherForce
+    
+    return tetherForce
+            
+    
 def pullForce(sim_object, particles, forces):
     """
     adds force pulling on each particle
@@ -517,7 +511,6 @@ def pullForce(sim_object, particles, forces):
     forces: list of forces [[f0x,f0y,f0z],[f1x,f1y,f1z], ...]
     if there are fewer forces than particles forces are padded with forces[-1]
     """
-    import itertools
     pullForce = openmm.CustomExternalForce(
         "PULLx * x + PULLy * y + PULLz * z")
     pullForce.addPerParticleParameter("PULLx")
@@ -527,3 +520,5 @@ def pullForce(sim_object, particles, forces):
         force = [float(i) * (sim_object.kT / sim_object.conlen) for i in force]
         pullForce.addParticle(num, force)
     sim_object.forceDict["PullForce"] = pullForce
+    
+    return pullForce
