@@ -3,10 +3,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 import os,sys
-from polychrom.openmm_simulator import Simulation
-import polychrom.openmm_forces as forces 
-import polychrom.extra_openmm_forces as extra_forces
-from polychrom import starting_conformations
+import polychrom
+from polychrom import (simulation, starting_conformations,
+                       forces, extra_forces, forcekits)
 import simtk.openmm as openmm
 import os
 
@@ -30,10 +29,15 @@ def exampleOpenmm():
     #  which would automatically adjusts timestep
     # This is relevant, for example, for simulations of polymer collapse
     # If simulation blows up, decrease errorTol by a factor of two and try again
-    a = Simulation(platform="CUDA", integrator="variableLangevin", error_tol=0.002,  GPU = "0", 
-                   collision_rate=0.02, N = 10000)  # timestep not necessary for variableLangevin
+    sim = simulation.Simulation(
+            platform="CPU", 
+            integrator="variableLangevin", 
+            error_tol=0.002, 
+            GPU = "0", 
+            collision_rate=0.02, 
+            N = 10000)  # timestep not necessary for variableLangevin
 
-    a.saveFolder("trajectory")  # folder where to save trajectory
+    # sim.saveFolder("trajectory")  # folder where to save trajectory
 
 
     # ------- Creation of the initial conformation-----------
@@ -50,38 +54,51 @@ def exampleOpenmm():
     polymer = starting_conformations.grow_cubic(10000, 100)
     # Creates an extended "random walk" conformation of length 8000
 
-    a.setData(polymer, center=True)  # loads a polymer, puts a center of mass at zero
-
-    # -----------Initialize conformation of the chains--------
-    # By default the library assumes you have one polymer chain
-    # If you want to make it a ring, or more than one chain, use self.setChains
-    # self.setChains([(0,50,1),(50,None,0)]) will set a 50-monomer ring and a chain from monomer 50 to the end
-
+    sim.setData(polymer, center=True)  # loads a polymer, puts a center of mass at zero
 
     # -----------Adding forces ---------------
-    forces.sphericalConfinement(a, density=0.85, k=1)
+    forces.sphericalConfinement(sim, density=0.85, k=1)
     # Specifying density is more intuitive than radius
     # k is the slope of confinement potential, measured in kT/mon
     # set k=5 for harsh confinement
     # and k = 0.2 or less for collapse simulation
 
-    extra_forces.addGrosbergPolymerBonds(a)
-    # Bond distance will fluctuate +- 0.05 on average
+    # forces.polynomialRepulsiveForce(sim, trunc=10)
 
-    forces.polynomialRepulsiveForce(a, trunc=10)
-    extra_forces.addGrosbergStiffness(a)
-    # this will resolve chain crossings and will not let chain cross anymore
+    forcekits.polymerChains(
+        sim,
+        chains=[(0, None, False)],
 
-    # a.addGrosbergRepulsiveForce(trunc=5)
-    # this will let chains cross sometimes
+            # By default the library assumes you have one polymer chain
+            # If you want to make it a ring, or more than one chain, use self.setChains
+            # self.setChains([(0,50,1),(50,None,0)]) will set a 50-monomer ring and a chain from monomer 50 to the end
 
-    forces.angleForce(a, k=4)
-    # K is more or less arbitrary, k=4 corresponds to presistence length of 4,
-    # k=1.5 is recommended to make polymer realistically flexible; k=8 is very stiff
+        bondForceFunc=forces.harmonicBonds,
+        bondForceKwargs={
+            'bondLength':1.0,
+            'bondWiggleDistance':0.05, # Bond distance will fluctuate +- 0.05 on average
+         },
+
+        angleForceFunc=forces.angleForce,
+        angleForceKwargs={
+            'k':0.05
+            # K is more or less arbitrary, k=4 corresponds to presistence length of 4,
+            # k=1.5 is recommended to make polymer realistically flexible; k=8 is very stiff
+        },
+
+        nonbondedForceFunc=forces.polynomialRepulsiveForce,
+        nonbondedForceKwargs={
+            'trunc':3.0, # this will let chains cross sometimes
+            #'trunc':10.0, # this will resolve chain crossings and will not let chain cross anymore
+        },
+
+        exceptBonds=True,
+    )
+
 
     # If your simulation does not start, consider using energy minimization below
 
-    # a.localEnergyMinimization()
+    # sim.localEnergyMinimization()
     # A very efficient algorithm to reach local energy minimum
     # Use it to minimize energy if you're doing diffusion simulations
     # If you're simulating dynamics of collapse or expansion, please do not use it
@@ -94,13 +111,13 @@ def exampleOpenmm():
 
     
     
-    a.save()  # save original conformationz
+    #sim.save()  # save original conformationz
     
     for _ in range(10):  # Do 10 blocks
-        a.doBlock(2000)  # Of 2000 timesteps each
-        a.save()  # and save data every block
-    a.printStats()  # In the end, print statistics
-    #a.show()  # and show the polymer if you want to see it.
+        sim.doBlock(2000)  # Of 2000 timesteps each
+        #sim.save()  # and save data every block
+    sim.printStats()  # In the end, print statistics
+    #sim.show()  # and show the polymer if you want to see it.
 
 
 exampleOpenmm()

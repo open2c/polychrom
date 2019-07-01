@@ -1,3 +1,4 @@
+import numpy as np
 from . import forces
 
 def polymerChains(
@@ -5,10 +6,10 @@ def polymerChains(
     chains=[(0, None, False)],
 
     bondForceFunc=forces.harmonicBonds,
-    bondForceKwargs={'wiggleDist':0.05,
+    bondForceKwargs={'bondWiggleDistance':0.05,
                      'bondLength':1.0},
 
-    angleForceFunc=forces.harmonicBonds,
+    angleForceFunc=forces.angleForce,
     angleForceKwargs={'k':0.05},
 
     nonbondedForceFunc=forces.polynomialRepulsiveForce,
@@ -34,11 +35,13 @@ def polymerChains(
     """
 
     bonds = []
+    triplets = []
     for start, end, is_ring in chains:
         end = sim_object.N if (end is None) else end
         
         bonds += [(j, j+1) for j in range(start, end - 1)]
-        triples += [(j - 1, j, j + 1) for j in range(start + 1, end - 1)]
+        triplets += [(j - 1, j, j + 1) for j in range(start + 1, end - 1)]
+
         if is_ring:
             bonds.append((start, end-1))
             triplets.append((int(end - 2), int(end - 1), int(start)))
@@ -52,19 +55,19 @@ def polymerChains(
     if nonbondedForceFunc is not None:
         nb_force = nonbondedForceFunc(sim_object, **nonbondedForceKwargs)
         
-        if exceptBonds:
-            exc = list(set([tuple(i) for i in np.sort(np.array(bonds), axis=1)]))
-            if hasattr(nb_force, "addException"):
-                print('Add exceptions for {0} force'.format(i))
-                for pair in exc:
-                    nb_force.addException(int(pair[0]), int(pair[1]), 0, 0, 0, True)
-                    
-            # The built-in LJ nonbonded force uses "exclusions" instead of "exceptions"
-            elif hasattr(nb_force, "addExclusion"):
-                print('Add exclusions for {0} force'.format(i))
-                for pair in exc:
-                    nb_force.addExclusion(int(pair[0]), int(pair[1]))
-                    
-            print("Number of exceptions:", len(bonds))
+    if exceptBonds:
+        exc = list(set([tuple(i) for i in np.sort(np.array(bonds), axis=1)]))
+        if hasattr(nb_force, "addException"):
+            print('Add exceptions for the non-bonded force')
+            for pair in exc:
+                nb_force.addException(int(pair[0]), int(pair[1]), 0, 0, 0, True)
+                
+        # The built-in LJ nonbonded force uses "exclusions" instead of "exceptions"
+        elif hasattr(nb_force, "addExclusion"):
+            print('Add exceptions for the non-bonded force')
+            for pair in exc:
+                nb_force.addExclusion(int(pair[0]), int(pair[1]))
+                
+        print("Number of exceptions:", len(bonds))
 
             

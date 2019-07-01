@@ -11,7 +11,7 @@ import numpy as np
 
 
 def _to_array_1d(scalar_or_array, arrlen, dtype=float):
-    if not hasattr(bondLength, "__iter__"):
+    if not hasattr(scalar_or_array, "__iter__"):
         outarr = np.full(arrlen, scalar_or_array, dtype)
     else:
         outarr = np.asarray(scalar_or_array, dtype=dtype)
@@ -131,7 +131,7 @@ def angleForce(
         Potential is k * alpha^2 * 0.5 * kT
     """
     
-    k = _to_array_1d(k, len(triples)) 
+    k = _to_array_1d(k, len(triplets)) 
         
     stiffForce = openmm.CustomAngleForce(
         "kT*angK * (theta - 3.141592) * (theta - 3.141592) * (0.5)")
