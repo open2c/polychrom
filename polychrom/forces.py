@@ -16,7 +16,7 @@ def _to_array_1d(scalar_or_array, arrlen, dtype=float):
     else:
         outarr = np.asarray(scalar_or_array, dtype=dtype)
     
-    if len(outarr) != arrlen
+    if len(outarr) != arrlen:
         raise ValueError('The length of the array differs from the expected one!')
         
     return outarr
@@ -170,12 +170,8 @@ def polynomialRepulsiveForce(
         "rsc4 = rsc2 * rsc2;"
         "rsc2 = rsc * rsc;"
         "rsc = r / REPsigma * REPrmin;")
-<<<<<<< HEAD:polychrom/openmm_forces.py
-    sim_object.forceDict["polynomialRepulsiveForce"] = openmm.CustomNonbondedForce(repul_energy)
-    repulforceGr = sim_object.forceDict["polynomialRepulsiveForce"]
-=======
+
     repulforceGr = openmm.CustomNonbondedForce(repul_energy)
->>>>>>> origin/ag_rework:polychrom/forces.py
 
     repulforceGr.addGlobalParameter('REPe', trunc * sim_object.kT)
     repulforceGr.addGlobalParameter('REPsigma', radius)

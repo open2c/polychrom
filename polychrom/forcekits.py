@@ -1,19 +1,19 @@
-from . import openmm_forces
+from . import forces
 
 def polymerChains(
     sim_object,
-    chains=[(0, None, False)]
+    chains=[(0, None, False)],
 
-    bondForceFunc=openmm_forces.harmonicBonds,
-    bondForceKwargs={'wiggleDist'=0.05,
-                     'bondLength'=1.0},
+    bondForceFunc=forces.harmonicBonds,
+    bondForceKwargs={'wiggleDist':0.05,
+                     'bondLength':1.0},
 
-    angleForceFunc=openmm_forces.harmonicBonds,
-    angleForceKwargs={'k'=0.05},
+    angleForceFunc=forces.harmonicBonds,
+    angleForceKwargs={'k':0.05},
 
-    nonbondedForceFunc=openmm_forces.polynomialRepulsiveForce,
-    nonbondedForceKwargs={'trunc'=3.0, 
-                          'radiusMult'=1.},
+    nonbondedForceFunc=forces.polynomialRepulsiveForce,
+    nonbondedForceKwargs={'trunc':3.0, 
+                          'radiusMult':1.},
 
     exceptBonds=True,
 ):

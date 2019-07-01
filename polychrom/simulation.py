@@ -27,179 +27,185 @@ class eKExceedsError(Exception):
 
 
 class Simulation():
-    """Base class for openmm simulations
 
-    All parameters here are floats. Units specified in a parameter. 
+    def __init__(self, **kwargs):
+        """Base class for openmm simulations
 
-    Parameters
-    ----------
-    
-    N : int
-        number of particles 
-    
-    errorTol : float, optional
-        Error tolerance parameter for variableLangevin integrator
-        Values of 0.03-0.1 are reasonable for "nice" simulation
-        Simulations with strong forces may need 0.01 or less
+        All parameters here are floats. Units specified in a parameter. 
+
+        Parameters
+        ----------
+        
+        N : int
+            number of particles 
+        
+        errorTol : float, optional
+            Error tolerance parameter for variableLangevin integrator
+            Values of 0.03-0.1 are reasonable for "nice" simulation
+            Simulations with strong forces may need 0.01 or less
 
 
-    timestep : number
-        timestep in femtoseconds. Mandatory for non-variable integrators. Value of 70-80 are appropriate
+        timestep : number
+            timestep in femtoseconds. Mandatory for non-variable integrators. Value of 70-80 are appropriate
 
-    collision_rate : number
-        collision rate in inverse picoseconds. values of 0.01 or 0.05 are often used. 
-        Consult with lab members on values. 
+        collision_rate : number
+            collision rate in inverse picoseconds. values of 0.01 or 0.05 are often used. 
+            Consult with lab members on values. 
 
-    PBC : bool, optional
-        Use periodic boundary conditions, default:False
+        PBC : bool, optional
+            Use periodic boundary conditions, default:False
 
-    PBCbox : (float,float,float), optional
-        Define size of the bounding box for PBC
+        PBCbox : (float,float,float), optional
+            Define size of the bounding box for PBC
 
-    GPU : GPU index as a string ("0" for first, "1" for second etc.) 
-        Machines with 1 GPU automatically select their GPU.
+        GPU : GPU index as a string ("0" for first, "1" for second etc.) 
+            Machines with 1 GPU automatically select their GPU.
 
-    integrator : "langevin", "variableLangevin", "verlet", "variableVerlet",
-                 "brownian", optional Integrator to use
-                 (see Openmm class reference)
-                 
-    mass : number or np.array
-        Particle mass (default 100 amu)
+        integrator : "langevin", "variableLangevin", "verlet", "variableVerlet",
+                     "brownian", optional Integrator to use
+                     (see Openmm class reference)
+                     
+        mass : number or np.array
+            Particle mass (default 100 amu)
+            
+
+        temperature : simtk.units.quantity(units.kelvin), optional
+            Temperature of the simulation. Devault value is 300 K.
+
+        verbose : bool, optional
+            If True, prints a lot of stuff in the command line.
+
+
+        name : string, optional
+            Name to be printed out as a first line of each block.
+            Use it if you run simulations one after another
+            and want to see what's going on.
+
+        length_scale : float, optional
+            The geometric scaling factor of the system.
+            By default, length_scale=1.0 and harmonic bonds and repulsive
+            forces have the scale of 1 nm.
+
+        maxEk: float, optional
+            raise error if kinetic energy in (kT/particle) exceeds this value 
+
+        platform : string, optional
+            Platform to use
+
+        verbose : bool, optional
+            Shout out loud about every change.
+
+        
+        precision: str, optional (not recommended to change)
+            mixed is optimal for most situations. 
+            If you are using double precision, it will be slower by a factor of 10 or so. 
         
 
-    temperature : simtk.units.quantity(units.kelvin), optional
-        Temperature of the simulation. Devault value is 300 K.
 
-    verbose : bool, optional
-        If True, prints a lot of stuff in the command line.
+        """
+        defaultArgs = {"platform":"CUDA", 
+                       "GPU":"0",
+                       "integrator":"variablelangevin", 
+                       "temperature":300,
+                       "PBC":False,
+                       "length_scale":1.0,
+                       "mass":100, 
+                       "maxEk":10 , 
+                       "precision":"mixed", 
+                       "verbose":False, 
+                       "name":"sim"}
+        defaultArgs.update(kwargs)
+        kwargs = defaultArgs
+        self.kwargs = kwargs
 
+        platform = kwargs["platform"]
+        self.GPU = kwargs["GPU"]  # setting default GPU
 
-    name : string, optional
-        Name to be printed out as a first line of each block.
-        Use it if you run simulations one after another
-        and want to see what's going on.
+        properties = {}
+        if self.GPU.lower() != "default":
+            if platform.lower() in ["cuda", "opencl"]:
+                properties["DeviceIndex"] = str(self.GPU)
+                properties["Precision"] = kwargs["precision"]
+        self.properties = properties
 
-    length_scale : float, optional
-        The geometric scaling factor of the system.
-        By default, length_scale=1.0 and harmonic bonds and repulsive
-        forces have the scale of 1 nm.
-
-    maxEk: float, optional
-        raise error if kinetic energy in (kT/particle) exceeds this value 
-
-    platform : string, optional
-        Platform to use
-
-    verbose : bool, optional
-        Shout out loud about every change.
-
-    
-    precision: str, optional (not recommended to change)
-        mixed is optimal for most situations. 
-        If you are using double precision, it will be slower by a factor of 10 or so. 
-    
-
-
-    """
-    defaultArgs = {"platform":"CUDA", 
-                   "GPU":"0",
-                   "integrator":"variablelangevin", 
-                   "temperature":300,
-                   "PBC":False,
-                    "length_scale":1.0,
-                    "mass":100, 
-                    "maxEk":10 , 
-                    "precision":"mixed", 
-                    "verbose":False, 
-                    "name":"sim"}
-    defaultArgs.update(kwargs)
-    kwargs = defaultArgs
-    self.kwargs = kwargs
-
-    platform = kwargs["platform"]
-    self.GPU = kwargs["GPU"]  # setting default GPU
-
-    properties = {}
-    if self.GPU.lower() != "default":
-        if platform.lower() in ["cuda", "opencl"]:
-            properties["DeviceIndex"] = str(self.GPU)
-            properties["Precision"] = kwargs["precision"]
-    self.properties = properties
-
-    if platform.lower() == "opencl":
-        platformObject = openmm.Platform.getPlatformByName('OpenCL')
-    elif platform.lower() == "reference":
-        platformObject = openmm.Platform.getPlatformByName('Reference')
-    elif platform.lower() == "cuda":
-        platformObject = openmm.Platform.getPlatformByName('CUDA')
-    elif platform.lower() == "cpu":
-        platformObject = openmm.Platform.getPlatformByName('CPU')
-    else:
-        raise RuntimeError("Undefined platform: {0}".format(platform))
-    self.platform = platformObject
-    
-    self.temperature = kwargs["temperature"]
-
-    self.collisionRate = kwargs["collision_rate"] * (1 / ps)
-
-    self.integrator_type = kwargs["integrator"]                
-    if isinstance(self.integrator_type, string_types):
-        self.integrator_type = str(self.integrator_type)
-        if self.integrator_type.lower() == "langevin":
-            self.integrator = openmm.LangevinIntegrator(self.temperature,
-                kwargs["collision_rate"] * (1 / ps), kwargs["timestep"]* fs)
-        elif self.integrator_type.lower() == "variablelangevin":
-            self.integrator = openmm.VariableLangevinIntegrator(self.temperature,
-                kwargs["collision_rate"] * (1 / ps), kwargs["error_tol"])
-        elif self.integrator_type.lower() == "verlet":
-            self.integrator = openmm.VariableVerletIntegrator(kwargs["timestep"]* fs)
-        elif self.integrator_type.lower() == "variableverlet":
-            self.integrator = openmm.VariableVerletIntegrator(kwargs["error_tol"])
-
-        elif self.integrator_type.lower() == 'brownian':
-            self.integrator = openmm.BrownianIntegrator(self.temperature,
-               kwarg["collision_rate"] * (1 / ps), kwargs["timestep"])
+        if platform.lower() == "opencl":
+            platformObject = openmm.Platform.getPlatformByName('OpenCL')
+        elif platform.lower() == "reference":
+            platformObject = openmm.Platform.getPlatformByName('Reference')
+        elif platform.lower() == "cuda":
+            platformObject = openmm.Platform.getPlatformByName('CUDA')
+        elif platform.lower() == "cpu":
+            platformObject = openmm.Platform.getPlatformByName('CPU')
         else:
-            print ('please select from "langevin", "variablelangevin", '
-                   '"verlet", "variableVerlet", '
-                   '"brownian" or provide an integrator object')
-            self.integrator = integrator
-    else:
-        self.integrator = self.integrator_type
-        self.integrator_type = "UserDefined"
-        kwargs["integrator"] = "user_defined"
-    
-    self.N = kwargs["N"]
-    self.verbose = kwargs["verbose"]
-    self.temperature = kwargs["temperature"]
-    self.verbose = kwargs["verbose"]
-    self.loaded = False  # check if the data is loaded
-    self.forcesApplied = False
-    self.length_scale = kwargs["length_scale"]
-    self.eKcritical = kwargs["maxEk"]  # Max allowed kinetic energy
-    self.nm = nm
-    self.metadata = {}
-    self.step = 0
-
-    self.kB = units.BOLTZMANN_CONSTANT_kB * \
-        units.AVOGADRO_CONSTANT_NA  # Boltzmann constant
-    self.kT = self.kB * self.temperature  # thermal energy        
-    
-    # All masses are the same,
-    # unless individual mass multipliers are specified in self.load()
-    self.conlen = 1. * nm * self.length_scale
-    
-    self.kbondScalingFactor = float((2 * self.kT / (self.conlen) ** 2) / (units.kilojoule_per_mole / nm ** 2))
-    self.system = openmm.System()
-    self.PBC = kwargs["PBC"]
-
-    if self.PBC == True:  # if periodic boundary conditions
-        PBCbox = np.array(kwargs["PBCbox"])            
-        self.system.setDefaultPeriodicBoxVectors([PBCbox[0], 0.,
-            0.], [0., PBCbox[1], 0.], [0., 0., PBCbox[2]])
-
-    self.forceDict = {}  # Dictionary to store forces
+            raise RuntimeError("Undefined platform: {0}".format(platform))
+        self.platform = platformObject
         
+        self.temperature = kwargs["temperature"]
+
+        self.collisionRate = kwargs["collision_rate"] * (1 / ps)
+
+        self.integrator_type = kwargs["integrator"]                
+        if isinstance(self.integrator_type, string_types):
+            self.integrator_type = str(self.integrator_type)
+            if self.integrator_type.lower() == "langevin":
+                self.integrator = openmm.LangevinIntegrator(self.temperature,
+                    kwargs["collision_rate"] * (1 / ps), kwargs["timestep"]* fs)
+            elif self.integrator_type.lower() == "variablelangevin":
+                self.integrator = openmm.VariableLangevinIntegrator(self.temperature,
+                    kwargs["collision_rate"] * (1 / ps), kwargs["error_tol"])
+            elif self.integrator_type.lower() == "verlet":
+                self.integrator = openmm.VariableVerletIntegrator(kwargs["timestep"]* fs)
+            elif self.integrator_type.lower() == "variableverlet":
+                self.integrator = openmm.VariableVerletIntegrator(kwargs["error_tol"])
+
+            elif self.integrator_type.lower() == 'brownian':
+                self.integrator = openmm.BrownianIntegrator(self.temperature,
+                   kwarg["collision_rate"] * (1 / ps), kwargs["timestep"])
+            else:
+                print ('please select from "langevin", "variablelangevin", '
+                       '"verlet", "variableVerlet", '
+                       '"brownian" or provide an integrator object')
+                self.integrator = integrator
+        else:
+            self.integrator = self.integrator_type
+            self.integrator_type = "UserDefined"
+            kwargs["integrator"] = "user_defined"
+        
+        self.N = kwargs["N"]
+        self.verbose = kwargs["verbose"]
+        self.temperature = kwargs["temperature"]
+        self.verbose = kwargs["verbose"]
+        self.loaded = False  # check if the data is loaded
+        self.forcesApplied = False
+        self.length_scale = kwargs["length_scale"]
+        self.eKcritical = kwargs["maxEk"]  # Max allowed kinetic energy
+        self.nm = nm
+        self.metadata = {}
+        self.step = 0
+
+        self.kB = units.BOLTZMANN_CONSTANT_kB * \
+            units.AVOGADRO_CONSTANT_NA  # Boltzmann constant
+        self.kT = self.kB * self.temperature * units.kelvin  # thermal energy        
+        
+        # All masses are the same,
+        # unless individual mass multipliers are specified in self.load()
+        self.conlen = 1. * nm * self.length_scale
+        
+        self.kbondScalingFactor = float(
+                (2 * self.kT / (self.conlen) ** 2) 
+                / (units.kilojoule_per_mole / nm ** 2))
+        self.system = openmm.System()
+        self.PBC = kwargs["PBC"]
+
+        if self.PBC == True:  # if periodic boundary conditions
+            PBCbox = np.array(kwargs["PBCbox"])            
+            self.system.setDefaultPeriodicBoxVectors(
+                [PBCbox[0], 0., 0.], 
+                [0., PBCbox[1], 0.], 
+                [0., 0., PBCbox[2]])
+
+        self.forceDict = {}  # Dictionary to store forces
+            
             
     def getData(self):
         "Returns an Nx3 array of positions"
