@@ -29,10 +29,6 @@ class eKExceedsError(Exception):
 class Simulation():
     """Base class for openmm simulations
 
-"""
-def __init__(self,  **kwargs): 
-    """
-    
     All parameters here are floats. Units specified in a parameter. 
 
     Parameters
