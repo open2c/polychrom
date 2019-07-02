@@ -10,8 +10,12 @@ import tempfile
 import warnings
 from six import string_types
 
+from collections.abc import Iterable
+
 import simtk.openmm as openmm
 import simtk.unit as units
+
+from . import forces
 
 nm = units.meter * 1e-9
 fs = units.second * 1e-15
@@ -289,7 +293,19 @@ class Simulation():
         dif = data[i] - data[j]
         return np.sqrt(sum(dif ** 2))
         
+
+    def addForce(self, force):
+        if isinstance(force, Iterable):
+            for f in force:
+                self.addForce(f)
+        else:
+            if force.name in self.forceDict:
+                raise ValueError(
+                    'A force named {} was added to the system twice!'.format(force.name))
+            forces._prepend_force_name_to_params(force)
+            self.forceDict[force.name] = force
         
+
     def _applyForces(self):
         """Adds all particles to the system.
         Then applies all the forces in the forcedict.
