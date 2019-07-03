@@ -8,6 +8,8 @@ import os
 import time
 import tempfile
 import warnings
+import logging
+
 from six import string_types
 
 from collections.abc import Iterable
@@ -21,6 +23,7 @@ nm = units.meter * 1e-9
 fs = units.second * 1e-15
 ps = units.second * 1e-12
 
+logging.basicConfig(level=logging.INFO)
 
 class integrationFailError(Exception):
     pass
@@ -166,9 +169,12 @@ class Simulation():
                 self.integrator = openmm.BrownianIntegrator(self.temperature,
                    kwarg["collision_rate"] * (1 / ps), kwargs["timestep"])
             else:
-                print ('please select from "langevin", "variablelangevin", '
-                       '"verlet", "variableVerlet", '
-                       '"brownian" or provide an integrator object')
+                logging.info(
+                    'Using the provided integrator object'
+                       #'please select from "langevin", "variablelangevin", '
+                       #'"verlet", "variableVerlet", '
+                       #'"brownian" or provide an integrator object'
+                )
                 self.integrator = integrator
         else:
             self.integrator = self.integrator_type
@@ -326,11 +332,12 @@ class Simulation():
             if hasattr(force, "CutoffNonPeriodic") and hasattr(force, "CutoffPeriodic"):
                 if self.PBC:
                     force.setNonbondedMethod(force.CutoffPeriodic)
-                    print("Using periodic boundary conditions!!!")
+                    logging.info("Using periodic boundary conditions")
                 else:
                     force.setNonbondedMethod(force.CutoffNonPeriodic)
                     
-            print("adding force ", i, self.system.addForce(self.forceDict[i]))
+            logging.info("adding force {} {}".format( 
+                i, self.system.addForce(self.forceDict[i])))
 
         self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
         self.initPositions()
@@ -369,7 +376,7 @@ class Simulation():
 
         self.context.setPositions(self.data)        
         eP = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
-        print("Particles loaded. Potential energy is %lf" % eP)
+        logging.info("Particles loaded. Potential energy is %lf" % eP)
 
         
     def reinitialize(self):
@@ -385,7 +392,7 @@ class Simulation():
     def localEnergyMinimization(self, tolerance=0.3, maxIterations=0):
         "A wrapper to the build-in OpenMM Local Energy Minimization"
 
-        print("Performing local energy minimization")
+        logging.info("Performing local energy minimization")
 
         self._applyForces()
 
@@ -394,7 +401,7 @@ class Simulation():
         eK = (self.state.getKineticEnergy() / self.N / self.kT)
         eP = self.state.getPotentialEnergy() / self.N / self.kT
         locTime = self.state.getTime()
-        print("before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
+        logging.info("before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
         openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)
 
@@ -402,7 +409,7 @@ class Simulation():
         eK = (self.state.getKineticEnergy() / self.N / self.kT)
         eP = self.state.getPotentialEnergy() / self.N / self.kT
         locTime = self.state.getTime()
-        print("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
+        logging.info("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
 
     def doBlock(self, steps=None, increment=True,  reinitialize=True, maxIter=0, checkFunctions=[], getVelocities = False):
@@ -420,7 +427,7 @@ class Simulation():
 
         if self.forcesApplied == False:
             if self.verbose:
-                print("applying forces")
+                logging.info("applying forces")
                 sys.stdout.flush()
             self._applyForces()
             self.forcesApplied = True
@@ -441,7 +448,7 @@ class Simulation():
         eP = self.state.getPotentialEnergy() / self.N / self.kT
         curtime = self.state.getTime() / units.picosecond
 
-        print("pos[1]=[%.1lf %.1lf %.1lf]" % tuple(newcoords[0]), end=' ')
+        msg = "pos[1]=[%.1lf %.1lf %.1lf] " % tuple(newcoords[0])
 
 
         checkFail = False
@@ -459,20 +466,22 @@ class Simulation():
             raise integrationFailError("Custom checks failed")
 
         dif = np.sqrt(np.mean(np.sum((newcoords - self.getData()) ** 2, axis=1)))
-        print("dr=%.2lf" % (dif,), end=' ')
+        msg += "dr=%.2lf " % (dif,)
         self.data = coords
-        print("t=%2.1lfps" % (self.state.getTime() / ps), end=' ')
-        print("kin=%.2lf pot=%.2lf" % (eK,eP), "Rg=%.3lf" % self.RG(), end=' ')
-        print("SPS=%.0lf" % (steps / (float(b - a))), end=' ')
+        msg += "t=%2.1lfps " % (self.state.getTime() / ps)
+        msg += "kin=%.2lf pot=%.2lf " % (eK,eP)
+        msg += "Rg=%.3lf " % self.RG()
+        msg + "SPS=%.0lf " % (steps / (float(b - a)))
 
         if (self.integrator_type.lower() == 'variablelangevin'
             or self.integrator_type.lower() == 'variableverlet'):
             dt = self.integrator.getStepSize()
-            print('dt=%.1lffs' % (dt / fs), end=' ')
+            msg += 'dt=%.1lffs ' % (dt / fs)
             mass = self.system.getParticleMass(1)
             dx = (units.sqrt(2.0 * eK * self.kT / mass) * dt)
-            print('dx=%.2lfpm' % (dx / nm * 1000.0), end=' ')
+            msg += 'dx=%.2lfpm ' % (dx / nm * 1000.0)
           
+        logging.info(msg)
 
         result =  {"coordinates":newcoords, "potentialEnergy":eP, "kineticEnergy":eK, "time":curtime}
         if getVelocities:
@@ -551,7 +560,7 @@ class Simulation():
         if len(data[0]) != 3:
             data = np.transpose(data)
         if len(data[0]) != 3:
-            print("wrong data!")
+            logging.error("wrong data!")
             return
         # determining the 95 percentile distance between particles,
         if scale == "auto":
