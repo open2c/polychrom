@@ -61,20 +61,20 @@ def polymerChains(
     if nonbondedForceFunc is not None:
         nb_force = nonbondedForceFunc(sim_object, **nonbondedForceKwargs)
         
-    if exceptBonds:
-        exc = list(set([tuple(i) for i in np.sort(np.array(bonds), axis=1)]))
-        if hasattr(nb_force, "addException"):
-            print('Exclude neighbouring chain particles from {}'.format(nb_force.name))
-            for pair in exc:
-                nb_force.addException(int(pair[0]), int(pair[1]), 0, 0, 0, True)
-                
-        # The built-in LJ nonbonded force uses "exclusions" instead of "exceptions"
-        elif hasattr(nb_force, "addExclusion"):
-            print('Exclude neighbouring chain particles from {}'.format(nb_force.name))
-            for pair in exc:
-                nb_force.addExclusion(int(pair[0]), int(pair[1]))
-                
-        print("Number of exceptions:", len(bonds))
+        if exceptBonds:
+            exc = list(set([tuple(i) for i in np.sort(np.array(bonds), axis=1)]))
+            if hasattr(nb_force, "addException"):
+                print('Exclude neighbouring chain particles from {}'.format(nb_force.name))
+                for pair in exc:
+                    nb_force.addException(int(pair[0]), int(pair[1]), 0, 0, 0, True)
+                    
+            # The built-in LJ nonbonded force uses "exclusions" instead of "exceptions"
+            elif hasattr(nb_force, "addExclusion"):
+                print('Exclude neighbouring chain particles from {}'.format(nb_force.name))
+                for pair in exc:
+                    nb_force.addExclusion(int(pair[0]), int(pair[1]))
+                    
+            print("Number of exceptions:", len(bonds))
 
         force_list.append(nb_force)
 
