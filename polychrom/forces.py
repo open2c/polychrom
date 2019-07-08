@@ -418,26 +418,31 @@ def cylindricalConfinement(
 
     if bottom is not None:
         force = openmm.CustomExternalForce(
-            "step(r-aa) * kb * (sqrt((r-aa)*(r-aa) + t*t) - t)"
-            "+ step(-z + bot) * kb * (sqrt((z - bot)^2 + t^2) - t) "
-            "+ step(z - top) * kb * (sqrt((z - top)^2 + t^2) - t);"
-            "r = sqrt(x^2 + y^2 + tt^2)")
+            "kt * k * ("
+            " step(dr) * (sqrt(dr*dr + t*t) - t)"
+            " + step(-z + bot) * (sqrt((z - bot)^2 + t^2) - t) "
+            " + step(z - top) * (sqrt((z - top)^2 + t^2) - t)"
+            ") ;"
+            "dr = sqrt(x^2 + y^2 + tt^2) - rmax + 10*t"
+        )
     else:
         force = openmm.CustomExternalForce(
-            "step(r-aa) * kb * (sqrt((r-aa)*(r-aa) + t*t) - t);"
-            "r = sqrt(x^2 + y^2 + tt^2)")
+            "kt * k * step(dr) * (sqrt(dr*dr + t*t) - t);"
+            "dr = sqrt(x^2 + y^2 + tt^2) - rmax + 10*t"
+        )
     force.name = name
 
     for i in range(sim_object.N):
         force.addParticle(i, [])
-    force.addGlobalParameter("kb", k * sim_object.kT / nm)
+
+    force.addGlobalParameter("k", k / nm)
+    force.addGlobalParameter("rmax", r * nm)
+    force.addGlobalParameter("kt", sim_object.kT)
+    force.addGlobalParameter("t",  0.1 / k * nm)
+    force.addGlobalParameter("tt", 0.01 * nm)
     force.addGlobalParameter("top", top * sim_object.conlen)
     if bottom is not None:
         force.addGlobalParameter("bot", bottom * sim_object.conlen)
-    force.addGlobalParameter("kt", sim_object.kT)
-    force.addGlobalParameter("aa", (r - 1. / k) * nm)
-    force.addGlobalParameter("t", (1. / (10 * k)) * nm)
-    force.addGlobalParameter("tt", 0.01 * nm)
     
     return force
 
