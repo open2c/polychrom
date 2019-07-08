@@ -423,12 +423,12 @@ def cylindricalConfinement(
             " + step(-z + bot) * (sqrt((z - bot)^2 + t^2) - t) "
             " + step(z - top) * (sqrt((z - top)^2 + t^2) - t)"
             ") ;"
-            "dr = sqrt(x^2 + y^2 + tt^2) - rmax + 10*t"
+            "dr = sqrt(x^2 + y^2 + tt^2) - r + 10*t"
         )
     else:
         force = openmm.CustomExternalForce(
             "kt * k * step(dr) * (sqrt(dr*dr + t*t) - t);"
-            "dr = sqrt(x^2 + y^2 + tt^2) - rmax + 10*t"
+            "dr = sqrt(x^2 + y^2 + tt^2) - r + 10*t"
         )
     force.name = name
 
@@ -436,7 +436,7 @@ def cylindricalConfinement(
         force.addParticle(i, [])
 
     force.addGlobalParameter("k", k / nm)
-    force.addGlobalParameter("rmax", r * nm)
+    force.addGlobalParameter("r", r * sim_object.conlen)
     force.addGlobalParameter("kt", sim_object.kT)
     force.addGlobalParameter("t",  0.1 / k * nm)
     force.addGlobalParameter("tt", 0.01 * nm)
