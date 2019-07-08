@@ -182,17 +182,16 @@ class Simulation():
             kwargs["integrator"] = "user_defined"
         
         self.N = kwargs["N"]
+
         self.verbose = kwargs["verbose"]
-        self.temperature = kwargs["temperature"]
-        self.verbose = kwargs["verbose"]
-        self.loaded = False  # check if the data is loaded
         self.forcesApplied = False
         self.length_scale = kwargs["length_scale"]
         self.eKcritical = kwargs["maxEk"]  # Max allowed kinetic energy
-        self.nm = nm
-        self.metadata = {}
-        self.step = 0
 
+        self.step = 0
+        self.block = 0
+
+        self.nm = nm
         self.kB = units.BOLTZMANN_CONSTANT_kB * \
             units.AVOGADRO_CONSTANT_NA  # Boltzmann constant
         self.kT = self.kB * self.temperature * units.kelvin  # thermal energy        
@@ -204,7 +203,9 @@ class Simulation():
         self.kbondScalingFactor = float(
                 (2 * self.kT / (self.conlen) ** 2) 
                 / (units.kilojoule_per_mole / nm ** 2))
+
         self.system = openmm.System()
+
         self.PBC = kwargs["PBC"]
 
         if self.PBC == True:  # if periodic boundary conditions
@@ -422,7 +423,7 @@ class Simulation():
         steps : int or None
             Number of timesteps to perform.
         increment : bool, optional
-            If true, will not increment self.steps counter
+            If true, will not increment self.block and self.steps counters
         """
 
         if self.forcesApplied == False:
@@ -433,8 +434,13 @@ class Simulation():
             self.forcesApplied = True
 
 
+
         a = time.time()
         self.integrator.step(steps)  # integrate!
+
+        if increment:
+            self.block += 1
+            self.step += steps
         
         self.state = self.context.getState(getPositions=True,getVelocities=getVelocities,
                                            getEnergy=True)
