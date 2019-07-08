@@ -1,14 +1,15 @@
-import simtk.openmm as openmm
-import simtk.unit as units
-
 import re
 import itertools
+from collections.abc import Iterable
+
+import numpy as np 
+
+import simtk.openmm as openmm
+import simtk.unit as units
 
 nm = units.meter * 1e-9
 fs = units.second * 1e-15
 ps = units.second * 1e-12
-
-import numpy as np 
 
 
 def _prepend_force_name_to_params(force):
@@ -502,24 +503,39 @@ def tetherParticles(
     ----------
 
     particles : list of ints
-        List of particles to be tethered (fixed in space)
+        List of particles to be tethered (fixed in space).
+        Negative values are allowed.
     k : int, optional
-        Steepness of the tethering potential.
-        Values >30 will require decreasing potential,
-        but will make tethering rock solid.
+        The steepness of the tethering potential.
+        Values >30 will require decreasing potential, but will make tethering 
+        rock solid.
+        Can be provided as a vector [kx, ky, kz].
     """
     
-    energy = "kb * ((x - x0)^2 + (y - y0)^2 + (z - z0)^2)"
+    energy = "kx * (x - x0)^2 + ky * (y - y0)^2 + kz * (z - z0)^2"
     force = openmm.CustomExternalForce(energy)
     force.name = name
 
     # assigning parameters of the force
-    force.addGlobalParameter("kb", k * sim_object.kT / nm)
+
+    if isinstance(k, Iterable):
+        k = list(k)
+        if len(k) != 3:
+            raise ValueError('k must either be a scalar or a 3D vector!')
+        kx, ky, kz = k
+    else:
+        kx, ky, kz = k, k, k
+
+    force.addGlobalParameter("kx", kx * sim_object.kT / nm)
+    force.addGlobalParameter("ky", ky * sim_object.kT / nm)
+    force.addGlobalParameter("kz", kz * sim_object.kT / nm)
     force.addPerParticleParameter("x0")
     force.addPerParticleParameter("y0")
     force.addPerParticleParameter("z0")
 
     _prepend_force_name_to_params(force)
+
+    particles = [sim_object.N+i if i<0 else i for i in particles]
 
     if positions == "current":
         positions = [sim_object.data[i] for i in particles]
