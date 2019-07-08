@@ -454,7 +454,8 @@ class Simulation():
         eP = self.state.getPotentialEnergy() / self.N / self.kT
         curtime = self.state.getTime() / units.picosecond
 
-        msg = "pos[1]=[%.1lf %.1lf %.1lf] " % tuple(newcoords[0])
+        msg = "block %4s " % int(self.block)
+        msg += "pos[1]=[%.1lf %.1lf %.1lf] " % tuple(newcoords[0])
 
 
         checkFail = False
