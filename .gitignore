@@ -3,3 +3,4 @@ polychrom.egg-info
 *linux-gnu.so
 .ipynb*
 *.pyc
+polychrom/_polymer_math.cpp
