@@ -1,6 +1,6 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 
-from . import polymerutils
+from . import polymerutils, _polymer_math
 from math import sqrt
 
 import random
@@ -43,14 +43,15 @@ def generate_bins(N, start=4, bins_per_order_magn=10):
     lstart = np.log10(start)
     lend = np.log10(N-1)  + 1e-6
     num = np.ceil((lend - lstart) * bins_per_order_magn)
-    bins = np.unique(np.logspace(lstart, lend, dtype=int))
+    bins = np.unique(np.logspace(lstart, lend, dtype=int, num=num))
     assert bins[-1] == N - 1
     return bins
 
-    
 
-def contact_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
-                  ring=False):
+def contact_scaling(
+        data, bins0 = None, cutoff=1.1, integrate=False,
+        ring=False,
+        bins_per_order_magn=10):
 
     """
     Returns contact probability scaling for a given polymer conformation
@@ -86,7 +87,7 @@ def contact_scaling(data, bins0 = None, cutoff=1.1, integrate=False,
     assert data.shape[1] == 3 
     
     if bins0 is None: 
-        bins0 = generate_bins(N)
+        bins0 = generate_bins(N, bins_per_order_magn=bins_per_order_magn)
     
     bins0 = np.array(bins0)
     bins = [(bins0[i], bins0[i + 1]) for i in range(len(bins0) - 1)]
@@ -146,8 +147,6 @@ def R2_scaling(data, bins=None, ring=False):
     return (np.array(bins), rads)
 
 
-
-
 def Rg2(data):
     """
     Simply calculates gyration radius of a polymer chain.
@@ -155,6 +154,7 @@ def Rg2(data):
     data = np.asarray(data)
     assert data.shape[1] == 3
     return np.mean((data - np.mean(data, axis=0))**2) * 3
+
 
 def Rg2_matrix(data):
     """
@@ -178,7 +178,6 @@ def Rg2_matrix(data):
     mask = np.arange(N)[:,None] > np.arange(N)[None,:]
     sums[mask] = sums.T[mask]
     return sums
-
 
 
 def Rg2_scaling(data, bins=None, ring=False):
@@ -230,8 +229,6 @@ def Rg2_scaling(data, bins=None, ring=False):
     return (np.array(bins), rads)
 
 
-
-
 def _test_Rg_scalings():
     a = np.random.lognormal(1,1,size=(30,3))  # array for testing 
 
@@ -254,9 +251,6 @@ def _test_Rg_scalings():
     assert np.allclose(scal[1][0], d1)  
     # compare with manually calculated rg(i,j) plus Rg of two 3-monomer subchains crossing the boundary
 
-
-
-   
 
 def ndarray_groupby_aggregate(df, ndarray_cols, aggregate_cols, value_cols=[], 
                               sample_cols=[], preset="sum",
@@ -293,7 +287,6 @@ def ndarray_groupby_aggregate(df, ndarray_cols, aggregate_cols, value_cols=[],
         return agg_series
     
     return  df.groupby(aggregate_cols).apply(combine_values)
-    
 
     
 def streaming_ndarray_agg(in_stream,  ndarray_cols, aggregate_cols, value_cols=[],  sample_cols=[], 
@@ -356,8 +349,6 @@ def streaming_ndarray_agg(in_stream,  ndarray_cols, aggregate_cols, value_cols=[
     
     return aggregate
 
-
-
                              
 def kabsch_rmsd(P, Q):
     """
@@ -410,7 +401,6 @@ def kabsch_rmsd(P, Q):
     return dist
 
 
-
 def _test_Rg_scalings():
     a = np.random.lognormal(1,1,size=(30,3))  # array for testing 
 
@@ -434,3 +424,5 @@ def _test_Rg_scalings():
     # compare with manually calculated rg(i,j) plus Rg of two 3-monomer subchains crossing the boundary
 
 
+def getLinkingNumber(data1, data2, randomOffset=True):
+    return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)
