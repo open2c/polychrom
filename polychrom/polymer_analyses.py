@@ -424,5 +424,27 @@ def _test_Rg_scalings():
     # compare with manually calculated rg(i,j) plus Rg of two 3-monomer subchains crossing the boundary
 
 
-def getLinkingNumber(data1, data2, randomOffset=True):
+def mutualSimplify(a, b, verbose=False):
+    if verbose:
+        print("Starting mutual simplification of polymers")
+    while True:
+        la, lb = len(a), len(b)
+        if verbose:
+            print(len(a), len(b), "before; ", end=' ')
+        a, b = _polymer_math.mutualSimplify(a, b)
+        if verbose:
+            print(len(a), len(b), "after one; ", end=' ')
+        b, a = _polymer_math.mutualSimplify(b, a)
+        if verbose:
+            print(len(a), len(b), "after two; ")
+
+        if (len(a) == la) and (len(b) == lb):
+            if verbose:
+                print("Mutual simplification finished")
+            return a, b
+
+
+def getLinkingNumber(data1, data2, simplify=True, randomOffset=True, verbose=False):
+    if simplify:
+        data1, data2 = mutualSimplify(data1=data1, data2=data2, verbose=verbose)
     return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)
