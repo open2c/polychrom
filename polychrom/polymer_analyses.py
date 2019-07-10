@@ -446,5 +446,5 @@ def mutualSimplify(a, b, verbose=False):
 
 def getLinkingNumber(data1, data2, simplify=True, randomOffset=True, verbose=False):
     if simplify:
-        data1, data2 = mutualSimplify(data1=data1, data2=data2, verbose=verbose)
+        data1, data2 = mutualSimplify(a=data1, b=data2, verbose=verbose)
     return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)
