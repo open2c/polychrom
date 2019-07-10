@@ -1,2 +1,5 @@
 build
-openmmlib2.egg-info
+polychrom.egg-info
+polymath.cpython-37m-x86_64-linux-gnu.so
+.ipynb*
+*.pyc
