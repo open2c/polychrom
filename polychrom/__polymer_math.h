@@ -7,5 +7,7 @@ void _mutualSimplifyCpp (
     double *datax2, double *datay2, double *dataz2, int N2,
     long *ret
     );
+    
+int _simplifyCpp (double *datax, double *datay, double *dataz, int N);
 
 #endif
