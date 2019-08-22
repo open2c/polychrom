@@ -448,6 +448,7 @@ class filenameContactMapRepeat(object):
             if len(self.curStarts) == 0:
                 self.data = self.loadFunction(self.filenames[self.i])
                 self.curStarts = list(self.mapStarts)
+                self.i += 1 
             start = self.curStarts.pop()
             data = self.data[start:start+self.mapN]
             assert len(data) == self.mapN
@@ -456,7 +457,6 @@ class filenameContactMapRepeat(object):
             self.i += 1
             return None
         contacts = self.contactFunction(data, cutoff=self.cutoff)
-        self.i += 1
         return contacts
 
 def monomerResolutionContactMapSubchains(filenames,
