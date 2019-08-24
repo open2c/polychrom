@@ -133,7 +133,6 @@ class hdf5Reporter(object):
             cmin = min(self.datas.keys())
             cmax = max(self.datas.keys())
             filename = f"blocks_{cmin}-{cmax}.h5"
-            print(filename)
             with h5py.File(os.path.join(self.folder,filename)) as file: 
                 for count, values in self.datas.items():                     
                     gr = file.create_group(str(count))
