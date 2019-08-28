@@ -7,7 +7,7 @@ import os
 from math import sqrt, sin, cos
 import numpy
 
-
+from . import hdf5_format
 import scipy, scipy.stats  # @UnusedImport
 
 import numpy as np
@@ -20,7 +20,9 @@ import io
 
 def load(filename, h5dictKey=None):
     """Universal load function for any type of data file"""
-   
+    if "::" in filename:
+        return hdf5_format.load_block(filename)["pos"]
+        
     if not os.path.exists(filename):
         raise IOError("File not found :( \n %s" % filename)
 
