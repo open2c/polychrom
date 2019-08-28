@@ -223,6 +223,11 @@ class Simulation():
                 [0., 0., PBCbox[2]])
 
         self.forceDict = {}  # Dictionary to store forces
+        
+        
+        kwCopy = {i:j for i,j in kwargs.items() if i != "reporters"}
+        for reporter in self.reporters:
+            reporter.report("initArgs", kwCopy)
             
             
     def getData(self):
@@ -283,7 +288,7 @@ class Simulation():
         
         self.data = units.Quantity(data, nm)
         for reporter in self.reporters:
-            reporter.report("load_data", {"data":data, "time":self.time, "block":self.block})
+            reporter.report("starting_conformation", {"data":data, "time":self.time, "block":self.block})
         
         if hasattr(self, "context"):
             self.initPositions()        
@@ -425,7 +430,7 @@ class Simulation():
         logging.info("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
 
-    def doBlock(self, steps=None, increment=True,  reinitialize=True, maxIter=0, checkFunctions=[], getVelocities = False, save=True):
+    def doBlock(self, steps=None, increment=True,  reinitialize=True, maxIter=0, checkFunctions=[], getVelocities = False, save=True, saveExtras = {}):
         """performs one block of simulations, doing steps timesteps,
         or steps_per_block if not specified.
 
@@ -503,9 +508,10 @@ class Simulation():
           
         logging.info(msg)
 
-        result =  {"coordinates":newcoords, "potentialEnergy":eP, "kineticEnergy":eK, "time":curtime, "block":self.block}
+        result =  {"pos":newcoords, "potentialEnergy":eP, "kineticEnergy":eK, "time":curtime, "block":self.block}
         if getVelocities:
-            result["velocities"] = self.state.getVelocities() / (units.nanometer / units.picosecond)
+            result["vel"] = self.state.getVelocities() / (units.nanometer / units.picosecond)
+        result.update(saveExtras)
         if save:
             for reporter in self.reporters:
                 reporter.report("data", result)
