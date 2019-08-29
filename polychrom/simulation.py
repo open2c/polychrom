@@ -46,7 +46,7 @@ class Simulation():
         N : int
             number of particles 
         
-        errorTol : float, optional
+        error_tol : float, optional
             Error tolerance parameter for variableLangevin integrator
             Values of 0.03-0.1 are reasonable for "nice" simulation
             Simulations with strong forces may need 0.01 or less
@@ -117,10 +117,15 @@ class Simulation():
                        "PBC":False,
                        "length_scale":1.0,
                        "mass":100, 
+                       "reporters":[],
                        "maxEk":10 , 
                        "precision":"mixed", 
                        "verbose":False, 
                        "name":"sim"}
+        valid_names = list(defaultArgs.keys()) + ["N", "error_tol", "collision_rate", "timestep"]
+        for i in kwargs.keys():
+            if i not in valid_names:
+                raise ValueError("incorrect argument provided: {0}. Allowed are {1}".format(i, valid_names))
         defaultArgs.update(kwargs)
         kwargs = defaultArgs
         self.kwargs = kwargs
@@ -184,12 +189,14 @@ class Simulation():
         self.N = kwargs["N"]
 
         self.verbose = kwargs["verbose"]
+        self.reporters = kwargs["reporters"]
         self.forcesApplied = False
         self.length_scale = kwargs["length_scale"]
         self.eKcritical = kwargs["maxEk"]  # Max allowed kinetic energy
 
         self.step = 0
         self.block = 0
+        self.time = 0 
 
         self.nm = nm
         self.kB = units.BOLTZMANN_CONSTANT_kB * \
@@ -216,6 +223,11 @@ class Simulation():
                 [0., 0., PBCbox[2]])
 
         self.forceDict = {}  # Dictionary to store forces
+        
+        
+        kwCopy = {i:j for i,j in kwargs.items() if i != "reporters"}
+        for reporter in self.reporters:
+            reporter.report("initArgs", kwCopy)
             
             
     def getData(self):
@@ -275,6 +287,8 @@ class Simulation():
             data -= minvalue
         
         self.data = units.Quantity(data, nm)
+        for reporter in self.reporters:
+            reporter.report("starting_conformation", {"data":data, "time":self.time, "block":self.block})
         
         if hasattr(self, "context"):
             self.initPositions()        
@@ -339,6 +353,9 @@ class Simulation():
                     
             logging.info("adding force {} {}".format( 
                 i, self.system.addForce(self.forceDict[i])))
+            
+        for reporter in self.reporters:
+            reporter.report("applied_forces", {i:j.__getstate__() for i,j in self.forceDict.items()})
 
         self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
         self.initPositions()
@@ -413,7 +430,7 @@ class Simulation():
         logging.info("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
 
-    def doBlock(self, steps=None, increment=True,  reinitialize=True, maxIter=0, checkFunctions=[], getVelocities = False):
+    def doBlock(self, steps=None, increment=True,  reinitialize=True, maxIter=0, checkFunctions=[], getVelocities = False, save=True, saveExtras = {}):
         """performs one block of simulations, doing steps timesteps,
         or steps_per_block if not specified.
 
@@ -448,6 +465,7 @@ class Simulation():
         b = time.time()        
         coords = self.state.getPositions(asNumpy=True)
         newcoords = coords / nm
+        self.time = self.state.getTime() / ps
 
         # calculate energies in KT/particle
         eK = (self.state.getKineticEnergy() / self.N / self.kT)
@@ -490,9 +508,13 @@ class Simulation():
           
         logging.info(msg)
 
-        result =  {"coordinates":newcoords, "potentialEnergy":eP, "kineticEnergy":eK, "time":curtime}
+        result =  {"pos":newcoords, "potentialEnergy":eP, "kineticEnergy":eK, "time":curtime, "block":self.block}
         if getVelocities:
-            result["velocities"] = self.state.getVelocities() / (units.nanometer / units.picosecond)
+            result["vel"] = self.state.getVelocities() / (units.nanometer / units.picosecond)
+        result.update(saveExtras)
+        if save:
+            for reporter in self.reporters:
+                reporter.report("data", result)
         return result
     
 
