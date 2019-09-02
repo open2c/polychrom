@@ -39,11 +39,11 @@ def _to_array_1d(scalar_or_array, arrlen, dtype=float):
     return outarr
 
 
-def harmonicBonds(sim_object,
+def harmonic_bonds(sim_object,
                   bonds,
                   bondWiggleDistance=0.05,
                   bondLength=1.0,
-                  name="HarmonicBonds",
+                  name="harmonic_bonds",
                   ):
     """Adds harmonic bonds
 
@@ -82,11 +82,11 @@ def harmonicBonds(sim_object,
     return force
     
     
-def FENEBonds(sim_object,
+def FENE_bonds(sim_object,
               bonds,
               bondWiggleDistance=0.05,
               bondLength=1.0,
-              name="FENEBonds",
+              name="FENE_bonds",
               ):
     """Adds harmonic bonds
 
@@ -131,11 +131,11 @@ def FENEBonds(sim_object,
     return force
 
 
-def angleForce(
+def angle_force(
         sim_object, 
         triplets,
         k=1.5,
-        name='Angle'):
+        name='angle'):
     """Adds harmonic angle bonds. k specifies energy in kT at one radian
     If k is an array, it has to be of the length N.
     Xth value then specifies stiffness of the angle centered at
@@ -166,11 +166,11 @@ def angleForce(
     return force
 
 
-def polynomialRepulsiveForce(
+def polynomial_repulsive(
         sim_object, 
         trunc=3.0, 
         radiusMult=1.,
-        name='PolynomialRepulsive'
+        name='polynomial_repulsive'
     ):
     """This is a simple polynomial repulsive potential. It has the value
     of `trunc` at zero, stays flat until 0.6-0.7 and then drops to zero
@@ -212,10 +212,10 @@ def polynomialRepulsiveForce(
     return force
 
 
-def smoothSquareWellForce(sim_object,
+def smooth_square_well(sim_object,
     repulsionEnergy=3.0, repulsionRadius=1.,
     attractionEnergy=0.5, attractionRadius=2.0,
-    name='SmoothSquareWell'
+    name='smooth_square_well'
     ):
     """
     This is a simple and fast polynomial force that looks like a smoothed
@@ -284,7 +284,7 @@ def smoothSquareWellForce(sim_object,
     return force
 
     
-def selectiveSSWForce(sim_object,
+def selective_SSW(sim_object,
     stickyParticlesIdxs,
     extraHardParticlesIdxs,
     repulsionEnergy=3.0,
@@ -293,7 +293,7 @@ def selectiveSSWForce(sim_object,
     attractionRadius=1.5,
     selectiveRepulsionEnergy=20.0,
     selectiveAttractionEnergy=1.0,
-    name='SelectiveSSW'):
+    name='selective_SSW'):
     """
     This is a simple and fast polynomial force that looks like a smoothed
     version of the square-well potential. The energy equals `repulsionEnergy`
@@ -402,13 +402,13 @@ def selectiveSSWForce(sim_object,
     return force
 
 
-def cylindricalConfinement(
+def cylindrical_confinement(
     sim_object, 
     r, 
     bottom=None, 
     k=0.1, 
     top=9999,
-    name="CylindricalConfinement"):
+    name="cylindrical_confinement"):
     """As it says."""
 
     if bottom == True:
@@ -447,12 +447,12 @@ def cylindricalConfinement(
     return force
 
     
-def sphericalConfinement(sim_object,
+def spherical_confinement(sim_object,
             r="density",  # radius... by default uses certain density
             k=5.,  # How steep the walls are
             density=.3,    # target density, measured in particles
                            # per cubic nanometer (bond size is 1 nm)
-            name='SphericalConfinement'
+            name='spherical_confinement'
             ):
     """Constrain particles to be within a sphere.
     With no parameters creates sphere with density .3
@@ -494,7 +494,7 @@ def sphericalConfinement(sim_object,
     return force
 
 
-def tetherParticles(
+def tether_particles(
         sim_object, 
         particles, 
         k=30, 
@@ -556,7 +556,7 @@ def tetherParticles(
     return force
             
     
-def pullForce(
+def pull_force(
         sim_object, 
         particles, 
         force_vecs,
@@ -569,6 +569,8 @@ def pullForce(
     """
     force = openmm.CustomExternalForce(
         "x * fx + y * fy + z * fz")
+    force.name = name
+
     force.addPerParticleParameter("fx")
     force.addPerParticleParameter("fy")
     force.addPerParticleParameter("fz")
@@ -580,3 +582,134 @@ def pullForce(
     return force
 
 
+def grosberg_polymer_bonds(sim_object, 
+                           bonds,
+                           k=30,
+                          name = "grosberg_polymer"):
+    """Adds FENE bonds according to Halverson-Grosberg paper.
+    (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
+     nonconcatenated ring polymers in a melt. I. Statics."
+     The Journal of chemical physics 134 (2011): 204904.)
+
+    This method has a repulsive potential build-in,
+    so that Grosberg bonds could be used with truncated potentials.
+    Is of no use unless you really need to simulate Grosberg-type system.
+
+    Parameters
+    ----------
+    k : float, optional
+        Arbitrary parameter; default value as in Grosberg paper.
+
+     """
+    
+    equation = ("- 0.5 * k * r0 * r0 * log(1-(r/r0)* (r / r0))")
+    force = openmm.CustomBondForce(equation)
+    force.name = name 
+
+    force.addGlobalParameter("k", k *
+        sim_object.kT / (sim_object.conlen * sim_object.conlen))
+    force.addGlobalParameter("r0", sim_object.conlen * 1.5)
+       
+    _prepend_force_name_to_params(force)
+
+
+    for bond_idx, (i, j) in enumerate(bonds):
+        if (i >= sim_object.N) or (j >= sim_object.N):
+            raise ValueError("\nCannot add bond with monomers %d,%d that"\
+            "are beyound the polymer length %d" % (i, j, sim_object.N))
+        
+        force.addBond(int(i), int(j))
+    
+    return force 
+                
+
+
+def grosberg_angle(sim_object, 
+                   triplets,
+                       k=1.5, 
+                      name="grosberg_angle"):
+    """Adds stiffness according to the Grosberg paper.
+    (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
+     nonconcatenated ring polymers in a melt. I. Statics."
+     The Journal of chemical physics 134 (2011): 204904.)
+
+    Parameters are synchronized with normal stiffness
+
+    If k is an array, it has to be of the length N.
+    Xth value then specifies stiffness of the angle centered at
+    monomer number X.
+    Values for ends of the chain will be simply ignored.
+
+    Parameters
+    ----------
+
+    k : float or N-long list of floats
+        Synchronized with regular stiffness.
+        Default value is very flexible, as in Grosberg paper.
+        Default value maximizes entanglement length.
+
+    """
+    k = _to_array_1d(k, len(triplets)) 
+        
+    force = openmm.CustomAngleForce(
+        "GRk * kT * (1 - cos(theta - 3.141592))")
+    
+    force.name = name 
+    force.addGlobalParameter("kT", sim_object.kT)
+    force.addPerAngleParameter("GRk")
+
+    _prepend_force_name_to_params(force)
+    
+    for triplet_idx, (p1, p2, p3) in enumerate(triplets):
+        force.addAngle(p1, p2, p3, [k[triplet_idx]])
+        
+    return force 
+
+    
+    
+def grosberg_repulsive_force(sim_object,
+                             trunc=None,
+                             radiusMult=1.,
+                            name="grosberg_repulsive"):
+    """This is the fastest non-transparent repulsive force.
+    (that preserves topology, doesn't allow chain passing)
+    Done according to the paper:
+    (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
+     nonconcatenated ring polymers in a melt. I. Statics."
+     The Journal of chemical physics 134 (2011): 204904.)
+    Parameters
+    ----------
+
+    trunc : None or float
+         truncation energy in kT, used for chain crossing.
+         Value of 1.5 yields frequent passing,
+         3 - average passing, 5 - rare passing.
+
+    """
+    radius = sim_object.conlen * radiusMult
+    nbCutOffDist = radius * 2. ** (1. / 6.)
+    if trunc is None:
+        repul_energy = "4 * e * ((sigma/r)^12 - (sigma/r)^6) + e"
+    else:
+        repul_energy = (
+            "step(cut2 - U) * U"
+            " + step(U - cut2) * cut2 * (1 + tanh(U/cut2 - 1));"
+            "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
+            "r2 = (r^10. + (sigma03)^10.)^0.1")
+    force = openmm.CustomNonbondedForce(repul_energy)
+    force.name = name
+
+    force.addGlobalParameter('e', sim_object.kT)
+    force.addGlobalParameter('sigma', radius)
+    force.addGlobalParameter('sigma03', 0.3 * radius)
+    if trunc is not None:
+        force.addGlobalParameter('cut', sim_object.kT * trunc)
+        force.addGlobalParameter('cut2', 0.5 * trunc * sim_object.kT)
+    for _ in range(sim_object.N):
+        force.addParticle(())
+
+    force.setCutoffDistance(nbCutOffDist)
+    _prepend_force_name_to_params(force)
+    
+    return force 
+    

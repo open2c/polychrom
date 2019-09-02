@@ -423,10 +423,14 @@ class Simulation():
 
         openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)
 
-        self.state = self.context.getState(getPositions=False, getEnergy=True)
+        self.state = self.context.getState(getPositions=True, getEnergy=True)
         eK = (self.state.getKineticEnergy() / self.N / self.kT)
         eP = self.state.getPotentialEnergy() / self.N / self.kT
+        
+        coords = self.state.getPositions(asNumpy=True)
+        self.data = coords
         locTime = self.state.getTime()
+        
         logging.info("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
 
