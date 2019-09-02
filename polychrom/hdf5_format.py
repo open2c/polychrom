@@ -94,7 +94,7 @@ def load_hdf5_file(fname):
     
             
             
-class hdf5Reporter(object):
+class HDF5Reporter(object):
     def __init__(self, folder, max_data_length=50, 
                  h5py_dset_opts={"compression":"gzip"}, 
                  overwrite=False, 

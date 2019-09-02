@@ -1,7 +1,7 @@
 from polychrom.polymerutils import load, save 
 import os 
 
-class legacyReporter(object):
+class LegacyReporter(object):
     def __init__(self, folder):
         """
         
