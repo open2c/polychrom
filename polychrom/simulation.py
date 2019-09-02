@@ -53,17 +53,19 @@ class Simulation():
 
 
         timestep : number
-            timestep in femtoseconds. Mandatory for non-variable integrators. Value of 70-80 are appropriate
+            timestep in femtoseconds. Mandatory for non-variable integrators.
+            Ignored for variableLangevin integrator. Value of 70-80 are appropriate
 
         collision_rate : number
             collision rate in inverse picoseconds. values of 0.01 or 0.05 are often used. 
             Consult with lab members on values. 
 
-        PBC : bool, optional
-            Use periodic boundary conditions, default:False
 
-        PBCbox : (float,float,float), optional
-            Define size of the bounding box for PBC
+        PBCbox : (float,float,float) or False; default:False
+            Controls periodic boundary conditions
+            If PBCbox is False, do not use periodic boundary conditions
+            If intending to use PBC, then set PBCbox to (x,y,z) where x,y,z are dimensions
+            of the bounding box for PBC
 
         GPU : GPU index as a string ("0" for first, "1" for second etc.) 
             Machines with 1 GPU automatically select their GPU.
@@ -82,12 +84,6 @@ class Simulation():
         verbose : bool, optional
             If True, prints a lot of stuff in the command line.
 
-
-        name : string, optional
-            Name to be printed out as a first line of each block.
-            Use it if you run simulations one after another
-            and want to see what's going on.
-
         length_scale : float, optional
             The geometric scaling factor of the system.
             By default, length_scale=1.0 and harmonic bonds and repulsive
@@ -97,7 +93,11 @@ class Simulation():
             raise error if kinetic energy in (kT/particle) exceeds this value 
 
         platform : string, optional
-            Platform to use
+            Platform to use: 
+            CUDA (preferred fast GPU platform)
+            OpenCL (maybe slower GPU platofrm, does not need CUDA installed)
+            CPU (medium speed parallelized CPU platform) 
+            reference (slow CPU platform for debug)
 
         verbose : bool, optional
             Shout out loud about every change.
@@ -110,24 +110,23 @@ class Simulation():
 
 
         """
-        defaultArgs = {"platform":"CUDA", 
+        default_args = {"platform":"CUDA", 
                        "GPU":"0",
                        "integrator":"variablelangevin", 
                        "temperature":300,
-                       "PBC":False,
+                       "PBCbox":False,
                        "length_scale":1.0,
                        "mass":100, 
                        "reporters":[],
                        "maxEk":10 , 
                        "precision":"mixed", 
-                       "verbose":False, 
-                       "name":"sim"}
-        valid_names = list(defaultArgs.keys()) + ["N", "error_tol", "collision_rate", "timestep"]
+                       "verbose":False}
+        valid_names = list(default_args.keys()) + ["N", "error_tol", "collision_rate", "timestep"]
         for i in kwargs.keys():
             if i not in valid_names:
                 raise ValueError("incorrect argument provided: {0}. Allowed are {1}".format(i, valid_names))
-        defaultArgs.update(kwargs)
-        kwargs = defaultArgs
+        default_args.update(kwargs)
+        kwargs = default_args
         self.kwargs = kwargs
 
         platform = kwargs["platform"]
@@ -141,16 +140,16 @@ class Simulation():
         self.properties = properties
 
         if platform.lower() == "opencl":
-            platformObject = openmm.Platform.getPlatformByName('OpenCL')
+            platform_object = openmm.Platform.getPlatformByName('OpenCL')
         elif platform.lower() == "reference":
-            platformObject = openmm.Platform.getPlatformByName('Reference')
+            platform_object = openmm.Platform.getPlatformByName('Reference')
         elif platform.lower() == "cuda":
-            platformObject = openmm.Platform.getPlatformByName('CUDA')
+            platform_object = openmm.Platform.getPlatformByName('CUDA')
         elif platform.lower() == "cpu":
-            platformObject = openmm.Platform.getPlatformByName('CPU')
+            platform_object = openmm.Platform.getPlatformByName('CPU')
         else:
             raise RuntimeError("Undefined platform: {0}".format(platform))
-        self.platform = platformObject
+        self.platform = platform_object
         
         self.temperature = kwargs["temperature"]
 
@@ -192,7 +191,7 @@ class Simulation():
         self.reporters = kwargs["reporters"]
         self.forcesApplied = False
         self.length_scale = kwargs["length_scale"]
-        self.eKcritical = kwargs["maxEk"]  # Max allowed kinetic energy
+        self.eK_critical = kwargs["maxEk"]  # Max allowed kinetic energy
 
         self.step = 0
         self.block = 0
@@ -212,20 +211,21 @@ class Simulation():
                 / (units.kilojoule_per_mole / nm ** 2))
 
         self.system = openmm.System()
-
-        self.PBC = kwargs["PBC"]
-
-        if self.PBC == True:  # if periodic boundary conditions
+        
+        #adding PBC
+        self.PBC = False
+        if (kwargs["PBCbox"] is not False):
+            self.PBC = True
             PBCbox = np.array(kwargs["PBCbox"])            
             self.system.setDefaultPeriodicBoxVectors(
-                [PBCbox[0], 0., 0.], 
-                [0., PBCbox[1], 0.], 
-                [0., 0., PBCbox[2]])
+                [float(PBCbox[0]), 0., 0.], 
+                [0., float(PBCbox[1]), 0.], 
+                [0., 0., float(PBCbox[2])])
 
         self.forceDict = {}  # Dictionary to store forces
         
-        
-        kwCopy = {i:j for i,j in kwargs.items() if i != "reporters"}
+        # saving arguments - not trying to save reporters because they are not serializable
+        kwCopy = {i:j for i,j in kwargs.items() if i != "reporters"}  
         for reporter in self.reporters:
             reporter.report("initArgs", kwCopy)
             
@@ -483,8 +483,8 @@ class Simulation():
 
         if np.isnan(newcoords).any():
             raise integrationFailError("Coordinates are NANs")
-        if (eK > self.eKcritical):
-            raise eKExceedsError("Ek exceeds {0}".format(self.eKcritical))
+        if (eK > self.eK_critical):
+            raise eKExceedsError("Ek exceeds {0}".format(self.eK_critical))
         if  (np.isnan(eK)) or (np.isnan(eP)):
             raise integrationFailError("Energy is NAN)")
         if checkFail:
@@ -557,7 +557,7 @@ class Simulation():
 
         print("     95 percentile of distance to center is:   ", per95)
         print("     density of closest 95% monomers is:   ", den)
-        print("     density of the core monomers is:   ", den5)
+        print("     density of the 5% closest to CoM monomers is:   ", den5)
         print("     min/median/mean/max coordinates are: ")
         print("     x: %.2lf, %.2lf, %.2lf, %.2lf" % minmedmax(x))
         print("     y: %.2lf, %.2lf, %.2lf, %.2lf" % minmedmax(y))
