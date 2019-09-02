@@ -110,7 +110,7 @@ class Simulation():
 
 
         """
-        defaultArgs = {"platform":"CUDA", 
+        default_args = {"platform":"CUDA", 
                        "GPU":"0",
                        "integrator":"variablelangevin", 
                        "temperature":300,
@@ -121,12 +121,12 @@ class Simulation():
                        "maxEk":10 , 
                        "precision":"mixed", 
                        "verbose":False}
-        valid_names = list(defaultArgs.keys()) + ["N", "error_tol", "collision_rate", "timestep"]
+        valid_names = list(default_args.keys()) + ["N", "error_tol", "collision_rate", "timestep"]
         for i in kwargs.keys():
             if i not in valid_names:
                 raise ValueError("incorrect argument provided: {0}. Allowed are {1}".format(i, valid_names))
-        defaultArgs.update(kwargs)
-        kwargs = defaultArgs
+        default_args.update(kwargs)
+        kwargs = default_args
         self.kwargs = kwargs
 
         platform = kwargs["platform"]
@@ -140,16 +140,16 @@ class Simulation():
         self.properties = properties
 
         if platform.lower() == "opencl":
-            platformObject = openmm.Platform.getPlatformByName('OpenCL')
+            platform_object = openmm.Platform.getPlatformByName('OpenCL')
         elif platform.lower() == "reference":
-            platformObject = openmm.Platform.getPlatformByName('Reference')
+            platform_object = openmm.Platform.getPlatformByName('Reference')
         elif platform.lower() == "cuda":
-            platformObject = openmm.Platform.getPlatformByName('CUDA')
+            platform_object = openmm.Platform.getPlatformByName('CUDA')
         elif platform.lower() == "cpu":
-            platformObject = openmm.Platform.getPlatformByName('CPU')
+            platform_object = openmm.Platform.getPlatformByName('CPU')
         else:
             raise RuntimeError("Undefined platform: {0}".format(platform))
-        self.platform = platformObject
+        self.platform = platform_object
         
         self.temperature = kwargs["temperature"]
 
@@ -191,7 +191,7 @@ class Simulation():
         self.reporters = kwargs["reporters"]
         self.forcesApplied = False
         self.length_scale = kwargs["length_scale"]
-        self.eKcritical = kwargs["maxEk"]  # Max allowed kinetic energy
+        self.eK_critical = kwargs["maxEk"]  # Max allowed kinetic energy
 
         self.step = 0
         self.block = 0
@@ -483,8 +483,8 @@ class Simulation():
 
         if np.isnan(newcoords).any():
             raise integrationFailError("Coordinates are NANs")
-        if (eK > self.eKcritical):
-            raise eKExceedsError("Ek exceeds {0}".format(self.eKcritical))
+        if (eK > self.eK_critical):
+            raise eKExceedsError("Ek exceeds {0}".format(self.eK_critical))
         if  (np.isnan(eK)) or (np.isnan(eP)):
             raise integrationFailError("Energy is NAN)")
         if checkFail:

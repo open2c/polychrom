@@ -8,7 +8,7 @@ from polychrom import (simulation, starting_conformations,
                        forces, extra_forces, forcekits)
 import simtk.openmm as openmm
 import os
-from polychrom.hdf5_format import hdf5Reporter, list_filenames, load_block, load_hdf5_file
+from polychrom.hdf5_format import HDF5Reporter, list_filenames, load_block, load_hdf5_file
 
 
 def exampleOpenmm():
@@ -19,7 +19,7 @@ def exampleOpenmm():
     
     # creating a reporter - see examples/storage_formats/hdf5_reporter.ipynb for explanations/examples
     
-    reporter = hdf5Reporter(folder="trajectory", max_data_length=5, overwrite=True)
+    reporter = HDF5Reporter(folder="trajectory", max_data_length=5, overwrite=True)
         
     #Simulation object has many parameters that should be described in polychrom/simulation.py file 
     sim = simulation.Simulation(
