@@ -14,49 +14,38 @@ def exampleOpenmm():
     An example script which generates an extended polymer, and lets it collapse to a sphere.
     Please follow comments along the text for explanations.
     """
-
-    # ----------- Initializing general simulation parameters---------
-
-    # Initialization for simulations with constant environment, using default integrator (langevin)
-    # Fine-tune timestep and thermostat parameters so that your simulation does not blow up,
-    # But is going as fast as possible. You might need to increase timestep, but don't let
-    # your kinetic energy be above 1.6 in the "steady" regime
-
-    # a = Simulation(timestep=80, thermostat=0.005)
-    # a.setup(platform="cuda", verbose=True)  # Switch to platform="OpenCL" if you don't have cuda
-
-    # Alternative initialization for dynamic simulations with strong forces,
-    #  which would automatically adjusts timestep
-    # This is relevant, for example, for simulations of polymer collapse
-    # If simulation blows up, decrease errorTol by a factor of two and try again
+    
+    #Simulation object has many parameters that should be described in polychrom/simulation.py file 
     sim = simulation.Simulation(
             platform="CPU", 
             integrator="variableLangevin", 
             error_tol=0.002, 
             GPU = "0", 
             collision_rate=0.02, 
-            N = 10000)  # timestep not necessary for variableLangevin
-
-    # sim.saveFolder("trajectory")  # folder where to save trajectory
-
-
-    # ------- Creation of the initial conformation-----------
-
-    # polymer = polymerutils.load("globule")
-    # loads compact polymer conformation of the length 6000
-
-    # polymer = polymerutils.grow_rw(8000, 50, method="standard")
-    # grows a compact polymer ring of a length 8000 in a 50x50x50 box
-
-    # polymer = polymerutils.create_spiral(r1=4, r2=10, N=8000)
-    # Creates a compact polymer arranged in a cylinder of radius 10, 8000 monomers long
-
+            N = 10000) 
+    
+    # Creates a compact conformation on a cubic lattice, length=10,000; grown in a 100x100x100 box     
     polymer = starting_conformations.grow_cubic(10000, 100)
-    # Creates an extended "random walk" conformation of length 8000
 
+    # Now we load the data into the simulation object 
     sim.setData(polymer, center=True)  # loads a polymer, puts a center of mass at zero
 
-    # -----------Adding forces ---------------
+
+    
+    
+    ### -----------Adding forces and forcekits  ---------
+    
+    # Many forces are independent from each other, and can be just added to the system
+    
+    # However, in some cases some forces go together as a group and have shared properties 
+    # For example, both polymer chain and polymer stiffness demand a set of chains
+    # And exceptions to the nonbonded force should be added for all polymer bonds 
+    # Forcekits can explicitly take care of such dependencies 
+    # While still providing flexibility of choosing which forces to use 
+    
+    
+    # This is an example of a standalone force that implements spherical confinement 
+    # This force does not depend on any other forces and is just added alone 
     sim.addForce(
         forces.sphericalConfinement(sim, density=0.85, k=1))
     # Specifying density is more intuitive than radius
@@ -64,16 +53,28 @@ def exampleOpenmm():
     # set k=5 for harsh confinement
     # and k = 0.2 or less for collapse simulation
 
-    # forces.polynomialRepulsiveForce(sim, trunc=10)
 
+    # This is an example of a forcekit that intorudces dependencies between polymer chain related forces 
+    # This forcekit takes chains as a second argument; in the same format as openmmlib 
+    # It then takes a function to initialize polymer bond force, and a dictionary of parameters 
+    # Then the same for angleForce and for the nonbondedForce 
+    
+    # Note that if you defined your own force of a certain type (e.g. your own polymer bond force)
+    # Then you can simply sideload it using lambda functions ad in example below  
+    #
+    # myforce = openmm.customExternalForce(.......)
+    # forcekits.polymerChains(...,
+    # bondForceFunc = lambda x:myforce,
+    # bondForceKwargs = {}
+    # ... ) 
+    
     sim.addForce(
         forcekits.polymerChains(
             sim,
             chains=[(0, None, False)],
-
                 # By default the library assumes you have one polymer chain
                 # If you want to make it a ring, or more than one chain, use self.setChains
-                # self.setChains([(0,50,1),(50,None,0)]) will set a 50-monomer ring and a chain from monomer 50 to the end
+                # self.setChains([(0,50,True),(50,None,False)]) will set a 50-monomer ring and a chain from monomer 50 to the end
 
             bondForceFunc=forces.harmonicBonds,
             bondForceKwargs={
@@ -98,17 +99,6 @@ def exampleOpenmm():
         )
     )
 
-
-    # If your simulation does not start, consider using energy minimization below
-
-    # sim.localEnergyMinimization()
-    # A very efficient algorithm to reach local energy minimum
-    # Use it to minimize energy if you're doing diffusion simulations
-    # If you're simulating dynamics of collapse or expansion, please do not use it
-    
-    # An algorithm to start a simulation
-    # Which works only with langevin integrator (but will not throw an error otherwise)
-    # Decreases a timestep, and then increases it slowly back to normal
 
     # -----------Running a simulation ---------
 
