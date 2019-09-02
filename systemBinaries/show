@@ -20,17 +20,17 @@ Use command "xyz" if you don't want to connect consecutive monomers.
 Filename convention
 ---------------
 
-The first argument is a filename, but with following caveats/shortcuts
+The first argument is a filename, or a URI, or a simplified filename (see below)
 
 One way to call the function is to use a full filename:
-show /path/to/file/block1.dat 
+xyz /path/to/file/block1.dat 
 
-This would work both with old-style trajectories (block42.dat) and new style (blocks1-50.h5::42)
+This would work both with old-style filenames (block42.dat) and new style URI's (blocks1-50.h5::42)
 
-Another is to use a number: e.g. "42" instead of "block42.dat":
-show /path/to/file/42
+Another is to use a number: e.g. "42" instead of a filename or a URI:
+xyz /path/to/file/42
 
-If you are already in a trajectory folder, you can just use "show 42" to show the relevant block
+If you are already in a trajectory folder, you can just use "xyz 42" to show the relevant block
 
 Other arguments
 ---------------

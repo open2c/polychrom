@@ -25,11 +25,11 @@ ps = units.second * 1e-12
 
 logging.basicConfig(level=logging.INFO)
 
-class integrationFailError(Exception):
+class IntegrationFailError(Exception):
     pass
 
 
-class eKExceedsError(Exception):
+class EKExceedsError(Exception):
     pass 
 
 
@@ -189,7 +189,7 @@ class Simulation():
 
         self.verbose = kwargs["verbose"]
         self.reporters = kwargs["reporters"]
-        self.forcesApplied = False
+        self.forces_applied = False
         self.length_scale = kwargs["length_scale"]
         self.eK_critical = kwargs["max_Ek"]  # Max allowed kinetic energy
 
@@ -222,7 +222,7 @@ class Simulation():
                 [0., float(PBCbox[1]), 0.], 
                 [0., 0., float(PBCbox[2])])
 
-        self.forceDict = {}  # Dictionary to store forces
+        self.force_dict = {}  # Dictionary to store forces
         
         # saving arguments - not trying to save reporters because they are not serializable
         kwCopy = {i:j for i,j in kwargs.items() if i != "reporters"}  
@@ -230,16 +230,16 @@ class Simulation():
             reporter.report("initArgs", kwCopy)
             
             
-    def getData(self):
+    def get_data(self):
         "Returns an Nx3 array of positions"
         return np.asarray(self.data / nm, dtype=np.float32)
 
     
-    def getScaledData(self):
+    def get_scaled_data(self):
         """Returns data, scaled back to PBC box """
         if self.PBC != True:
-            return self.getData()
-        alldata = self.getData()
+            return self.get_data()
+        alldata = self.get_data()
         boxsize = np.array(self.kwargs["PBCbox"])
         mults = np.floor(alldata / boxsize[None, :])
         toRet = alldata - mults * boxsize[None, :]
@@ -247,7 +247,7 @@ class Simulation():
         return toRet
 
     
-    def setData(self, data, center=False, random_offset = 1e-5):
+    def set_data(self, data, center=False, random_offset = 1e-5):
         """Sets particle positions
 
         Parameters
@@ -291,7 +291,7 @@ class Simulation():
             reporter.report("starting_conformation", {"data":data, "time":self.time, "block":self.block})
         
         if hasattr(self, "context"):
-            self.initPositions()        
+            self.init_positions()        
         
 
     def RG(self):
@@ -301,7 +301,7 @@ class Simulation():
 
         Gyration ratius in units of length (bondlength).
         """
-        data = self.getScaledData()
+        data = self.get_scaled_data()
         data = data - np.mean(data, axis=0)[None,:]
         return np.sqrt(np.sum(np.var(np.array(data), 0)))    
 
@@ -310,30 +310,30 @@ class Simulation():
         """
         Calculates distance between particles i and j
         """
-        data = self.getData()
+        data = self.get_data()
         dif = data[i] - data[j]
         return np.sqrt(sum(dif ** 2))
         
 
-    def addForce(self, force):
+    def add_force(self, force):
         if isinstance(force, Iterable):
             for f in force:
-                self.addForce(f)
+                self.add_force(f)
         else:
-            if force.name in self.forceDict:
+            if force.name in self.force_dict:
                 raise ValueError(
                     'A force named {} was added to the system twice!'.format(force.name))
             forces._prepend_force_name_to_params(force)
-            self.forceDict[force.name] = force
+            self.force_dict[force.name] = force
         
 
-    def _applyForces(self):
+    def _apply_forces(self):
         """Adds all particles to the system.
         Then applies all the forces in the forcedict.
         Forces should not be modified after that, unless you do it carefully
         (see openmm reference)."""
 
-        if self.forcesApplied == True:
+        if self.forces_applied == True:
             return
         
         self.masses = np.zeros(self.N, dtype=float) + self.kwargs["mass"]
@@ -341,8 +341,8 @@ class Simulation():
             self.system.addParticle(mass)
 
 
-        for i in list(self.forceDict.keys()):  # Adding forces
-            force = self.forceDict[i]
+        for i in list(self.force_dict.keys()):  # Adding forces
+            force = self.force_dict[i]
                     
             if hasattr(force, "CutoffNonPeriodic") and hasattr(force, "CutoffPeriodic"):
                 if self.PBC:
@@ -352,18 +352,18 @@ class Simulation():
                     force.setNonbondedMethod(force.CutoffNonPeriodic)
                     
             logging.info("adding force {} {}".format( 
-                i, self.system.addForce(self.forceDict[i])))
+                i, self.system.addForce(self.force_dict[i])))
             
         for reporter in self.reporters:
-            reporter.report("applied_forces", {i:j.__getstate__() for i,j in self.forceDict.items()})
+            reporter.report("applied_forces", {i:j.__getstate__() for i,j in self.force_dict.items()})
 
         self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
-        self.initPositions()
-        self.initVelocities()
-        self.forcesApplied = True
+        self.init_positions()
+        self.init_velocities()
+        self.forces_applied = True
 
         
-    def initVelocities(self,  temperature="current"):
+    def init_velocities(self,  temperature="current"):
         """Initializes particles velocities
 
         Parameters
@@ -381,7 +381,7 @@ class Simulation():
             
         self.context.setVelocitiesToTemperature(temperature)
     
-    def initPositions(self):
+    def init_positions(self):
         """Sends particle coordinates to OpenMM system.
         If system has exploded, this is
          used in the code to reset coordinates. """
@@ -403,16 +403,16 @@ class Simulation():
         such as forces, have changed"""
         
         self.context.reinitialize()
-        self.initPositions()
-        self.initVelocities()
+        self.init_positions()
+        self.init_velocities()
         
 
-    def localEnergyMinimization(self, tolerance=0.3, maxIterations=0):
+    def local_energy_minimization(self, tolerance=0.3, maxIterations=0):
         "A wrapper to the build-in OpenMM Local Energy Minimization"
 
         logging.info("Performing local energy minimization")
 
-        self._applyForces()
+        self._apply_forces()
 
         self.state = self.context.getState(getPositions=False,
                                            getEnergy=True)
@@ -430,7 +430,7 @@ class Simulation():
         logging.info("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
 
-    def doBlock(self, steps=None, increment=True,  reinitialize=True, maxIter=0, checkFunctions=[], getVelocities = False, save=True, saveExtras = {}):
+    def do_block(self, steps=None,  reinitialize=True, maxIter=0, check_functions=[], get_velocities = False, save=True, save_extras = {}):
         """performs one block of simulations, doing steps timesteps,
         or steps_per_block if not specified.
 
@@ -443,23 +443,20 @@ class Simulation():
             If true, will not increment self.block and self.steps counters
         """
 
-        if self.forcesApplied == False:
+        if self.forces_applied == False:
             if self.verbose:
                 logging.info("applying forces")
                 sys.stdout.flush()
-            self._applyForces()
-            self.forcesApplied = True
+            self._apply_forces()
+            self.forces_applied = True
 
 
 
         a = time.time()
         self.integrator.step(steps)  # integrate!
 
-        if increment:
-            self.block += 1
-            self.step += steps
         
-        self.state = self.context.getState(getPositions=True,getVelocities=getVelocities,
+        self.state = self.context.getState(getPositions=True,getVelocities=get_velocities,
                                            getEnergy=True)
             
         b = time.time()        
@@ -476,21 +473,21 @@ class Simulation():
         msg += "pos[1]=[%.1lf %.1lf %.1lf] " % tuple(newcoords[0])
 
 
-        checkFail = False
-        for checkFunction in checkFunctions:
-            if not checkFunction(newcoords):
-                checkFail = True
+        check_fail = False
+        for check_function in check_functions:
+            if not check_function(newcoords):
+                check_fail = True
 
         if np.isnan(newcoords).any():
-            raise integrationFailError("Coordinates are NANs")
+            raise IntegrationFailError("Coordinates are NANs")
         if (eK > self.eK_critical):
-            raise eKExceedsError("Ek exceeds {0}".format(self.eK_critical))
+            raise EKExceedsError("Ek exceeds {0}".format(self.eK_critical))
         if  (np.isnan(eK)) or (np.isnan(eP)):
-            raise integrationFailError("Energy is NAN)")
-        if checkFail:
-            raise integrationFailError("Custom checks failed")
+            raise IntegrationFailError("Energy is NAN)")
+        if check_fail:
+            raise IntegrationFailError("Custom checks failed")
 
-        dif = np.sqrt(np.mean(np.sum((newcoords - self.getData()) ** 2, axis=1)))
+        dif = np.sqrt(np.mean(np.sum((newcoords - self.get_data()) ** 2, axis=1)))
         msg += "dr=%.2lf " % (dif,)
         self.data = coords
         msg += "t=%2.1lfps " % (self.state.getTime() / ps)
@@ -509,16 +506,20 @@ class Simulation():
         logging.info(msg)
 
         result =  {"pos":newcoords, "potentialEnergy":eP, "kineticEnergy":eK, "time":curtime, "block":self.block}
-        if getVelocities:
+        if get_velocities:
             result["vel"] = self.state.getVelocities() / (units.nanometer / units.picosecond)
-        result.update(saveExtras)
+        result.update(save_extras)
         if save:
             for reporter in self.reporters:
                 reporter.report("data", result)
+
+        self.block += 1
+        self.step += steps
+            
         return result
     
 
-    def printStats(self):
+    def print_stats(self):
         """Prints detailed statistics of a system.
         Will be run every 50 steps
         """
@@ -571,7 +572,7 @@ class Simulation():
 
         print()
         print("Statistics for the system:")
-        print("     Forces are: ", list(self.forceDict.keys()))
+        print("     Forces are: ", list(self.force_dict.keys()))
         print()
         print("Potential Energy Ep = ", eP / self.N / self.kT)
 
@@ -585,7 +586,7 @@ class Simulation():
         # change these numbers: e.g. [0,.1, .2 ...  .9] will draw 10 spheres,
         # and this will look better
 
-        data = self.getData()
+        data = self.get_data()
         if len(data[0]) != 3:
             data = np.transpose(data)
         if len(data[0]) != 3:

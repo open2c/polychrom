@@ -8,7 +8,7 @@ from polychrom import (simulation, starting_conformations,
                        forces, extra_forces, forcekits)
 import simtk.openmm as openmm
 import os
-from polychrom.hdf5_format import HDF5Reporter, list_filenames, load_block, load_hdf5_file
+from polychrom.hdf5_format import HDF5Reporter
 
 
 def exampleOpenmm():
@@ -35,7 +35,7 @@ def exampleOpenmm():
     polymer = starting_conformations.grow_cubic(10000, 100)
 
     # Now we load the data into the simulation object 
-    sim.setData(polymer, center=True)  # loads a polymer, puts a center of mass at zero
+    sim.set_data(polymer, center=True)  # loads a polymer, puts a center of mass at zero
 
 
     
@@ -53,7 +53,7 @@ def exampleOpenmm():
     
     # This is an example of a standalone force that implements spherical confinement 
     # This force does not depend on any other forces and is just added alone 
-    sim.addForce(
+    sim.add_force(
         forces.sphericalConfinement(sim, density=0.85, k=1))
     # Specifying density is more intuitive than radius
     # k is the slope of confinement potential, measured in kT/mon
@@ -75,7 +75,7 @@ def exampleOpenmm():
     # bondForceKwargs = {}
     # ... ) 
     
-    sim.addForce(
+    sim.add_force(
         forcekits.polymerChains(
             sim,
             chains=[(0, None, False)],
@@ -114,9 +114,9 @@ def exampleOpenmm():
     #sim.save()  # save original conformationz
     
     for _ in range(10):  # Do 10 blocks
-        sim.doBlock(100)  # Of 2000 timesteps each
+        sim.do_block(100)  # Of 2000 timesteps each
         #sim.save()  # and save data every block
-    sim.printStats()  # In the end, print statistics
+    sim.print_stats()  # In the end, print statistics
     #sim.show()  # and show the polymer if you want to see it.
 
     reporter.dump_data()
