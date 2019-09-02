@@ -96,13 +96,24 @@ def load_hdf5_file(fname):
             
 class hdf5Reporter(object):
     def __init__(self, folder, max_data_length=50, 
-                 h5py_dset_opts={"compression":"gzip"}
+                 h5py_dset_opts={"compression":"gzip"}, 
+                 overwrite=False, 
                 ):
         """
         
         """
         if not os.path.exists(folder):
             os.mkdir(folder)
+            
+        if overwrite: 
+            for the_file in os.listdir(folder):
+                file_path = os.path.join(folder, the_file)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+                else:
+                    raise IOError("Subfolder in traj folder; not deleting. Ensure folder is correct and delete manually. ")
+                        
+                    
         if len(os.listdir(folder)) != 0:
             raise RuntimeError(f"folder {folder} is not empty")
         self.counter = {}
@@ -117,7 +128,7 @@ class hdf5Reporter(object):
         
         
         if name not in ["data"]:
-            filename = f"{name}_{count}.hdf5"
+            filename = f"{name}_{count}.h5"
             with h5py.File(os.path.join(self.folder,filename)) as file: 
                 _write_group(values, file, dset_opts=self.h5py_dset_opts)
                 

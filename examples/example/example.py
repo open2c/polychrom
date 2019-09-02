@@ -8,6 +8,8 @@ from polychrom import (simulation, starting_conformations,
                        forces, extra_forces, forcekits)
 import simtk.openmm as openmm
 import os
+from polychrom.hdf5_format import hdf5Reporter, list_filenames, load_block, load_hdf5_file
+
 
 def exampleOpenmm():
     """
@@ -15,14 +17,19 @@ def exampleOpenmm():
     Please follow comments along the text for explanations.
     """
     
+    # creating a reporter - see examples/storage_formats/hdf5_reporter.ipynb for explanations/examples
+    
+    reporter = hdf5Reporter(folder="trajectory", max_data_length=5, overwrite=True)
+        
     #Simulation object has many parameters that should be described in polychrom/simulation.py file 
     sim = simulation.Simulation(
-            platform="CPU", 
+            platform="CPU",   # <--------- change this to CUDA for simulations on a GPU 
             integrator="variableLangevin", 
             error_tol=0.002, 
             GPU = "0", 
             collision_rate=0.02, 
-            N = 10000) 
+            N = 10000, 
+            reporters=[reporter]) 
     
     # Creates a compact conformation on a cubic lattice, length=10,000; grown in a 100x100x100 box     
     polymer = starting_conformations.grow_cubic(10000, 100)
@@ -107,10 +114,12 @@ def exampleOpenmm():
     #sim.save()  # save original conformationz
     
     for _ in range(10):  # Do 10 blocks
-        sim.doBlock(2000)  # Of 2000 timesteps each
+        sim.doBlock(100)  # Of 2000 timesteps each
         #sim.save()  # and save data every block
     sim.printStats()  # In the end, print statistics
     #sim.show()  # and show the polymer if you want to see it.
+
+    reporter.dump_data()
 
 
 exampleOpenmm()
