@@ -5,15 +5,39 @@ import numpy as np
 import joblib
 import textwrap
 
+usage = """
+Usage: xyz filename [start end step]
+
+Shows individual monomers from a file using rasmol. 
+Unlike "show", it does not try to connect consecutive monomers with lines. 
+
+Filename convention
+---------------
+
+The first argument is a filename, but with following caveats/shortcuts
+
+One way to call the function is to use a full filename:
+xyz /path/to/file/block1.dat 
+
+This would work both with old-style trajectories (block42.dat) and new style (blocks1-50.h5::42)
+
+Another is to use a number: e.g. "42" instead of "block42.dat":
+xyz /path/to/file/42
+
+If you are already in a trajectory folder, you can just use "xyz 42" to show the relevant block
+
+Other arguments
+---------------
+Arguments 2-4 will show monomers starting with "start", up to "end", and with a step of "step"
+start, end, step will basically select data[start:end:step]
+
+
+"""
+
+
 if len(sys.argv) < 2:
-    print(textwrap.dedent("""
-            Usage: show filename [start end pace]
-                 show filenum [start end pace] 
-
-                 filenum is a number of files of the type block123.dat
-
-                 start, end, pace will convert data to data[start:end:pace]"""))
-       
+    print(usage)
+    exit()
   
 
 def showData(data):
@@ -99,23 +123,21 @@ def showData(data):
 
 
 
-def load(filename):
-    from openmmlib import polymerutils
-    return polymerutils.load(filename)
+
+from polychrom.polymerutils import load, fetch_block 
 
 
-
+filename = sys.argv[1]
 
 try:
-    showData(load(sys.argv[1]))
-    exit()
+    fol, fname = os.path.split(filename)
+    showData(fetch_block(fol, fname))    
 
-except IOError:
-    try: 
-        showData(load("expanded%s.dat" % sys.argv[1]))
+except:
+    showData(load(filename))
 
-    except IOError:
-        showData(load("block%s.dat" % sys.argv[1]))
+
+
 
 
 

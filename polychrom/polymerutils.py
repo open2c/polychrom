@@ -9,10 +9,11 @@ import numpy
 
 from . import hdf5_format
 import scipy, scipy.stats  # @UnusedImport
-
+from polychrom.hdf5_format import load_block
 import numpy as np
 import joblib
 import gzip
+import glob 
 
 import io
 
@@ -42,7 +43,48 @@ def load(filename, h5dictKey=None):
             raise ValueError("N does not correspond to the number of lines!")
         return np.array(data)
 
+def fetch_block(folder, ind):
+    """
+    A more generic function to fetch block number "ind" from trajectory 
+    
+    
+    This function is useful if you want to load both "old style" trajectories (block1.dat), 
+    and "new style" trajectories ("blocks_1-50.h5")
+    
+    It will be used in files "show" 
+    
+    Parameters
+    ----------
+    
+        folder: str, folder with a trajectory
 
+        ind: str or int, number of a block to fetch 
+    
+    Returns
+    -------
+        data, Nx3 numpy array     
+    """
+    blocksh5 = glob.glob(os.path.join(folder,"blocks*.h5"))
+    blocksdat = glob.glob(os.path.join(folder, "block*.dat"))
+    ind = int(ind)
+    if (len(blocksh5) > 0) and (len(blocksdat) > 0):
+        raise ValueError("both .h5 and .dat files found in folder - exiting")
+
+    if len(blocksh5) > 0:
+        fnames = [os.path.split(i)[-1] for i in blocksh5]
+        inds = [i.split("_")[-1].split(".")[0].split("-") for i in fnames]    
+        exists = [(int(i[0]) <= ind) and (int(i[1]) >= ind) for i in inds]
+
+        if True not in exists:
+            raise ValueError(f"block {ind} not found in files")
+        if exists.count(True) > 1:
+            raise ValueError("Cannot find the file uniquely: names are wrong")
+        pos = exists.index(True)
+        block = load_block(blocksh5[pos]+f"::{ind}")["pos"]
+
+    if len(blocksdat) > 0:
+        block = load(os.path.join(folder, f"block{ind}.dat"))
+    return block
 
 def save(data, filename, mode="txt",  pdbGroups=None):
     data = np.asarray(data, dtype=np.float32)

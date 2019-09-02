@@ -89,7 +89,7 @@ class Simulation():
             By default, length_scale=1.0 and harmonic bonds and repulsive
             forces have the scale of 1 nm.
 
-        maxEk: float, optional
+        max_Ek: float, optional
             raise error if kinetic energy in (kT/particle) exceeds this value 
 
         platform : string, optional
@@ -118,7 +118,7 @@ class Simulation():
                        "length_scale":1.0,
                        "mass":100, 
                        "reporters":[],
-                       "maxEk":10 , 
+                       "max_Ek":10 , 
                        "precision":"mixed", 
                        "verbose":False}
         valid_names = list(default_args.keys()) + ["N", "error_tol", "collision_rate", "timestep"]
@@ -191,7 +191,7 @@ class Simulation():
         self.reporters = kwargs["reporters"]
         self.forcesApplied = False
         self.length_scale = kwargs["length_scale"]
-        self.eK_critical = kwargs["maxEk"]  # Max allowed kinetic energy
+        self.eK_critical = kwargs["max_Ek"]  # Max allowed kinetic energy
 
         self.step = 0
         self.block = 0
