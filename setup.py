@@ -23,6 +23,6 @@ setup(
     description=('A library for polymer simulations.'),
     ext_modules=ext_modules,
     cmdclass = cmdclass,
-    packages=['polychrom'],
+    packages=find_packages(),
 
 )
