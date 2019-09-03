@@ -6,7 +6,8 @@ import numpy as np
 This is a collection of old forces that are likely no longer used 
 These were a part of openmmlib before April 2019, but were removed during spring cleaning. 
 
-They should be importable and should just work, but are not extensively tested. 
+They should be importable and may or may not just work. It should not be difficult to make them compatible 
+with the new library. 
 
 """
 
