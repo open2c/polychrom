@@ -2,13 +2,28 @@ import pickle
 import os
 import time
 import numpy as np
+import polychrom
+
 from polychrom import polymerutils
-# from openmmlib.polymerutils import scanBlocks
+from polychrom import forces
+from polychrom import forcekits
 from polychrom.simulation import Simulation
 from polychrom.starting_conformations import grow_cubic
+from polychrom.hdf5_format import HDF5Reporter, list_URIs, load_URI, load_hdf5_file
+
+import simtk.openmm 
+import os 
+import shutil
+
 
 import pyximport; pyximport.install()
 from smcTranslocator import smcTranslocatorDirectional
+
+import warnings
+import h5py 
+import glob
+
+
 
 
 # -------defining parameters----------
@@ -37,22 +52,6 @@ restartMilkerEveryBlocks = 100
 smcBondWiggleDist = 0.2
 smcBondDist = 0.5
 
-import polychrom
-import numpy as np 
-import warnings
-import h5py 
-import glob
-from polychrom.simulation import Simulation
-import polychrom.starting_conformations
-# from polychrom.starting_conformations import grow_cubic
-from polychrom import forces
-from polychrom import forcekits
-import simtk.openmm 
-import os 
-import shutil
-import polychrom.polymerutils
-
-from polychrom.hdf5_format import HDF5Reporter, list_URIs, load_URI, load_hdf5_file
 
 # assertions for easy managing code below 
 assert restartMilkerEveryBlocks % saveEveryBlocks == 0 
