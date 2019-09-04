@@ -8,7 +8,7 @@ from polychrom import (simulation, starting_conformations,
                        forces, extra_forces, forcekits)
 import simtk.openmm as openmm
 import os
-from polychrom.hdf5_format import HDF5Reporter, list_filenames, load_block, load_hdf5_file
+from polychrom.hdf5_format import HDF5Reporter
 
 
 def exampleOpenmm():
@@ -35,7 +35,7 @@ def exampleOpenmm():
     polymer = starting_conformations.grow_cubic(10000, 100)
 
     # Now we load the data into the simulation object 
-    sim.setData(polymer, center=True)  # loads a polymer, puts a center of mass at zero
+    sim.set_data(polymer, center=True)  # loads a polymer, puts a center of mass at zero
 
 
     
@@ -53,8 +53,8 @@ def exampleOpenmm():
     
     # This is an example of a standalone force that implements spherical confinement 
     # This force does not depend on any other forces and is just added alone 
-    sim.addForce(
-        forces.sphericalConfinement(sim, density=0.85, k=1))
+    sim.add_force(
+        forces.spherical_confinement(sim, density=0.85, k=1))
     # Specifying density is more intuitive than radius
     # k is the slope of confinement potential, measured in kT/mon
     # set k=5 for harsh confinement
@@ -75,34 +75,34 @@ def exampleOpenmm():
     # bondForceKwargs = {}
     # ... ) 
     
-    sim.addForce(
-        forcekits.polymerChains(
+    sim.add_force(
+        forcekits.polymer_chains(
             sim,
             chains=[(0, None, False)],
                 # By default the library assumes you have one polymer chain
                 # If you want to make it a ring, or more than one chain, use self.setChains
                 # self.setChains([(0,50,True),(50,None,False)]) will set a 50-monomer ring and a chain from monomer 50 to the end
 
-            bondForceFunc=forces.harmonicBonds,
-            bondForceKwargs={
+            bond_force_func=forces.harmonic_bonds,
+            bond_force_kwargs={
                 'bondLength':1.0,
                 'bondWiggleDistance':0.05, # Bond distance will fluctuate +- 0.05 on average
              },
 
-            angleForceFunc=forces.angleForce,
-            angleForceKwargs={
+            angle_force_func=forces.angle_force,
+            angle_force_kwargs={
                 'k':0.05
                 # K is more or less arbitrary, k=4 corresponds to presistence length of 4,
                 # k=1.5 is recommended to make polymer realistically flexible; k=8 is very stiff
             },
 
-            nonbondedForceFunc=forces.polynomialRepulsiveForce,
-            nonbondedForceKwargs={
+            nonbonded_force_func=forces.polynomial_repulsive,
+            nonbonded_force_kwargs={
                 'trunc':3.0, # this will let chains cross sometimes
                 #'trunc':10.0, # this will resolve chain crossings and will not let chain cross anymore
             },
 
-            exceptBonds=True,
+            except_bonds=True,
         )
     )
 
@@ -114,9 +114,9 @@ def exampleOpenmm():
     #sim.save()  # save original conformationz
     
     for _ in range(10):  # Do 10 blocks
-        sim.doBlock(100)  # Of 2000 timesteps each
+        sim.do_block(100)  # Of 2000 timesteps each
         #sim.save()  # and save data every block
-    sim.printStats()  # In the end, print statistics
+    sim.print_stats()  # In the end, print statistics
     #sim.show()  # and show the polymer if you want to see it.
 
     reporter.dump_data()

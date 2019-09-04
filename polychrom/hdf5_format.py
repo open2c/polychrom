@@ -8,6 +8,9 @@ import shutil
 
 
 def _read_h5_group(gr):
+    """
+    Reads all attributes of an HDF5 group, and returns a dict of them
+    """
     result = {i:j[:] for i,j in gr.items()}
     for i,j in gr.attrs.items():
         result[i] = j
@@ -15,6 +18,17 @@ def _read_h5_group(gr):
 
 
 def _convert_to_hdf5_array(data):
+    """
+    Attempts to convert data to HDF5 compatible array
+    or to an HDF5 attribute compatible entity (str, number)
+    
+    Does its best at determining if this is a "normal" 
+    object (str, int, float), or an array. 
+    
+    Right now, if something got converted to a numpy object, 
+    it is discarded and not saved in any way. 
+    We could think about pickling those cases, or JSONing them... 
+    """
     if type(data) == str:
         data = np.array(data, dtype="S")
     data = np.array(data)    
@@ -30,6 +44,13 @@ def _convert_to_hdf5_array(data):
     
     
 def _write_group(dataDict, group, dset_opts={}):
+    """
+    Writes a dictionary of elements to an HDF5 group
+    Puts all "items" into attrs, and all ndarrays into datasets 
+    
+    dset_opts is a dictionary of arguments passed to create_dataset function
+    (compression would be here for example)
+    """
     for name,data in dataDict.items():
         datatype, converted = _convert_to_hdf5_array(data)
         if datatype is None:
@@ -44,7 +65,7 @@ def _write_group(dataDict, group, dset_opts={}):
 
             
 
-def list_filenames(folder, readError=True):    
+def list_URIs(folder, readError=True):    
     """
     Takes a trajectory folder and makes a list of dset paths for each block. 
     It is needed because now we store multiple blocks per file. 
@@ -70,7 +91,7 @@ def list_filenames(folder, readError=True):
             filenames[i] =  file+f"::{i}"
     return [i[1] for i in sorted(filenames.items(), key=lambda x:int(x[0]))]
 
-def load_block(dset_path):
+def load_URI(dset_path):
     """
     Loads a single block of the simulation using address provided by list_filenames
     dset_path should be 

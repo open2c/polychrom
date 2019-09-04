@@ -9,19 +9,40 @@ import numpy
 
 from . import hdf5_format
 import scipy, scipy.stats  # @UnusedImport
-
+from polychrom.hdf5_format import load_URI
 import numpy as np
 import joblib
 import gzip
+import glob 
 
 import io
 
 
 
-def load(filename, h5dictKey=None):
-    """Universal load function for any type of data file"""
+def load(filename):
+    """Universal load function for any type of data file
+    It always returns just XYZ positions - use fetch_block 
+    or hdf5_format.load_URI for loading the whole metadata
+    
+    Accepted file types
+    -------------------
+    
+    New-style URIs (HDF5 based storageo)
+    
+    Text files in openmm-polymer format
+    joblib files in openmm-polymer format 
+    
+    Parameters
+    ----------
+    
+    filename: str 
+        filename to load or a URI
+        
+    
+    
+    """
     if "::" in filename:
-        return hdf5_format.load_block(filename)["pos"]
+        return hdf5_format.load_URI(filename)["pos"]
         
     if not os.path.exists(filename):
         raise IOError("File not found :( \n %s" % filename)
@@ -42,9 +63,67 @@ def load(filename, h5dictKey=None):
             raise ValueError("N does not correspond to the number of lines!")
         return np.array(data)
 
+def fetch_block(folder, ind, full_output=False):
+    """
+    A more generic function to fetch block number "ind" from a trajectory in a folder
+    
+    
+    This function is useful both if you want to load both "old style" trajectories (block1.dat), 
+    and "new style" trajectories ("blocks_1-50.h5")
+    
+    It will be used in files "show" 
+    
+    Parameters
+    ----------
+    
+        folder: str, folder with a trajectory
 
+        ind: str or int, number of a block to fetch 
+        
+        full_output: bool (default=False)
+            If set to true, outputs a dict with positions, eP, eK, time etc. 
+            if False, outputs just the conformation
+            (relevant only for new-style URIs, so default is False) 
+    
+    Returns
+    -------
+        data, Nx3 numpy array     
+        
+        if full_output==True, then dict with data and metadata; XYZ is under key "pos"
+    """
+    blocksh5 = glob.glob(os.path.join(folder,"blocks*.h5"))
+    blocksdat = glob.glob(os.path.join(folder, "block*.dat"))
+    ind = int(ind)
+    if (len(blocksh5) > 0) and (len(blocksdat) > 0):
+        raise ValueError("both .h5 and .dat files found in folder - exiting")
+
+    if len(blocksh5) > 0:
+        fnames = [os.path.split(i)[-1] for i in blocksh5]
+        inds = [i.split("_")[-1].split(".")[0].split("-") for i in fnames]    
+        exists = [(int(i[0]) <= ind) and (int(i[1]) >= ind) for i in inds]
+
+        if True not in exists:
+            raise ValueError(f"block {ind} not found in files")
+        if exists.count(True) > 1:
+            raise ValueError("Cannot find the file uniquely: names are wrong")
+        pos = exists.index(True)
+        block = load_URI(blocksh5[pos]+f"::{ind}")
+        if not full_output:
+            block = block["pos"]
+
+    if len(blocksdat) > 0:
+        block = load(os.path.join(folder, f"block{ind}.dat"))
+    return block
 
 def save(data, filename, mode="txt",  pdbGroups=None):
+    """
+    Basically unchanged polymerutils.save function from openmm-polymer
+    
+    It can save into txt or joblib formats used by old openmm-polymer
+    
+    It is also very useful for saving files to PDB format to make them compatible
+    with nglview, pymol_show and others
+    """
     data = np.asarray(data, dtype=np.float32)
     
     if mode.lower() == "joblib":                
