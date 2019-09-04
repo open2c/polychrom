@@ -48,8 +48,10 @@ class Simulation():
         
         error_tol : float, optional
             Error tolerance parameter for variableLangevin integrator
-            Values of 0.03-0.1 are reasonable for "nice" simulation
-            Simulations with strong forces may need 0.01 or less
+            Values of around 0.01 are reasonable for a "nice" simulation
+            (i.e. simulation with soft forces etc). 
+            Simulations with strong forces may need 0.001 or less
+            OpenMM manual recommends 0.001, but our forces tend to be "softer" than theirs
 
 
         timestep : number
@@ -59,6 +61,15 @@ class Simulation():
         collision_rate : number
             collision rate in inverse picoseconds. values of 0.01 or 0.05 are often used. 
             Consult with lab members on values. 
+            
+            In brief, equilibrium simulations likely do not care about the exact dynamics 
+            you're using, and therefore can be simulated in a "ballistic" dynamics with 
+            col_rate of around 0.001-0.01. 
+            
+            Dynamical simulations and active simulations may be more sensitive to col_rate,
+            though this is still under discussion/investigation. 
+            
+            Johannes converged on using 0.1 for loop extrusion simulations, just to be safe. 
 
 
         PBCbox : (float,float,float) or False; default:False
