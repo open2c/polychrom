@@ -198,9 +198,9 @@ for milkerCount in range(milkerInitsTotal):
     a = Simulation(
             platform="cuda",
             integrator="variableLangevin", 
-            error_tol=0.0002, 
+            error_tol=0.01, 
             GPU = "0", 
-            collision_rate=0.01, 
+            collision_rate=0.03, 
             N = len(data),
             reporters=[reporter],
             PBCbox=[box, box, box],
@@ -229,7 +229,12 @@ for milkerCount in range(milkerInitsTotal):
             bond_force_func=forces.harmonic_bonds,
             bond_force_kwargs={
                 'bondLength':1.0,
-                'bondWiggleDistance':0.01, # Bond distance will fluctuate +- 0.05 on average
+                'bondWiggleDistance':0.1, # Bond distance will fluctuate +- 0.1 on average
+                
+                # This is fine because our simulation is "soft" on average (all forces are soft-core)
+                # And this is potentially desirable to make polymer chain softer to avoid jerking 
+                # when a new bond is initialized
+
              },
 
             angle_force_func=forces.angle_force,
@@ -273,7 +278,8 @@ for milkerCount in range(milkerInitsTotal):
 
     
     # If your simulation does not start, consider using energy minimization below
-    a.local_energy_minimization() 
+    #a.local_energy_minimization() 
+    a._apply_forces()
     
     
 #     a.do_block(steps=steps,)#, increment=False)  # THIS RESULTS IN EK>10!!
