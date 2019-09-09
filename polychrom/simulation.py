@@ -247,7 +247,7 @@ class Simulation():
         return toRet
 
     
-    def set_data(self, data, center=False, random_offset = 1e-5):
+    def set_data(self, data, center=False, random_offset = 1e-5, report=True):
         """Sets particle positions
 
         Parameters
@@ -287,8 +287,9 @@ class Simulation():
             data -= minvalue
         
         self.data = units.Quantity(data, nm)
-        for reporter in self.reporters:
-            reporter.report("starting_conformation", {"data":data, "time":self.time, "block":self.block})
+        if report: 
+            for reporter in self.reporters:
+                reporter.report("starting_conformation", {"pos":data, "time":self.time, "block":self.block})
         
         if hasattr(self, "context"):
             self.init_positions()        
@@ -407,8 +408,57 @@ class Simulation():
         self.init_velocities()
         
 
-    def local_energy_minimization(self, tolerance=0.3, maxIterations=0):
-        "A wrapper to the build-in OpenMM Local Energy Minimization"
+    def local_energy_minimization(self, tolerance=0.3, maxIterations=0, random_offset = 0.02):
+        """        
+        A wrapper to the build-in OpenMM Local Energy Minimization
+        
+        See caveat below 
+
+        Parameters
+        ----------
+        
+        tolerance: float 
+            It is something like a value of force below which 
+            the minimizer is trying to minimize energy to.             
+            see openmm documentation for description 
+            
+            Value of 0.3 seems to be fine for most normal forces. 
+            
+        maxIterations: int
+            Maximum # of iterations for minimization to do.
+            default: 0 means there is no limit
+            
+            This is relevant especially if your simulation does not have a 
+            well-defined energy minimum (e.g. you want to simulate a collapse of a chain 
+            in some potential). In that case, if you don't limit energy minimization, 
+            it will attempt to do a whole simulation for you. In that case, setting 
+            a limit to the # of iterations will just stop energy minimization manually when 
+            it reaches this # of iterations. 
+            
+        random_offset: float 
+            A random offset to introduce after energy minimization. 
+            Should ideally make your forces have realistic values. 
+            
+            For example, if your stiffest force is polymer bond force
+            with "wiggle_dist" of 0.05, setting this to 0.02 will make
+            separation between monomers realistic, and therefore will 
+            make force values realistic. 
+            
+            See why do we need it in the caveat below. 
+            
+            
+        Caveat
+        ------
+        
+        If using variable langevin integrator after minimization, a big error may 
+        happen in the first timestep. The reason is that enregy minimization 
+        makes all the forces basically 0. Variable langevin integrator measures
+        the forces and assumes that they are all small - so it makes the timestep 
+        very large, and at the first timestep it overshoots completely and energy goes up a lot. 
+        
+        The workaround for now is to randomize positions after energy minimization 
+        
+        """
 
         logging.info("Performing local energy minimization")
 
@@ -429,12 +479,16 @@ class Simulation():
         
         coords = self.state.getPositions(asNumpy=True)
         self.data = coords
+        self.set_data(self.get_data(), random_offset = random_offset)
+        for reporter in self.reporters:
+            reporter.report("energy_minimization", {"pos":self.get_data(), "time":self.time, "block":self.block})
+        
         locTime = self.state.getTime()
         
         logging.info("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
 
-    def do_block(self, steps=None,  reinitialize=True, maxIter=0, check_functions=[], get_velocities = False, save=True, save_extras = {}):
+    def do_block(self, steps=None, check_functions=[], get_velocities = False, save=True, save_extras = {}):
         """performs one block of simulations, doing steps timesteps,
         or steps_per_block if not specified.
 

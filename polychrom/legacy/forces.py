@@ -543,9 +543,7 @@ def old_energy_minimization(sim_object, stepsPerIteration=100,
     """
 
     print("Performing energy minimization")
-    sim_object._applyForces()
-    oldName = sim_object.name
-    sim_object.name = "minim"
+    sim_object._apply_forces()
     if (maxIterations is True) or (maxIterations is False):
         raise ValueError(
             "Please stop using the old notation and read the new energy minimization code")
@@ -568,29 +566,28 @@ def old_energy_minimization(sim_object, stepsPerIteration=100,
             sim_object.integrator.setStepSize(def_step / float(drop))
             sim_object.integrator.setFriction(def_fric * drop)
             # sim_object.reinitialize()
-            numAttempts = 5
+            numAttempts = 3
+            maxEk = 4 * sim_object.kT
             for attempt in range(numAttempts):
-                a = sim_object.doBlock(stepsPerIteration, increment=False,
-                    reinitialize=False)
+                a = sim_object.do_block(stepsPerIteration, save=False)
                 # sim_object.initVelocities()
-                if a == False:
+                if a["eK"] > maxEk:
                     drop *= 2
                     print("Timestep decreased {0}".format(1. / drop))
-                    sim_object.initVelocities()
+                    sim_object.init_velocities()
                     break
                 if attempt == numAttempts - 1:
                     if drop == 1.:
                         return 0
                     drop /= 2
                     print("Timestep decreased by {0}".format(drop))
-                    sim_object.initVelocities()
+                    sim_object.init_velocities()
         return -1
 
     if failNotConverged and (minimizeDrop() == -1):
         raise RuntimeError(
             "Reached maximum number of iterations and still not converged\n"\
             "increase maxIterations or set failNotConverged=False")
-    sim_object.name = oldName
     sim_object.integrator.setFriction(def_fric)
     sim_object.integrator.setStepSize(def_step)
     # sim_object.reinitialize()
