@@ -479,7 +479,7 @@ class Simulation():
         
         coords = self.state.getPositions(asNumpy=True)
         self.data = coords
-        self.set_data(self.get_data(), random_offset = random_offset)
+        self.set_data(self.get_data(), random_offset = random_offset, report=False)
         for reporter in self.reporters:
             reporter.report("energy_minimization", {"pos":self.get_data(), "time":self.time, "block":self.block})
         
