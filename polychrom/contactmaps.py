@@ -201,7 +201,7 @@ def worker(x):
             assert len(contacts.shape) == 2
             if contacts.shape[1] != 2:
                 raise ValueError("Contacts.shape[1] must be 2. Exiting.")
-            contactSum += contacts.shape[1]
+            contactSum += contacts.shape[0]
             allContacts.append(contacts)
         except StopIteration:
             stopped = True
@@ -354,19 +354,19 @@ def monomerResolutionContactMap(filenames,
                           n=4,  # Num threads
                           contactFinder = polymer_analyses.calculate_contacts,
                           loadFunction=polymerutils.load,
-                          exceptionsToIgnore=[]):
+                          exceptionsToIgnore=[], useFmap=False):
 
     N =  findN(filenames, loadFunction, exceptionsToIgnore)        
     args = [cutoff, loadFunction, exceptionsToIgnore, contactFinder]
     values = [filenames[i::n] for i in range(n)]
-    return averageContacts(filenameContactMap,values,N, classInitArgs=args, useFmap=True, uniqueContacts = True, nproc=n)
+    return averageContacts(filenameContactMap,values,N, classInitArgs=args, useFmap=useFmap, uniqueContacts = True, nproc=n)
 
 
 def binnedContactMap(filenames, chains=None, binSize=5, cutoff=1.7,
                             n=4,  # Num threads
                             contactFinder = polymer_analyses.calculate_contacts,
                             loadFunction=polymerutils.load,
-                            exceptionsToIgnore=None):
+                            exceptionsToIgnore=None, useFmap=False):
     n = min(n, len(filenames))
     subvalues = [filenames[i::n] for i in range(n)]
 
@@ -404,7 +404,7 @@ def binnedContactMap(filenames, chains=None, binSize=5, cutoff=1.7,
 
     args = [cutoff, loadFunction, exceptionsToIgnore, contactFinder]
     values = [filenames[i::n] for i in range(n)]
-    mymap =  averageContacts(filenameContactMap,values,Nbase, classInitArgs=args, useFmap=True, contactProcessing=contactAction, nproc=n)
+    mymap =  averageContacts(filenameContactMap,values,Nbase, classInitArgs=args, useFmap=useFmap, contactProcessing=contactAction, nproc=n)
     return mymap, chromosomeStarts
 
 
@@ -441,11 +441,12 @@ class filenameContactMapRepeat(object):
          When there are no more contacts to return (all filenames are gone, or simulation is over),
          then this method should raise StopIteration
         """
-        if self.i == len(self.filenames):
-            raise StopIteration
+
             
         try:
             if len(self.curStarts) == 0:
+                if self.i == len(self.filenames):
+                    raise StopIteration
                 self.data = self.loadFunction(self.filenames[self.i])
                 self.curStarts = list(self.mapStarts)
                 self.i += 1 
@@ -466,11 +467,11 @@ def monomerResolutionContactMapSubchains(filenames,
                           n=4,  # Num threads
                           method = polymer_analyses.calculate_contacts,                          
                           loadFunction=polymerutils.load,
-                          exceptionsToIgnore=[]):
+                          exceptionsToIgnore=[], useFmap=False):
 
     args = [ mapStarts, mapN,cutoff, loadFunction, exceptionsToIgnore, method]
     values = [filenames[i::n] for i in range(n)]
-    return averageContacts(filenameContactMapRepeat,values,mapN, classInitArgs=args, useFmap=True, uniqueContacts = True, nproc=n)
+    return averageContacts(filenameContactMapRepeat,values,mapN, classInitArgs=args, useFmap=useFmap, uniqueContacts = True, nproc=n)
 
 
 
