@@ -135,6 +135,7 @@ def angle_force(
         sim_object, 
         triplets,
         k=1.5,
+        theta_0=np.pi,
         name='angle'):
     """Adds harmonic angle bonds. k specifies energy in kT at one radian
     If k is an array, it has to be of the length N.
@@ -149,19 +150,27 @@ def angle_force(
         Stiffness of the bond.
         If list, then determines the stiffness of the i-th triplet
         Potential is k * alpha^2 * 0.5 * kT
+    
+    theta_0 : float or list of length N 
+              Equilibrium angle of the bond. By default it is np.pi. 
+              
+        
     """
     
     k = _to_array_1d(k, len(triplets)) 
+    theta_0 = _to_array_1d(theta_0, len(triplets))
         
-    energy = "kT*angK * (theta - 3.141592) * (theta - 3.141592) * (0.5)"
+    energy = "kT*angK * (theta - angT0) * (theta - angT0) * (0.5)"
     force = openmm.CustomAngleForce(energy)
     force.name = name
     
     force.addGlobalParameter("kT", sim_object.kT)
     force.addPerAngleParameter("angK")
+    force.addPerAngleParameter("angT0")
 
+    
     for triplet_idx, (p1, p2, p3) in enumerate(triplets):
-        force.addAngle(p1, p2, p3, [k[triplet_idx]])
+        force.addAngle(p1, p2, p3, [k[triplet_idx], theta_0[triplet_idx]])
     
     return force
 
