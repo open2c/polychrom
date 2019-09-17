@@ -9,30 +9,27 @@ import warnings
 from . import polymer_analyses
 
 """
-This file defines the class that allows averaging contacts from multile processes into one shared contactmap. 
+This module is the main workhorse of tools to calculate contactmaps, both from polymer simulations and from other simulations (e.g. 1D simulations of loop extrusion). All of the functions here are designed to be parallelized, and lots of efforts were put into making this possible. 
 
-It was not an easy function to write, and as a result it is a little messy. But it is necessary for a set of reasons. 
--- Calculating contact maps is slow, and benefits greatly from parallelizing
+The reasons we need parallel contactmap code is the following: 
+
+-- Calculating contact maps is slow, esp. at large contact radii, and benefits greatly from parallelizing
 -- Doing regular multiprocesing.map has limitations
     -- It can only handle heataps up to some size, and transferring gigabyte-sized heatmaps between processes takes minutes 
     -- It can only do as many heatmaps as fits in RAM, which on 20-core 128GB machine is no more than 5GB/heatmap 
-    -- Historically, we had troubles with heatmaps over 6000x6000 monomers being transferred between processes using pickle 
-So to combat that we implemented this module. It can create one big heatmap, and keep in in shared memory. 
-Different processes can write to that. 
-
 
 The structure of this class is as follows. 
-On the outer lefe, it  provides three methods to average contactmaps: monomerResolutionContactMap, binnedContactMap, 
+
+On the outer level, it  provides three methods to average contactmaps: monomerResolutionContactMap, binnedContactMap, 
 and monomerResolutionContactMapSubchains
-The first two create contact map from an entire file. The last one creates contact maps from sub-chains in a file, starting at a 
-given set of starts. It is useful when doing contact maps from several copies of a system in one simulation.
+The first two create contact map from an entire file: either monomer-resolution or binned. The last one creates contact maps from sub-chains in a file, starting at a given set of starting points. It is useful when doing contact maps from several copies of a system in one simulation.
 
 The first two methods have a legacy implementation from the old library that is still here to do the tests. 
 
-It also provides a more generic method "averageContacts". You can use it to average contacts obtained from 
-polymer simulations, or from any other simulation. 
+On the middle level, it provides a method "averageContacts". This method accepts a "contact iterator", and can be used to average contacts from both a set of filenames and from a simulation of some kind (e.g. averaging positions of loop extruding factors from a 1D loop extrusion simulation). All of the outer level functions (monomerResolutionContactMap for example) are implemented using this method. 
 
-It also will provide an example of how to average contacts from a non-polymer simulation, and run this simulation on many cores.
+On the lower level, there are internals of the "averageContacts" method and an associated "worker" function. There is generally no need to understand the code of those functions. There exists a reference implementation of both the worker and the averageContacts function, named "simpleWorker" and "averageContactsSimple". They do all the things that "averageContacts" do, but on only one core. In fact, "averageContacts" defaults to "averageContactsSimple" if requested to run on one core because it is a little bit faster. 
+
 """
 def indexing(smaller, larger, M):
     """converts x-y indexes to index in the upper triangular matrix"""
@@ -321,8 +318,6 @@ class filenameContactMap(object):
 
         When initialized, the iterator should store these args properly and create all necessary constructs
         """
-        from openmmlib import contactmaps
-        self.contactmaps  = contactmaps
         self.filenames = filenames
         self.cutoff = cutoff
         self.exceptionsToIgnore = exceptionsToIgnore
@@ -421,8 +416,6 @@ class filenameContactMapRepeat(object):
 
         When initialized, the iterator should store these args properly and create all necessary constructs
         """
-        from openmmlib import contactmaps
-        self.contactmaps  = contactmaps
         self.filenames = filenames
         self.cutoff = cutoff
         self.exceptionsToIgnore = exceptionsToIgnore
