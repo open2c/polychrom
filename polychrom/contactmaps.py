@@ -345,8 +345,8 @@ class filenameContactMap(object):
         return contacts
 
 def monomerResolutionContactMap(filenames,
-                          cutoff=1.7,
-                          n=4,  # Num threads
+                          cutoff=5,
+                          n=8,  # Num threads
                           contactFinder = polymer_analyses.calculate_contacts,
                           loadFunction=polymerutils.load,
                           exceptionsToIgnore=[], useFmap=False):
@@ -357,8 +357,8 @@ def monomerResolutionContactMap(filenames,
     return averageContacts(filenameContactMap,values,N, classInitArgs=args, useFmap=useFmap, uniqueContacts = True, nproc=n)
 
 
-def binnedContactMap(filenames, chains=None, binSize=5, cutoff=1.7,
-                            n=4,  # Num threads
+def binnedContactMap(filenames, chains=None, binSize=5, cutoff=5,
+                            n=8,  # Num threads
                             contactFinder = polymer_analyses.calculate_contacts,
                             loadFunction=polymerutils.load,
                             exceptionsToIgnore=None, useFmap=False):
@@ -456,8 +456,8 @@ class filenameContactMapRepeat(object):
 def monomerResolutionContactMapSubchains(filenames,
                           mapStarts, 
                           mapN,
-                          cutoff=1.7,
-                          n=4,  # Num threads
+                          cutoff=5,
+                          n=8,  # Num threads
                           method = polymer_analyses.calculate_contacts,                          
                           loadFunction=polymerutils.load,
                           exceptionsToIgnore=[], useFmap=False):
@@ -485,7 +485,6 @@ class dummyContactMap(object):
   
 def _test():
     ars = [np.random.random((60,3)) * 4 for _ in range(200)]
-    import openmmlib.contactmaps
     conts = polymer_analyses.calculate_contacts(ars[0],1)
     print(conts.shape)
     args = np.repeat(np.arange(20, dtype=int), 10)
@@ -505,8 +504,8 @@ def _test():
     assert np.allclose(cmap1, cmap4)
     assert np.allclose(cmap1, cmap3)
 
-    from .legacy_contactmaps import averagePureContactMap as cmapPureMap
-    from .legacy_contactmaps import averageBinnedContactMap as cmapBinnedMap
+    from .legacy.contactmaps import averagePureContactMap as cmapPureMap
+    from .legacy.contactmaps import averageBinnedContactMap as cmapBinnedMap
 
     for n in [1, 5, 20]:
         cmap6 = monomerResolutionContactMap(range(200), cutoff = 1, loadFunction=lambda x:ars[x], n=n)

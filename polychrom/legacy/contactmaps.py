@@ -26,21 +26,12 @@ import numpy as np
 
 from math import sqrt
 import sys
-from .polymerutils import load
+from polychrom.polymerutils import load
 import warnings
-from . import polymerutils
+import polychrom.polymerutils as polymerutils
 import time
 from scipy.spatial import ckdtree
-from .polymer_analyses import calculate_contacts as giveContacts
-
-try:
-    import mkl
-    mkl.set_num_threads(1)
-except:
-    pass 
-
-
-
+from polychrom.polymer_analyses import calculate_contacts as giveContacts
 
 
 def rescalePoints(points, bins):
