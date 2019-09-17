@@ -5,9 +5,10 @@ def polymer_chains(
     sim_object,
     chains=[(0, None, False)],
 
+    extraBonds=[],
     bond_force_func=forces.harmonic_bonds,
     bond_force_kwargs={'bondWiggleDistance':0.05,
-                     'bondLength':1.0, 'extraBonds':[]},
+                     'bondLength':1.0},
 
     angle_force_func=forces.angle_force,
     angle_force_kwargs={'k':0.05},
