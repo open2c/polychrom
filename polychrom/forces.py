@@ -564,7 +564,6 @@ def tether_particles(
     
     return force
             
-    
 def pull_force(
         sim_object, 
         particles, 
@@ -577,19 +576,18 @@ def pull_force(
     if there are fewer forces than particles forces are padded with forces[-1]
     """
     force = openmm.CustomExternalForce(
-        "x * fx + y * fy + z * fz")
+        "- x * fx - y * fy - z * fz")
     force.name = name
 
     force.addPerParticleParameter("fx")
     force.addPerParticleParameter("fy")
     force.addPerParticleParameter("fz")
 
-    for num, force_vec in itertools.zip_longest(particles, force_vecs, fillvalue=forces[-1]):
+    for num, force_vec in itertools.zip_longest(particles, force_vecs, fillvalue=force_vecs[-1]):
         force_vec = [float(f) * (sim_object.kT / sim_object.conlen) for f in force_vec]
         force.addParticle(num, force_vec)
     
     return force
-
 
 def grosberg_polymer_bonds(sim_object, 
                            bonds,
