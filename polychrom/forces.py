@@ -410,6 +410,202 @@ def selective_SSW(sim_object,
 
     return force
 
+def Compartment_SSW(sim_object,
+    compartmentInteractions,
+    compartmentIDs,
+    extraHardParticlesIdxs,
+    repulsionEnergy=3.0,
+    repulsionRadius=1.,
+    attractionEnergy=3.0,
+    attractionRadius=1.5,
+    selectiveRepulsionEnergy=20.0,
+    selectiveAttractionEnergy=1.0,
+    name='Compartment_SSW'):
+    """
+    A version of smooth square well potential that enables the use of up to 5
+    compartments with arbitrary interaction energies.
+
+    This is a simple and fast polynomial force that looks like a smoothed
+    version of the square-well potential. The energy equals `repulsionEnergy`
+    around r=0, stays flat until 0.6-0.7, then drops to zero together
+    with its first derivative at r=1.0. After that it drop down to
+    `attractionEnergy` and gets back to zero at r=`attractionRadius`.
+
+    The energy function is based on polynomials of 12th power. Both the
+    function and its first derivative is continuous everywhere within its
+    domain and they both get to zero at the boundary.
+
+    This is a tunable version of SSW:
+    a) You can give compartmentIDs (e.g. 0, 1, 2 for A, B, C; up to five total)
+       and interaction strengths between these compartments. The corresponding entry in
+       compartmentInteractions is multiplied by selectiveAttractionEnergy to give the actual
+       (additional) depth of the potential well. 
+    b) You can select a subset of particles and make them "extra hard".
+
+    Parameters
+    ----------
+
+    compartmentInteractions: 5x5 np.array (or smaller)
+        the interaction strenghts between the different compartment types.
+        Only upper triangular values are used. If smaller than 5x5 (e.g.
+        because we only have A and B compartments) will be padded with zeros.
+    compartmentIDs: list of int or np.array
+        the compartment ID for each particle, starting at 0
+    extraHardParticlesIdxs : list of int
+        the list of indices of the "extra hard" particles. The extra hard
+        particles repel all other particles with extra
+        `selectiveRepulsionEnergy`
+    repulsionEnergy: float
+        the heigth of the repulsive part of the potential.
+        E(0) = `repulsionEnergy`
+    repulsionRadius: float
+        the radius of the repulsive part of the potential.
+        E(`repulsionRadius`) = 0,
+        E'(`repulsionRadius`) = 0
+    attractionEnergy: float
+        the depth of the attractive part of the potential.
+        E(`repulsionRadius`/2 + `attractionRadius`/2) = `attractionEnergy`
+    attractionRadius: float
+        the maximal range of the attractive part of the potential.
+    selectiveRepulsionEnergy: float
+        the EXTRA repulsion energy applied to the "extra hard" particles
+    selectiveAttractionEnergy: float
+        prefactor for the compartment attractions.
+    """
+
+    energy = (
+        "step(REPsigma - r) * Erep + step(r - REPsigma) * Eattr;"
+        ""
+        "Erep = rsc12 * (rsc2 - 1.0) * REPeTot / emin12 + REPeTot;"  # + ESlide;"
+        "REPeTot = REPe + (ExtraHard1 + ExtraHard2) * REPeAdd;"
+        "rsc12 = rsc4 * rsc4 * rsc4;"
+        "rsc4 = rsc2 * rsc2;"
+        "rsc2 = rsc * rsc;"
+        "rsc = r / REPsigma * rmin12;"
+        ""
+        "Eattr = - rshft12 * (rshft2 - 1.0) * ATTReTot / emin12 - ATTReTot;"
+        "ATTReTot = ATTRe + ATTReAdd*(delta(type1-0)*delta(type2-0)*COMP00"
+                                    "+delta(type1-0)*delta(type2-1)*COMP01"
+                                    "+delta(type1-0)*delta(type2-2)*COMP02"
+                                    "+delta(type1-0)*delta(type2-3)*COMP03"
+                                    "+delta(type1-0)*delta(type2-4)*COMP04"
+                                    "+delta(type1-1)*delta(type2-1)*COMP11"
+                                    "+delta(type1-1)*delta(type2-2)*COMP12"
+                                    "+delta(type1-1)*delta(type2-3)*COMP13"
+                                    "+delta(type1-1)*delta(type2-4)*COMP14"
+                                    "+delta(type1-2)*delta(type2-2)*COMP22"
+                                    "+delta(type1-2)*delta(type2-3)*COMP23"
+                                    "+delta(type1-2)*delta(type2-4)*COMP24"
+                                    "+delta(type1-3)*delta(type2-3)*COMP33"
+                                    "+delta(type1-3)*delta(type2-4)*COMP34"
+                                    "+delta(type1-4)*delta(type2-4)*COMP44);"
+        "rshft12 = rshft4 * rshft4 * rshft4;"
+        "rshft4 = rshft2 * rshft2;"
+        "rshft2 = rshft * rshft;"
+        "rshft = (r - REPsigma - ATTRdelta) / ATTRdelta * rmin12;"
+        ""
+        )
+
+    if selectiveRepulsionEnergy == float('inf'):
+        energy += (
+        "REPeAdd = 4 * ((REPsigma / (2.0^(1.0/6.0)) / r)^12 - (REPsigma / (2.0^(1.0/6.0)) / r)^6) + 1;"
+        )
+
+    force = openmm.CustomNonbondedForce(energy)
+    force.name = name
+
+    force.setCutoffDistance(attractionRadius * sim_object.conlen)
+
+    force.addGlobalParameter('REPe', repulsionEnergy * sim_object.kT)
+    if selectiveRepulsionEnergy != float('inf'):
+        force.addGlobalParameter('REPeAdd', selectiveRepulsionEnergy * sim_object.kT)
+    force.addGlobalParameter('REPsigma', repulsionRadius * sim_object.conlen)
+
+    force.addGlobalParameter('ATTRe', attractionEnergy * sim_object.kT)
+    force.addGlobalParameter('ATTReAdd', selectiveAttractionEnergy * sim_object.kT)
+    force.addGlobalParameter('ATTRdelta',
+        sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0)
+
+    # Coefficients for x^12*(x*x-1)
+    force.addGlobalParameter('emin12', 46656.0 / 823543.0)
+    force.addGlobalParameter('rmin12', np.sqrt(6.0 / 7.0))
+
+    compartmentInteractions = np.pad(compartmentInteractions,
+            ((0, max(0, 5-compartmentInteractions.shape[0])), (0, max(0, 5-compartmentInteractions.shape[1]))),
+            mode='constant', constant_values=0)
+    force.addGlobalParameter('COMP00', compartmentInteractions[0, 0])
+    force.addGlobalParameter('COMP01', compartmentInteractions[0, 1])
+    force.addGlobalParameter('COMP02', compartmentInteractions[0, 2])
+    force.addGlobalParameter('COMP03', compartmentInteractions[0, 3])
+    force.addGlobalParameter('COMP04', compartmentInteractions[0, 4])
+    force.addGlobalParameter('COMP11', compartmentInteractions[1, 1])
+    force.addGlobalParameter('COMP12', compartmentInteractions[1, 2])
+    force.addGlobalParameter('COMP13', compartmentInteractions[1, 3])
+    force.addGlobalParameter('COMP14', compartmentInteractions[1, 4])
+    force.addGlobalParameter('COMP22', compartmentInteractions[2, 2])
+    force.addGlobalParameter('COMP23', compartmentInteractions[2, 3])
+    force.addGlobalParameter('COMP24', compartmentInteractions[2, 4])
+    force.addGlobalParameter('COMP33', compartmentInteractions[3, 3])
+    force.addGlobalParameter('COMP34', compartmentInteractions[3, 4])
+    force.addGlobalParameter('COMP44', compartmentInteractions[4, 4])
+
+    force.addPerParticleParameter("type")
+    force.addPerParticleParameter("ExtraHard")
+
+    _prepend_force_name_to_params(force)
+
+    for i in range(sim_object.N):
+        force.addParticle(
+            (float(compartmentIDs[i]),
+             float(i in extraHardParticlesIdxs)))
+
+    return force
+
+def LaminaAttraction(sim_object, particles, r, center=[0, 0, 0], width=1, depth=1, name="Lamina_attraction"):
+    """
+    Attraction to the lamina.
+
+    Parameters
+    ----------
+
+    particles : list of int or np.array
+        indices of particles that are attracted
+    r : float
+        Radius of the nucleus
+    center : vector, optional
+        center position of the lamina. This parameter is useful when confining
+        chromosomes to their territory.
+    width : float, optional
+        Width of attractive layer next to the lamina, nm.
+    depth : float, optional
+        Depth of attractive potential in kT
+        NOTE: switched sign from openmm-polymer, because it was confusing. Now
+        this parameter is really the depth of the well, i.e. positive =
+        attractive, negative = repulsive
+    """
+
+    # NOTE: like this, the force just pushes outward agains the lamina. The
+    # confinement should be done with spherical confinement
+    force = openmm.CustomExternalForce(
+            "step(d + 1)*step(-d)*LAMdepth*cos(3.1415926536*d)/2 + 0.5;"
+            "d = (sqrt((x-LAMx)^2 + (y-LAMy)^2 + (z-LAMz)^2) - LAMradius) / LAMwidth"
+            )
+    force.name = name
+
+    force.addGlobalParameter("LAMradius", r * sim_object.conlen)
+    force.addGlobalParameter("LAMwidth", width * sim_object.conlen)
+    force.addGlobalParameter("LAMdepth", -depth * sim_object.kT)
+    force.addGlobalParameter("LAMx", center[0] * sim_object.conlen)
+    force.addGlobalParameter("LAMy", center[1] * sim_object.conlen)
+    force.addGlobalParameter("LAMz", center[2] * sim_object.conlen)
+
+    _prepend_force_name_to_params(force)
+
+    # adding all the particles on which force acts
+    for i in particles:
+        force.addParticle(i, [])
+
+    return force
 
 def cylindrical_confinement(
     sim_object, 
