@@ -584,17 +584,15 @@ def LaminaAttraction(sim_object, particles, r, center=[0, 0, 0], width=1, depth=
         attractive, negative = repulsive
     """
 
-    # NOTE: like this, the force just pushes outward agains the lamina. The
-    # confinement should be done with spherical confinement
     force = openmm.CustomExternalForce(
-            "step(d + 1)*step(-d)*LAMdepth*cos(3.1415926536*d)/2 + 0.5;"
+            "-step(1+d)*step(1-d)*LAMdepth*cos(3.1415926536*d)/2 + 0.5;"
             "d = (sqrt((x-LAMx)^2 + (y-LAMy)^2 + (z-LAMz)^2) - LAMradius) / LAMwidth"
             )
     force.name = name
 
     force.addGlobalParameter("LAMradius", r * sim_object.conlen)
     force.addGlobalParameter("LAMwidth", width * sim_object.conlen)
-    force.addGlobalParameter("LAMdepth", -depth * sim_object.kT)
+    force.addGlobalParameter("LAMdepth", depth * sim_object.kT)
     force.addGlobalParameter("LAMx", center[0] * sim_object.conlen)
     force.addGlobalParameter("LAMy", center[1] * sim_object.conlen)
     force.addGlobalParameter("LAMz", center[2] * sim_object.conlen)
