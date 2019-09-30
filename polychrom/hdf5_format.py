@@ -43,7 +43,7 @@ def _convert_to_hdf5_array(data):
 
     
     
-def _write_group(dataDict, group, dset_opts={}):
+def _write_group(dataDict, group, dset_opts={"compression":"gzip"}):
     """
     Writes a dictionary of elements to an HDF5 group
     Puts all "items" into attrs, and all ndarrays into datasets 
@@ -63,7 +63,7 @@ def _write_group(dataDict, group, dset_opts={}):
             raise ValueError("Unknown datatype")
 
 
-            
+        
 
 def list_URIs(folder, readError=True):    
     """
@@ -104,6 +104,14 @@ def load_URI(dset_path):
     fname, group = dset_path.split("::")
     with h5py.File(fname, mode='r') as myfile:        
         return _read_h5_group(myfile[group])
+
+def save_hdf5_file(filename, data_dict, dset_opts={"compression":"gzip"}):
+    """
+    Saves data_dict to filename 
+    """
+    with h5py.File(filename) as file: 
+        _write_group(data_dict, file, dset_opts=dset_opts)
+
     
 def load_hdf5_file(fname):
     """
