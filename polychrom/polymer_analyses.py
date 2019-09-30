@@ -350,9 +350,9 @@ def streaming_ndarray_agg(in_stream,  ndarray_cols, aggregate_cols, value_cols=[
     return aggregate
 
                              
-def kabsch_rmsd(P, Q):
+def kabsch_msd(P, Q):
     """
-    Calculates RMSD between two vectors using Kabash alcorithm 
+    Calculates MSD between two vectors using Kabash alcorithm 
     Borrowed from https://github.com/charnley/rmsd  with some changes 
     
     rmsd is licenced with  a 2-clause BSD licence 
@@ -400,6 +400,7 @@ def kabsch_rmsd(P, Q):
 
     return dist
 
+kabsch_rmsd = kabsch_msd
 
 def _test_Rg_scalings():
     a = np.random.lognormal(1,1,size=(30,3))  # array for testing 

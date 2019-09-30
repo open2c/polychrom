@@ -3,16 +3,47 @@ from __future__ import absolute_import, division, print_function
 import  os, tempfile, sys
 import numpy as np
 import joblib
-import textwrap
+
+
+
+
+usage = """
+Usage: show filename [start end step]
+
+Shows polymer, making it appear like a tube. 
+It is achieved by placing 5 spheres between two consecutive monomers. 
+It can be more-or-less safely used on simulations with many chains because
+the "break" between two chains will just place 4 random spheres somewhere.
+
+Use command "xyz" if you don't want to connect consecutive monomers. 
+
+Filename convention
+---------------
+
+The first argument is a filename, or a URI, or a simplified filename (see below)
+
+One way to call the function is to use a full filename:
+xyz /path/to/file/block1.dat 
+
+This would work both with old-style filenames (block42.dat) and new style URI's (blocks1-50.h5::42)
+
+Another is to use a number: e.g. "42" instead of a filename or a URI:
+xyz /path/to/file/42
+
+If you are already in a trajectory folder, you can just use "xyz 42" to show the relevant block
+
+Other arguments
+---------------
+Arguments 2-4 will show monomers starting with "start", up to "end", and with a step of "step"
+start, end, step will basically select data[start:end:step]
+
+
+"""
+
 
 if len(sys.argv) < 2:
-    print((   textwrap.dedent("""
-            Usage: show filename [start end pace]
-                 show filenum [start end pace] 
-
-                 filenum is a number of files of the type block123.dat
-
-                 start, end, pace will convert data to data[start:end:pace]""")))
+    print(useage)
+    exit()
        
   
 
@@ -96,27 +127,20 @@ def showData(data):
         os.system("rasmol -xyz %s -script %s" % (towrite.name, rascript.name))
     else:  #if windows
         os.system("C:/RasWin/raswin.exe -xyz %s -script %s" % (towrite.name, rascript.name))
-    exit()
 
 
 
-def load(filename):
-    from openmmlib import polymerutils
-    return polymerutils.load(filename)
+from polychrom.polymerutils import load, fetch_block 
 
 
-
+filename = sys.argv[1]
 
 try:
-    showData(load(sys.argv[1]))
-    exit()
+    fol, fname = os.path.split(filename)
+    showData(fetch_block(fol, fname))    
 
-except IOError:
-    try: 
-        showData(load("expanded%s.dat" % sys.argv[1]))
-
-    except IOError:
-        showData(load("block%s.dat" % sys.argv[1]))
+except:
+    showData(load(filename))
 
 
 

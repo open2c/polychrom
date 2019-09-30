@@ -1,22 +1,22 @@
 import numpy as np
 from . import forces
 
-def polymerChains(
+def polymer_chains(
     sim_object,
     chains=[(0, None, False)],
 
-    bondForceFunc=forces.harmonicBonds,
-    bondForceKwargs={'bondWiggleDistance':0.05,
+    bond_force_func=forces.harmonic_bonds,
+    bond_force_kwargs={'bondWiggleDistance':0.05,
                      'bondLength':1.0},
 
-    angleForceFunc=forces.angleForce,
-    angleForceKwargs={'k':0.05},
+    angle_force_func=forces.angle_force,
+    angle_force_kwargs={'k':0.05},
 
-    nonbondedForceFunc=forces.polynomialRepulsiveForce,
-    nonbondedForceKwargs={'trunc':3.0, 
+    nonbonded_force_func=forces.polynomial_repulsive,
+    nonbonded_force_kwargs={'trunc':3.0, 
                           'radiusMult':1.},
 
-    exceptBonds=True,
+    except_bonds=True,
 ):
     """Adds harmonic bonds connecting polymer chains
 
@@ -33,13 +33,18 @@ def polymerChains(
         If True then do not calculate non-bonded forces between the
         particles connected by a bond. True by default.
     """
+    
+    
 
     force_list = []
 
     bonds = []
     triplets = []
+    newchains = []
+    
     for start, end, is_ring in chains:
         end = sim_object.N if (end is None) else end
+        newchains.append((start, end, is_ring))
         
         bonds += [(j, j+1) for j in range(start, end - 1)]
         triplets += [(j - 1, j, j + 1) for j in range(start + 1, end - 1)]
@@ -48,20 +53,27 @@ def polymerChains(
             bonds.append((start, end-1))
             triplets.append((int(end - 2), int(end - 1), int(start)))
             triplets.append((int(end - 1), int(start), int(start + 1)))
+            
+    reportDict = {"chains":np.array(newchains, dtype=int), 
+                  "bonds": np.array(bonds, dtype=int),
+                  "angles": np.array(triplets)
+                 }
+    for reporter in sim_object.reporters:
+        reporter.report("forcekit_polymer_chains", reportDict)
     
     force_list.append(
-        bondForceFunc(sim_object, bonds, **bondForceKwargs)
+        bond_force_func(sim_object, bonds, **bond_force_kwargs)
     )
     
-    if angleForceFunc is not None:
+    if angle_force_func is not None:
         force_list.append(
-            angleForceFunc(sim_object, triplets, **angleForceKwargs)
+            angle_force_func(sim_object, triplets, **angle_force_kwargs)
         )
     
-    if nonbondedForceFunc is not None:
-        nb_force = nonbondedForceFunc(sim_object, **nonbondedForceKwargs)
+    if nonbonded_force_func is not None:
+        nb_force = nonbonded_force_func(sim_object, **nonbonded_force_kwargs)
         
-        if exceptBonds:
+        if except_bonds:
             exc = list(set([tuple(i) for i in np.sort(np.array(bonds), axis=1)]))
             if hasattr(nb_force, "addException"):
                 print('Exclude neighbouring chain particles from {}'.format(nb_force.name))
