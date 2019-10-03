@@ -422,8 +422,9 @@ def Compartment_SSW(sim_object,
     selectiveAttractionEnergy=1.0,
     name='Compartment_SSW'):
     """
-    A version of smooth square well potential that enables the use of up to 5
-    compartments with arbitrary interaction energies.
+    A version of smooth square well potential that enables the use of
+    arbitrarily many compartments with arbitrary interaction strengths with
+    each other.
 
     This is a simple and fast polynomial force that looks like a smoothed
     version of the square-well potential. The energy equals `repulsionEnergy`
@@ -436,7 +437,7 @@ def Compartment_SSW(sim_object,
     domain and they both get to zero at the boundary.
 
     This is a tunable version of SSW:
-    a) You can give compartmentIDs (e.g. 0, 1, 2 for A, B, C; up to five total)
+    a) You can give compartmentIDs (e.g. 0, 1, 2 for A, B, C)
        and interaction strengths between these compartments. The corresponding entry in
        compartmentInteractions is multiplied by selectiveAttractionEnergy to give the actual
        (additional) depth of the potential well. 
@@ -445,10 +446,9 @@ def Compartment_SSW(sim_object,
     Parameters
     ----------
 
-    compartmentInteractions: 5x5 np.array (or smaller)
+    compartmentInteractions: np.array
         the interaction strenghts between the different compartment types.
-        Only upper triangular values are used. If smaller than 5x5 (e.g.
-        because we only have A and B compartments) will be padded with zeros.
+        Only upper triangular values are used.
     compartmentIDs: list of int or np.array
         the compartment ID for each particle, starting at 0
     extraHardParticlesIdxs : list of int
@@ -473,6 +473,14 @@ def Compartment_SSW(sim_object,
         prefactor for the compartment attractions.
     """
 
+    # Check compartment info for consistency
+    Ncomp = max(compartmentIDs) + 1 # IDs should be zero based
+    if any(np.less(compartmentInteractions.shape, [Ncomp, Ncomp])):
+        raise ValueError("Need compartment interactions for {0:d} compartments!".format(Ncomp))
+
+    indexpairs = []
+    [[indexpairs.append((i, j)) for j in range(i, Ncomp)] for i in range(0, Ncomp)]
+
     energy = (
         "step(REPsigma - r) * Erep + step(r - REPsigma) * Eattr;"
         ""
@@ -484,21 +492,12 @@ def Compartment_SSW(sim_object,
         "rsc = r / REPsigma * rmin12;"
         ""
         "Eattr = - rshft12 * (rshft2 - 1.0) * ATTReTot / emin12 - ATTReTot;"
-        "ATTReTot = ATTRe + ATTReAdd*(delta(type1-0)*delta(type2-0)*COMP00"
-                                    "+delta(type1-0)*delta(type2-1)*COMP01"
-                                    "+delta(type1-0)*delta(type2-2)*COMP02"
-                                    "+delta(type1-0)*delta(type2-3)*COMP03"
-                                    "+delta(type1-0)*delta(type2-4)*COMP04"
-                                    "+delta(type1-1)*delta(type2-1)*COMP11"
-                                    "+delta(type1-1)*delta(type2-2)*COMP12"
-                                    "+delta(type1-1)*delta(type2-3)*COMP13"
-                                    "+delta(type1-1)*delta(type2-4)*COMP14"
-                                    "+delta(type1-2)*delta(type2-2)*COMP22"
-                                    "+delta(type1-2)*delta(type2-3)*COMP23"
-                                    "+delta(type1-2)*delta(type2-4)*COMP24"
-                                    "+delta(type1-3)*delta(type2-3)*COMP33"
-                                    "+delta(type1-3)*delta(type2-4)*COMP34"
-                                    "+delta(type1-4)*delta(type2-4)*COMP44);"
+        "ATTReTot = ATTRe + ATTReAdd*(delta(type1-0)*delta(type2-0)*COMP_0_0"
+        )
+    for i, j in indexpairs[1:]:
+        energy += "+delta(type1-{0:d})*delta(type2-{1:d})*COMP_{0:d}_{1:d}".format(i, j)
+    energy += (
+        ");"
         "rshft12 = rshft4 * rshft4 * rshft4;"
         "rshft4 = rshft2 * rshft2;"
         "rshft2 = rshft * rshft;"
@@ -530,24 +529,8 @@ def Compartment_SSW(sim_object,
     force.addGlobalParameter('emin12', 46656.0 / 823543.0)
     force.addGlobalParameter('rmin12', np.sqrt(6.0 / 7.0))
 
-    compartmentInteractions = np.pad(compartmentInteractions,
-            ((0, max(0, 5-compartmentInteractions.shape[0])), (0, max(0, 5-compartmentInteractions.shape[1]))),
-            mode='constant', constant_values=0)
-    force.addGlobalParameter('COMP00', compartmentInteractions[0, 0])
-    force.addGlobalParameter('COMP01', compartmentInteractions[0, 1])
-    force.addGlobalParameter('COMP02', compartmentInteractions[0, 2])
-    force.addGlobalParameter('COMP03', compartmentInteractions[0, 3])
-    force.addGlobalParameter('COMP04', compartmentInteractions[0, 4])
-    force.addGlobalParameter('COMP11', compartmentInteractions[1, 1])
-    force.addGlobalParameter('COMP12', compartmentInteractions[1, 2])
-    force.addGlobalParameter('COMP13', compartmentInteractions[1, 3])
-    force.addGlobalParameter('COMP14', compartmentInteractions[1, 4])
-    force.addGlobalParameter('COMP22', compartmentInteractions[2, 2])
-    force.addGlobalParameter('COMP23', compartmentInteractions[2, 3])
-    force.addGlobalParameter('COMP24', compartmentInteractions[2, 4])
-    force.addGlobalParameter('COMP33', compartmentInteractions[3, 3])
-    force.addGlobalParameter('COMP34', compartmentInteractions[3, 4])
-    force.addGlobalParameter('COMP44', compartmentInteractions[4, 4])
+    for i, j in indexpairs:
+        force.addGlobalParameter("COMP_{0:d}_{1:d}".format(i, j), compartmentInteractions[i, j])
 
     force.addPerParticleParameter("type")
     force.addPerParticleParameter("ExtraHard")
