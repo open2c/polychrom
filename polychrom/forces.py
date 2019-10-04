@@ -410,9 +410,9 @@ def selective_SSW(sim_object,
 
     return force
 
-def Compartment_SSW(sim_object,
-    compartmentInteractions,
-    compartmentIDs,
+def heteropolymer_SSW(sim_object,
+    interactionMatrix,
+    monomerTypes,
     extraHardParticlesIdxs,
     repulsionEnergy=3.0,
     repulsionRadius=1.,
@@ -420,11 +420,13 @@ def Compartment_SSW(sim_object,
     attractionRadius=1.5,
     selectiveRepulsionEnergy=20.0,
     selectiveAttractionEnergy=1.0,
-    name='Compartment_SSW'):
+    keepVanishingInteractions=False,
+    name='heteropolymer_SSW'):
     """
-    A version of smooth square well potential that enables the use of
-    arbitrarily many compartments with arbitrary interaction strengths with
-    each other.
+    A version of smooth square well potential that enables the simulation of
+    heteropolymers. Every monomer is assigned a number determining its type,
+    then one can specify additional attraction between the types with the
+    interactionMatrix.
 
     This is a simple and fast polynomial force that looks like a smoothed
     version of the square-well potential. The energy equals `repulsionEnergy`
@@ -437,20 +439,20 @@ def Compartment_SSW(sim_object,
     domain and they both get to zero at the boundary.
 
     This is a tunable version of SSW:
-    a) You can give compartmentIDs (e.g. 0, 1, 2 for A, B, C)
-       and interaction strengths between these compartments. The corresponding entry in
-       compartmentInteractions is multiplied by selectiveAttractionEnergy to give the actual
+    a) You can give monomerTypes (e.g. 0, 1, 2 for A, B, C)
+       and interaction strengths between these types. The corresponding entry in
+       interactionMatrix is multiplied by selectiveAttractionEnergy to give the actual
        (additional) depth of the potential well. 
     b) You can select a subset of particles and make them "extra hard".
 
     Parameters
     ----------
 
-    compartmentInteractions: np.array
-        the interaction strenghts between the different compartment types.
+    interactionMatrix: np.array
+        the interaction strenghts between the different types.
         Only upper triangular values are used.
-    compartmentIDs: list of int or np.array
-        the compartment ID for each particle, starting at 0
+    monomerTypes: list of int or np.array
+        the type of each monomer, starting at 0
     extraHardParticlesIdxs : list of int
         the list of indices of the "extra hard" particles. The extra hard
         particles repel all other particles with extra
@@ -470,16 +472,23 @@ def Compartment_SSW(sim_object,
     selectiveRepulsionEnergy: float
         the EXTRA repulsion energy applied to the "extra hard" particles
     selectiveAttractionEnergy: float
-        prefactor for the compartment attractions.
+        prefactor for the heteropolymer interactions
+    keepVanishingInteractions : bool
+        a flag that determines whether the terms that have zero interaction are
+        still added to the force. This can be useful when changing the force
+        dynamically (i.e. switching interactions on at some point)
     """
 
-    # Check compartment info for consistency
-    Ncomp = max(compartmentIDs) + 1 # IDs should be zero based
-    if any(np.less(compartmentInteractions.shape, [Ncomp, Ncomp])):
-        raise ValueError("Need compartment interactions for {0:d} compartments!".format(Ncomp))
+    # Check type info for consistency
+    Ntypes = max(monomerTypes) + 1 # IDs should be zero based
+    if any(np.less(interactionMatrix.shape, [Ntypes, Ntypes])):
+        raise ValueError("Need interactions for {0:d} types!".format(Ntypes))
 
     indexpairs = []
-    [[indexpairs.append((i, j)) for j in range(i, Ncomp)] for i in range(0, Ncomp)]
+    for i in range(0, Ntypes):
+        for j in range(i, Ntypes):
+            if (not interactionMatrix[i, j] == 0) or keepVanishingInteractions:
+                indexpairs.append((i, j))
 
     energy = (
         "step(REPsigma - r) * Erep + step(r - REPsigma) * Eattr;"
@@ -492,12 +501,16 @@ def Compartment_SSW(sim_object,
         "rsc = r / REPsigma * rmin12;"
         ""
         "Eattr = - rshft12 * (rshft2 - 1.0) * ATTReTot / emin12 - ATTReTot;"
-        "ATTReTot = ATTRe + ATTReAdd*(delta(type1-0)*delta(type2-0)*COMP_0_0"
+        "ATTReTot = ATTRe"
         )
-    for i, j in indexpairs[1:]:
-        energy += "+delta(type1-{0:d})*delta(type2-{1:d})*COMP_{0:d}_{1:d}".format(i, j)
+    if len(indexpairs) > 0:
+        energy += (" + ATTReAdd*(delta(type1-{0:d})*delta(type2-{1:d})"
+                   "*INT_{0:d}_{1:d}").format(indexpairs[0][0], indexpairs[0][1])
+        for i, j in indexpairs[1:]:
+            energy += "+delta(type1-{0:d})*delta(type2-{1:d})*INT_{0:d}_{1:d}".format(i, j)
+        energy += ")"
     energy += (
-        ");"
+        ";"
         "rshft12 = rshft4 * rshft4 * rshft4;"
         "rshft4 = rshft2 * rshft2;"
         "rshft2 = rshft * rshft;"
@@ -530,7 +543,7 @@ def Compartment_SSW(sim_object,
     force.addGlobalParameter('rmin12', np.sqrt(6.0 / 7.0))
 
     for i, j in indexpairs:
-        force.addGlobalParameter("COMP_{0:d}_{1:d}".format(i, j), compartmentInteractions[i, j])
+        force.addGlobalParameter("INT_{0:d}_{1:d}".format(i, j), interactionMatrix[i, j])
 
     force.addPerParticleParameter("type")
     force.addPerParticleParameter("ExtraHard")
@@ -539,14 +552,14 @@ def Compartment_SSW(sim_object,
 
     for i in range(sim_object.N):
         force.addParticle(
-            (float(compartmentIDs[i]),
+            (float(monomerTypes[i]),
              float(i in extraHardParticlesIdxs)))
 
     return force
 
-def LaminaAttraction(sim_object, particles, r, center=[0, 0, 0], width=1, depth=1, name="Lamina_attraction"):
+def spherical_well(sim_object, particles, r, center=[0, 0, 0], width=1, depth=1, name="spherical_well"):
     """
-    Attraction to the lamina.
+    A spherical potential well, suited for example to simulate attraction to a lamina.
 
     Parameters
     ----------
@@ -556,10 +569,10 @@ def LaminaAttraction(sim_object, particles, r, center=[0, 0, 0], width=1, depth=
     r : float
         Radius of the nucleus
     center : vector, optional
-        center position of the lamina. This parameter is useful when confining
+        center position of the sphere. This parameter is useful when confining
         chromosomes to their territory.
     width : float, optional
-        Width of attractive layer next to the lamina, nm.
+        Width of attractive well, nm.
     depth : float, optional
         Depth of attractive potential in kT
         NOTE: switched sign from openmm-polymer, because it was confusing. Now
@@ -568,17 +581,17 @@ def LaminaAttraction(sim_object, particles, r, center=[0, 0, 0], width=1, depth=
     """
 
     force = openmm.CustomExternalForce(
-            "-step(1+d)*step(1-d)*LAMdepth*cos(3.1415926536*d)/2 + 0.5;"
-            "d = (sqrt((x-LAMx)^2 + (y-LAMy)^2 + (z-LAMz)^2) - LAMradius) / LAMwidth"
+            "-step(1+d)*step(1-d)*SPHWELLdepth*cos(3.1415926536*d)/2 + 0.5;"
+            "d = (sqrt((x-SPHWELLx)^2 + (y-SPHWELLy)^2 + (z-SPHWELLz)^2) - SPHWELLradius) / SPHWELLwidth"
             )
     force.name = name
 
-    force.addGlobalParameter("LAMradius", r * sim_object.conlen)
-    force.addGlobalParameter("LAMwidth", width * sim_object.conlen)
-    force.addGlobalParameter("LAMdepth", depth * sim_object.kT)
-    force.addGlobalParameter("LAMx", center[0] * sim_object.conlen)
-    force.addGlobalParameter("LAMy", center[1] * sim_object.conlen)
-    force.addGlobalParameter("LAMz", center[2] * sim_object.conlen)
+    force.addGlobalParameter("SPHWELLradius", r * sim_object.conlen)
+    force.addGlobalParameter("SPHWELLwidth", width * sim_object.conlen)
+    force.addGlobalParameter("SPHWELLdepth", depth * sim_object.kT)
+    force.addGlobalParameter("SPHWELLx", center[0] * sim_object.conlen)
+    force.addGlobalParameter("SPHWELLy", center[1] * sim_object.conlen)
+    force.addGlobalParameter("SPHWELLz", center[2] * sim_object.conlen)
 
     _prepend_force_name_to_params(force)
 
