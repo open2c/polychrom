@@ -744,7 +744,7 @@ def tether_particles(
     if positions == "current":
         positions = [sim_object.data[i] for i in particles]
     else:
-        positions = sim_object.addUnits(positions)
+        positions = units.Quantity(positions, nm)
 
     for i, pos in zip(particles, positions):  # adding all the particles on which force acts
         i = int(i)
