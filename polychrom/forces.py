@@ -730,9 +730,9 @@ def tether_particles(
     else:
         kx, ky, kz = k, k, k
 
-    force.addGlobalParameter("kx", kx * sim_object.kT / nm)
-    force.addGlobalParameter("ky", ky * sim_object.kT / nm)
-    force.addGlobalParameter("kz", kz * sim_object.kT / nm)
+    force.addGlobalParameter("kx", kx * sim_object.kT / nm / nm)
+    force.addGlobalParameter("ky", ky * sim_object.kT / nm / nm)
+    force.addGlobalParameter("kz", kz * sim_object.kT / nm / nm)
     force.addPerParticleParameter("x0")
     force.addPerParticleParameter("y0")
     force.addPerParticleParameter("z0")
