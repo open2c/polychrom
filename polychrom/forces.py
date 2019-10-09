@@ -597,7 +597,8 @@ def spherical_well(sim_object, particles, r, center=[0, 0, 0], width=1, depth=1,
 
     # adding all the particles on which force acts
     for i in particles:
-        force.addParticle(i, [])
+        # NOTE: the explicit type cast seems to be necessary if we have an np.array...
+        force.addParticle(int(i), [])
 
     return force
 
@@ -775,7 +776,7 @@ def pull_force(
 
     for num, force_vec in itertools.zip_longest(particles, force_vecs, fillvalue=force_vecs[-1]):
         force_vec = [float(f) * (sim_object.kT / sim_object.conlen) for f in force_vec]
-        force.addParticle(num, force_vec)
+        force.addParticle(int(num), force_vec)
     
     return force
 
