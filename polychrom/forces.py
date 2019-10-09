@@ -548,8 +548,6 @@ def heteropolymer_SSW(sim_object,
     force.addPerParticleParameter("type")
     force.addPerParticleParameter("ExtraHard")
 
-    _prepend_force_name_to_params(force)
-
     for i in range(sim_object.N):
         force.addParticle(
             (float(monomerTypes[i]),
@@ -592,8 +590,6 @@ def spherical_well(sim_object, particles, r, center=[0, 0, 0], width=1, depth=1,
     force.addGlobalParameter("SPHWELLx", center[0] * sim_object.conlen)
     force.addGlobalParameter("SPHWELLy", center[1] * sim_object.conlen)
     force.addGlobalParameter("SPHWELLz", center[2] * sim_object.conlen)
-
-    _prepend_force_name_to_params(force)
 
     # adding all the particles on which force acts
     for i in particles:
@@ -731,21 +727,19 @@ def tether_particles(
     else:
         kx, ky, kz = k, k, k
 
-    force.addGlobalParameter("kx", kx * sim_object.kT / nm)
-    force.addGlobalParameter("ky", ky * sim_object.kT / nm)
-    force.addGlobalParameter("kz", kz * sim_object.kT / nm)
+    force.addGlobalParameter("kx", kx * sim_object.kT / nm / nm)
+    force.addGlobalParameter("ky", ky * sim_object.kT / nm / nm)
+    force.addGlobalParameter("kz", kz * sim_object.kT / nm / nm)
     force.addPerParticleParameter("x0")
     force.addPerParticleParameter("y0")
     force.addPerParticleParameter("z0")
-
-    _prepend_force_name_to_params(force)
 
     particles = [sim_object.N+i if i<0 else i for i in particles]
 
     if positions == "current":
         positions = [sim_object.data[i] for i in particles]
     else:
-        positions = sim_object.addUnits(positions)
+        positions = units.Quantity(positions, nm)
 
     for i, pos in zip(particles, positions):  # adding all the particles on which force acts
         i = int(i)
@@ -808,8 +802,6 @@ def grosberg_polymer_bonds(sim_object,
         sim_object.kT / (sim_object.conlen * sim_object.conlen))
     force.addGlobalParameter("r0", sim_object.conlen * 1.5)
        
-    _prepend_force_name_to_params(force)
-
 
     for bond_idx, (i, j) in enumerate(bonds):
         if (i >= sim_object.N) or (j >= sim_object.N):
@@ -855,8 +847,6 @@ def grosberg_angle(sim_object,
     force.name = name 
     force.addGlobalParameter("kT", sim_object.kT)
     force.addPerAngleParameter("GRk")
-
-    _prepend_force_name_to_params(force)
     
     for triplet_idx, (p1, p2, p3) in enumerate(triplets):
         force.addAngle(p1, p2, p3, [k[triplet_idx]])
@@ -907,7 +897,6 @@ def grosberg_repulsive_force(sim_object,
         force.addParticle(())
 
     force.setCutoffDistance(nbCutOffDist)
-    _prepend_force_name_to_params(force)
     
     return force 
     
