@@ -220,7 +220,7 @@ for milkerCount in range(milkerInitsTotal):
     a.add_force(
         forcekits.polymer_chains(
             a,
-            chains=[(0, None, None)],
+            chains=[(0, None, False)],
 
                 # By default the library assumes you have one polymer chain
                 # If you want to make it a ring, or more than one chain, use self.setChains
