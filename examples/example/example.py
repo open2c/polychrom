@@ -5,7 +5,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os,sys
 import polychrom
 from polychrom import (simulation, starting_conformations,
-                       forces, extra_forces, forcekits)
+                       forces, forcekits)
 import simtk.openmm as openmm
 import os
 from polychrom.hdf5_format import HDF5Reporter
@@ -27,7 +27,7 @@ def exampleOpenmm():
             integrator="variableLangevin", 
             error_tol=0.002, 
             GPU = "0", 
-            collision_rate=0.02, 
+            collision_rate=0.1, 
             N = 10000, 
             reporters=[reporter]) 
     
@@ -91,7 +91,7 @@ def exampleOpenmm():
 
             angle_force_func=forces.angle_force,
             angle_force_kwargs={
-                'k':0.05
+                'k':1.5, 
                 # K is more or less arbitrary, k=4 corresponds to presistence length of 4,
                 # k=1.5 is recommended to make polymer realistically flexible; k=8 is very stiff
             },

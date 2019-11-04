@@ -90,8 +90,15 @@ inline double dotProduct(point a, point b){
 // }
 
 inline double dist(point a,point b){
-    return sqr(a.x-b.x)+sqr(a.y-b.y)+sqr(a.z-b.z);
+    return sqrt( (a.x-b.x)*(a.x-b.x)
+                +(a.y-b.y)*(a.y-b.y)
+                +(a.z-b.z)*(a.z-b.z));
 }
+
+// inline double dist(int i,int j){
+//     return sqrt(dotProduct((position[i]-position[j]),(position[i]-position[j])));
+// }
+
 
 int intersect(point t1,point t2,point t3,point r1,point r2) {
     point A,B,C,D,n;
@@ -309,3 +316,109 @@ void _mutualSimplifyCpp (
 }
 
 
+int _simplifyCpp (double *datax, double *datay, double *dataz, int N) 
+{
+    int M = 0;
+    int k1;
+    int sum = 0;
+    int t=0,s=0,k=0;
+    int turn=0;
+    bool breakflag;
+    float maxdist;
+    vector <point> position;
+    vector <point> newposition;
+    vector <int> todelete;
+    int i;
+
+    position=vector<point>(N);
+    newposition=vector<point>(N);
+
+    for (i=0;i<N;i++)
+    {
+        position[i].x = datax[i] + 0.000000000001*(rand()%1000);
+        position[i].y = datay[i] + 0.00000000000001*(rand()%1000);
+        position[i].z = dataz[i] + 0.0000000000001*(rand()%1000);
+    }
+
+    todelete = vector <int> (N);
+    for (i=0;i<N;i++) todelete[i] == -2;
+    for (int xxx = 0; xxx < 1000; xxx++)
+        {
+        maxdist = 0;
+        for (i=0;i<N-1;i++)
+        {
+        if (dist(position[i],position[i+1]) > maxdist) {maxdist = dist(position[i],position[i+1]);}
+        }
+        turn++;
+        M=0;
+        for (i=0;i<N;i++) todelete[i] = -2;
+        for (int j=1;j<N-1;j++)  //going over all elements trying to delete
+            {
+            breakflag = false; //by default we delete thing
+
+            for (k=0;k<N;k++)  //going over all triangles to check
+                {
+                long double dd = dist(position[j],position[k]);
+                if (dd  <  2 * maxdist)
+                {
+
+                if (k < j-2 || k > j+1)
+                    {
+                    if (k < N-1) k1 = k+1;
+                    else k1 = 0;
+                    sum = intersect(
+                        position[j-1],position[j],position[j+1],
+                        position[k],position[k1]);
+                    if (sum!=0)
+                        {
+                        //printf("intersection at %d,%d\n",j,k);
+                        breakflag = true; //keeping thing
+                        break;
+                        }
+                    }
+		        }
+		else
+		{
+			k+= max(((int)((float)dd/(float)maxdist )- 3), 0);
+		}
+                }
+            if (breakflag ==false)
+            {
+            todelete[M++] = j;
+            position[j] = (position[j-1] + position[j+1])* 0.5;
+            //printf("%d will be deleted at %d\n",j,k);
+            j++;
+            //break;
+            }
+            }
+        t = 0;//pointer for todelete
+        s = 0;//pointer for newposition
+        if (M==0)
+            {
+            break;
+            }
+        for (int j=0;j<N;j++)
+            {
+            if (todelete[t] == j)
+                {
+                t++;
+                continue;
+                }
+            else
+                {
+                newposition[s++] = position[j];
+                }
+            }
+        M = 0;
+        t = 0;
+        position = newposition;
+    }
+
+    for (i=0;i<s;i++)
+    {
+        datax[i]  = position[i].x;
+        datay[i]  = position[i].y;
+        dataz[i]  = position[i].z;
+    }
+    return s;
+}

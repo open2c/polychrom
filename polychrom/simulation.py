@@ -182,7 +182,7 @@ class Simulation():
 
             elif self.integrator_type.lower() == 'brownian':
                 self.integrator = openmm.BrownianIntegrator(self.temperature,
-                   kwarg["collision_rate"] * (1 / ps), kwargs["timestep"])
+                   kwargs["collision_rate"] * (1 / ps), kwargs["timestep"]* fs)
             else:
                 logging.info(
                     'Using the provided integrator object'
@@ -562,7 +562,7 @@ class Simulation():
         msg += "t=%2.1lfps " % (self.state.getTime() / ps)
         msg += "kin=%.2lf pot=%.2lf " % (eK,eP)
         msg += "Rg=%.3lf " % self.RG()
-        msg + "SPS=%.0lf " % (steps / (float(b - a)))
+        msg += "SPS=%.0lf " % (steps / (float(b - a)))
 
         if (self.integrator_type.lower() == 'variablelangevin'
             or self.integrator_type.lower() == 'variableverlet'):

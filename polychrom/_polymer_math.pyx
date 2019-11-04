@@ -11,6 +11,8 @@ cdef extern from "__polymer_math.h":
         double *datax2, double *datay2, double *dataz2, int N2,
         long *ret
     )
+    int _simplifyCpp (double *datax, double *datay, double *dataz, int N) 
+
 
 
 
@@ -72,3 +74,24 @@ def mutualSimplify(data1, data2):
     data2 = np.array([datax2, datay2, dataz2]).T
 
     return data1[:ret[0]], data2[:ret[1]]
+
+
+def simplifyPolymer(data):
+    """a weave.inline wrapper for polymer simplification code
+    Calculates a simplified topologically equivalent polymer ring"""
+
+    if len(data) != 3:
+        data = np.transpose(data)
+    if len(data) != 3:
+        raise ValueError("Wrong dimensions of data")
+    cdef double[:] datax = np.array(data[0], float, order="C")
+    cdef double[:] datay = np.array(data[1], float, order="C")
+    cdef double[:] dataz = np.array(data[2], float, order="C")
+    
+    cdef int N = len(datax)
+
+    new_N = _simplifyCpp(&datax[0], &datay[0], &dataz[0], N)
+
+    data = np.array([datax, datay, dataz]).T
+
+    return data[:new_N]
