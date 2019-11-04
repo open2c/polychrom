@@ -189,7 +189,7 @@ class HDF5Reporter(object):
                         if the_file.startswith(prefix):
                             raise RuntimeError(f"folder {folder} is not empty: set check_exists=False to ignore")
 
-    def continue_sim(self, continue_from=None, 
+    def continue_trajectory(self, continue_from=None, 
                        continue_max_delete = 5 ):
         """        
         Continues a simulation in a current folder (i.e. continues from the last block, or the block you specify).
