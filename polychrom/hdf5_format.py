@@ -65,7 +65,7 @@ def _write_group(dataDict, group, dset_opts={"compression":"gzip"}):
 
         
 
-def list_URIs(folder, readError=True):    
+def list_URIs(folder, readError=True, return_dict=False):    
     """
     Takes a trajectory folder and makes a list of dset paths for each block. 
     It is needed because now we store multiple blocks per file. 
@@ -89,7 +89,10 @@ def list_URIs(folder, readError=True):
             if i in filenames:
                 raise ValueError(f"Block {i} exists more than once")
             filenames[i] =  file+f"::{i}"
-    return [i[1] for i in sorted(filenames.items(), key=lambda x:int(x[0]))]
+    if not return_dict:
+        return [i[1] for i in sorted(filenames.items(), key=lambda x:int(x[0]))]
+    else:
+        return {int(i[0]):i[1] for i in sorted(filenames.items(), key=lambda x:int(x[0]))}
 
 def load_URI(dset_path):
     """
@@ -105,11 +108,11 @@ def load_URI(dset_path):
     with h5py.File(fname, mode='r') as myfile:        
         return _read_h5_group(myfile[group])
 
-def save_hdf5_file(filename, data_dict, dset_opts={"compression":"gzip"}):
+def save_hdf5_file(filename, data_dict, dset_opts={"compression":"gzip"}, mode='w'):
     """
     Saves data_dict to filename 
     """
-    with h5py.File(filename) as file: 
+    with h5py.File(filename, mode=mode) as file: 
         _write_group(data_dict, file, dset_opts=dset_opts)
 
     
@@ -127,42 +130,161 @@ class HDF5Reporter(object):
     def __init__(self, folder, max_data_length=50, 
                  h5py_dset_opts={"compression":"gzip"}, 
                  overwrite=False, 
-                 blocks_only=False
+                 blocks_only=False, 
+                 check_exists=True
                 ):
         """
+        Creates a reporter object that saves a trajectory to a folder 
+        
+        Parameters
+        ----------
+        
+        folder : str 
+            Folder to save data to. 
+            
+        max_data_length: int, optional (default=50)
+            Will save data in groups of max_data_length blocks 
+            
+        overwrite: bool, optional (default=False)
+            Overwrite an existing trajectory in a folder. 
+        
+        check_exists: bool (optional, default=True)
+            Raise an error if previous trajectory exists in the folder 
+            
+        blocks_only: bool, optional (default=False) 
+            Only save blocks, do not save any other information 
+        
+
         
         """
-        prefixes = ["blocks", "applied_forces", "initArgs", "starting_conformation", "energy_minimization"]
-        if not os.path.exists(folder):
-            os.mkdir(folder)
-            
-        if overwrite: 
-            for the_file in os.listdir(folder):
-                file_path = os.path.join(folder, the_file)
-                if os.path.isfile(file_path):                    
-                    for prefix in prefixes:
-                        if the_file.startswith(prefix):
-                            os.remove(file_path)
-                else:
-                    raise IOError("Subfolder in traj folder; not deleting. Ensure folder is correct and delete manually. ")
-                        
-                    
-        if len(os.listdir(folder)) != 0:
-            for the_file in os.listdir(folder):            
-                for prefix in prefixes:
-                    if the_file.startswith(prefix):
-                        raise RuntimeError(f"folder {folder} is not empty")
-        self.counter = {}
+        
+        self.prefixes = ["blocks", "applied_forces", "initArgs", "starting_conformation", "energy_minimization", 
+                        "forcekit_polymer_chains"]  # these are used for inferring if a file belongs to a trajectory or not 
+        self.counter = {}  # initializing all the options and dictionaries 
         self.datas = {}
         self.max_data_length = max_data_length
         self.h5py_dset_opts = h5py_dset_opts
         self.folder = folder
         self.blocks_only = blocks_only
+                                
         
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+
+        if overwrite: 
+            for the_file in os.listdir(folder):
+                file_path = os.path.join(folder, the_file)
+                if os.path.isfile(file_path):                    
+                    for prefix in self.prefixes:
+                        if the_file.startswith(prefix):
+                            os.remove(file_path)
+                else:
+                    raise IOError("Subfolder in traj folder; not deleting. Ensure folder is correct and delete manually. ")
+
+
+        if check_exists:
+            if len(os.listdir(folder)) != 0:
+                for the_file in os.listdir(folder):            
+                    for prefix in self.prefixes:
+                        if the_file.startswith(prefix):
+                            raise RuntimeError(f"folder {folder} is not empty: set check_exists=False to ignore")
+
+    def continue_trajectory(self, continue_from=None, 
+                       continue_max_delete = 5 ):
+        """        
+        Continues a simulation in a current folder (i.e. continues from the last block, or the block you specify).
+        By default, takes the last block. Otherwise, takes the continue_from block 
+        
+        You should initialize the class with "check_exists=False" to continue a simulation 
+        
+        NOTE: This funciton does not continue the simulation itself (parameters, bonds, etc.) - it only 
+        manages counting the blocks and the saved files. 
+                
+        
+        Returns (block_number, data_dict) - you should start a new simulation with data_dict["pos"]
+        
+        
+        Parameters
+        ----------
+        
+        continue_from: int or None, optional (default=None)
+            Block number to continue a simulation from. Default: last block found
+        
+        continue_max_delete: int (default = 5) 
+            Maximum number of blocks to delete if continuing a simulation. 
+            It is here to avoid accidentally deleting a lot of blocks. 
+            
+        Returns
+        -------
+        
+        (block_number, data_dict)
+        
+        block_number is a number of a current block
+        
+        data_dict is what load_URI would return on the last block of a trajectory. 
+        
+            """
+
+        uris = list_URIs(self.folder, return_dict=True)
+        uri_inds = np.array(list(uris.keys()))  # making a list of all URIs and filenames 
+        uri_vals = np.array(list(uris.values()))
+        uri_fnames = np.array([i.split("::")[0] for i in uris.values()])
+        if continue_from is None:
+            continue_from = uri_inds[-1]
+
+        if int(continue_from) not in uris:
+            raise ValueError(f"block {continue_from} not in folder")
+
+        ind = np.nonzero(uri_inds == continue_from)[0][0]  # position of a starting block in arrays 
+        newdata = load_URI(uri_vals[ind])
+
+        todelete = np.nonzero(uri_inds >= continue_from)[0]
+        if len(todelete) > continue_max_delete:
+            raise ValueError("Refusing to delete {uris_delete} blocks - set continue_max_delete accordingly")             
+
+        fnames_delete = np.unique(uri_fnames[todelete])                        
+        inds_tosave = np.nonzero((uri_fnames == uri_fnames[ind]) * (uri_inds <= ind))[0]
+
+        for saveind in inds_tosave:  # we are saving some data and deleting the whole last file 
+            self.datas[uri_inds[saveind]] = load_URI(uri_vals[saveind])
+        self.counter["data"] = ind + 1 
+
+        files = os.listdir(self.folder)  # some heuristics to infer values of counters - not crucial but maybe useful 
+        for prefix in self.prefixes:
+            if prefix is not "data": 
+                myfiles = [i for i in files if i.startswith(prefix)]
+                inds = []
+                for i in myfiles:
+                    try:
+                        inds.append(int(i.split("_")[-1].split(".h5")[0]))
+                    except:
+                        pass
+                    self.counter[prefix] = max(inds, default=-1)+1
+
+        for fdelete in fnames_delete: # actually deleting files that we need to delete 
+            os.remove(fdelete)
+
+        if len(self.datas) >= self.max_data_length:
+            self.dump_data()  
+
+        return (uri_inds[ind], newdata)        
 
     def report(self, name, values):
-        count = self.counter.get(name, 0)
+        """        
+        Semi-internal method to be called when you need to report something 
         
+        Parameters
+        ----------
+        
+        name : str
+            Name of what is being reported ("data", "init_args", anything else)
+        values : dict 
+            Dict of what to report. Accepted types are np-array-compatible, 
+            numbers, strings. No dicts, objects, or what cannot be converted
+            to a np-array of numbers or strings/bytes.            
+        
+        """
+        count = self.counter.get(name, 0)        
         
         if name not in ["data"]:
             if not self.blocks_only:
@@ -172,7 +294,7 @@ class HDF5Reporter(object):
                 
         else:
             self.datas[count] = values 
-            if len(self.datas) == self.max_data_length:
+            if len(self.datas) >= self.max_data_length:
                 self.dump_data()
         self.counter[name] = count + 1
                 
