@@ -55,6 +55,7 @@ def harmonic_bonds(sim_object,
     bondWiggleDistance : float or iterable of float
         Average displacement from the equilibrium bond distance.
         Can be provided per-particle.
+        If 0 then set k=0.
     bondLength : float or iterable of float
         The length of the bond.
         Can be provided per-particle.
@@ -68,6 +69,7 @@ def harmonic_bonds(sim_object,
     
     # using kbondScalingFactor because force accepts parameters with units
     kbond = sim_object.kbondScalingFactor / (bondWiggleDistance ** 2)  
+    kbond[bondWiggleDistance == 0] = 0
 
     for bond_idx, (i, j) in enumerate(bonds):
         if (i >= sim_object.N) or (j >= sim_object.N):
