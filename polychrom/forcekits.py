@@ -19,7 +19,6 @@ def polymer_chains(
     except_bonds=True,
 ):
     """Adds harmonic bonds connecting polymer chains
-
     Parameters
     ----------
     chains: list of tuples
@@ -28,18 +27,22 @@ def polymer_chains(
         the particles 0, 1 and 2. If bool(isRing) is True than the first
         and the last particles of the chain are linked into a ring.
         The default value links all particles of the system into one chain.
-
     exceptBonds : bool
         If True then do not calculate non-bonded forces between the
         particles connected by a bond. True by default.
     """
+    
+    
 
     force_list = []
 
     bonds = []
     triplets = []
+    newchains = []
+    
     for start, end, is_ring in chains:
         end = sim_object.N if (end is None) else end
+        newchains.append((start, end, is_ring))
         
         bonds += [(j, j+1) for j in range(start, end - 1)]
         triplets += [(j - 1, j, j + 1) for j in range(start + 1, end - 1)]
@@ -48,10 +51,18 @@ def polymer_chains(
             bonds.append((start, end-1))
             triplets.append((int(end - 2), int(end - 1), int(start)))
             triplets.append((int(end - 1), int(start), int(start + 1)))
+            
+    reportDict = {"chains":np.array(newchains, dtype=int), 
+                  "bonds": np.array(bonds, dtype=int),
+                  "angles": np.array(triplets)
+                 }
+    for reporter in sim_object.reporters:
+        reporter.report("forcekit_polymer_chains", reportDict)
     
-    force_list.append(
-        bond_force_func(sim_object, bonds, **bond_force_kwargs)
-    )
+    if bond_force_func is not None:
+        force_list.append(
+            bond_force_func(sim_object, bonds, **bond_force_kwargs)
+        )
     
     if angle_force_func is not None:
         force_list.append(
@@ -79,5 +90,3 @@ def polymer_chains(
         force_list.append(nb_force)
 
     return force_list
-
-            
