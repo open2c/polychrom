@@ -553,6 +553,7 @@ def tether_particles(
 
     if positions == "current":
         positions = [sim_object.data[i] for i in particles]
+        print(sim_object.data[0])
     else:
         positions = sim_object.addUnits(positions)
 
