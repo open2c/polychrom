@@ -4,7 +4,7 @@ from . import forces
 def polymer_chains(
     sim_object,
     chains=[(0, None, False)],
-
+    links,
     bond_force_func=forces.harmonic_bonds,
     bond_force_kwargs={'bondWiggleDistance':0.05,
                      'bondLength':1.0},
@@ -18,7 +18,7 @@ def polymer_chains(
 
     except_bonds=True,
 ):
-    """Adds harmonic bonds connecting polymer chains
+    """Adds harmonic bonds + A SET OF IRREVERSIBLE LINKS
     Parameters
     ----------
     chains: list of tuples
@@ -52,6 +52,7 @@ def polymer_chains(
             triplets.append((int(end - 2), int(end - 1), int(start)))
             triplets.append((int(end - 1), int(start), int(start + 1)))
             
+    bonds += links       
     reportDict = {"chains":np.array(newchains, dtype=int), 
                   "bonds": np.array(bonds, dtype=int),
                   "angles": np.array(triplets)
