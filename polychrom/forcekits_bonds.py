@@ -3,8 +3,8 @@ from . import forces
 
 def polymer_chains(
     sim_object,
-    chains=[(0, None, False)],
     links,
+    chains=[(0, None, False)],
     bond_force_func=forces.harmonic_bonds,
     bond_force_kwargs={'bondWiggleDistance':0.05,
                      'bondLength':1.0},
