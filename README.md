@@ -1,5 +1,7 @@
 # polychrom
 
+[![DOI](https://zenodo.org/badge/178608195.svg)](https://zenodo.org/badge/latestdoi/178608195)
+
 ## This is a library in development. 
 
 
