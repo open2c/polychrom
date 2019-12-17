@@ -4,3 +4,5 @@ polychrom.egg-info
 .ipynb*
 *.pyc
 polychrom/_polymer_math.cpp
+*.h5
+*.dat
