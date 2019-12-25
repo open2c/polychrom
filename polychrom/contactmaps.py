@@ -270,6 +270,31 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
             contactBlock: int (default 500k) Number of contacts to aggregate before writing to memory
             useFmap: True, or callable, fork-map (or regular map) function; not multiprocessing.map! 
                      defaults to mirnylib.systemutils.fmap if true. Otherwise, uses provided function
+                     
+                     
+    Code that calcualtes a contactmap from a set of polymer conformation is in the methods 
+    below (averageMonomerResolutionContactMap, etc.) 
+    
+    An example code that would run a contactmap from a simulation is pasted below. 
+    
+    class simContactMap(object):
+
+    "contactmap 'finder' for a simulation"
+    def __init__(self, ind):  # accept a parameter (e.g. random number generator seed)
+        self.model = initModel(ind)  # pass parameter to the functon that returns me a model object 
+        self.count = 10000000   # how many times to run a step of the model 
+        self.model.steps(10000)   # initial steps of the model to equilibrate it 
+        
+    def next(self):  # actual realization of the self.next method
+        if self.count == 0:   # terminate the simulation if we did self.count iterations
+            raise StopIteration
+        self.count -= 1      #decrement the counter 
+        self.model.steps(30)   # advance model by 30 steps 
+        return np.array(self.model.getSMCs()).T   # return current LEF positions 
+
+    mymap = polychrom.contactmaps.averageContacts(simContactMap, range(20), 30000,  nproc=20 )    
+
+    
     """
 
     arrayDtype = kwargs.get("arrayDtype", ctypes.c_int32)
