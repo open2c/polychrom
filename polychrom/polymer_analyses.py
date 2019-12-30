@@ -1,9 +1,8 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 
-from . import polymerutils, _polymer_math
+from . import  _polymer_math
 from math import sqrt
 
-import random
 import numpy as np
 import pandas as pd 
 
@@ -49,7 +48,7 @@ def generate_bins(N, start=4, bins_per_order_magn=10):
 
 
 def contact_scaling(
-        data, bins0 = None, cutoff=1.1, integrate=False,
+        data, bins0=None, cutoff=1.1, integrate=False,
         ring=False,
         bins_per_order_magn=10):
 
@@ -62,9 +61,10 @@ def contact_scaling(
     ----------
     data : Nx3 array of ints/floats
         Input polymer conformation
-    bins0 : list
+    bins0 : list or None
         Bins to calculate scaling.
-        Bins should probably be log-spaced; log-spaced bins can be quickly calculated using mirnylib.numtuis.logbinsnew. 
+        Bins should probably be log-spaced; log-spaced bins can be quickly calculated using mirnylib.numtuis.logbinsnew.
+        If None, bins will be calculated automatically
     cutoff : float, optional
         Cutoff to calculate scaling
     integrate : bool, optional
@@ -84,8 +84,8 @@ def contact_scaling(
     """
     data = np.asarray(data)
     N = data.shape[0]
-    assert data.shape[1] == 3 
-    
+    assert data.shape[1] == 3
+
     if bins0 is None: 
         bins0 = generate_bins(N, bins_per_order_magn=bins_per_order_magn)
     
