@@ -10,7 +10,6 @@ import numpy
 from . import hdf5_format
 import scipy, scipy.stats  # @UnusedImport
 from polychrom.hdf5_format import load_URI
-import numpy as np
 import joblib
 import gzip
 import glob 

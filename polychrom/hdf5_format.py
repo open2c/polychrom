@@ -2,9 +2,8 @@ import numpy as np
 import warnings
 import h5py 
 import glob
-import simtk.openmm 
 import os 
-import shutil
+
 
 
 def _read_h5_group(gr):
