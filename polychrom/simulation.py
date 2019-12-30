@@ -117,6 +117,14 @@ class Simulation():
         precision: str, optional (not recommended to change)
             mixed is optimal for most situations. 
             If you are using double precision, it will be slower by a factor of 10 or so. 
+            
+        save_decimals: int, optional 
+            Round to this number of decimals before saving. 8+ is full precision. 
+            Default is 2. It gives maximum error of 0.005, which is nearly always harmless
+            but saves up to 40% of storage space (0.6 of the original)
+            Using one decimal is safe most of the time, and reduces storage to 40% of int32. 
+            NOTE that using periodic boundary conditions will make storage advantage less. 
+            
         
 
 
@@ -127,10 +135,11 @@ class Simulation():
                        "temperature":300,
                        "PBCbox":False,
                        "length_scale":1.0,
-                       "mass":100, 
+                       "mass":100,
                        "reporters":[],
                        "max_Ek":10 , 
                        "precision":"mixed", 
+                        "save_decimals":2, 
                        "verbose":False}
         valid_names = list(default_args.keys()) + ["N", "error_tol", "collision_rate", "timestep"]
         for i in kwargs.keys():
@@ -532,6 +541,9 @@ class Simulation():
         coords = self.state.getPositions(asNumpy=True)
         newcoords = coords / nm
         newcoords = np.array(newcoords, dtype=np.float32)
+        if self.kwargs["save_decimals"] is not None:
+            newcoords = np.round(newcoords, self.kwargs["save_decimals"])
+            
         self.time = self.state.getTime() / ps
 
         # calculate energies in KT/particle

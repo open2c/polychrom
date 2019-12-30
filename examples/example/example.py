@@ -28,7 +28,8 @@ def exampleOpenmm():
             error_tol=0.002, 
             GPU = "0", 
             collision_rate=0.1, 
-            N = 10000, 
+            N = 10000,
+            save_decimals=None,
             reporters=[reporter]) 
     
     # Creates a compact conformation on a cubic lattice, length=10,000; grown in a 100x100x100 box     

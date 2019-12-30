@@ -61,16 +61,41 @@ def _write_group(dataDict, group, dset_opts={"compression":"gzip"}):
             group.create_dataset(name, data=data, **dset_opts)
         else:
             raise ValueError("Unknown datatype")
-
-
         
 
-def list_URIs(folder, readError=True, return_dict=False):    
+def list_URIs(folder, empty_error=True, read_error=True, return_dict=False):    
     """
-    Takes a trajectory folder and makes a list of dset paths for each block. 
-    It is needed because now we store multiple blocks per file. 
+    Makes a list of URIs (path-like records for each block). for a trajectory folder
+    Now we store multiple blocks per file, and URI is a 
+    Universal Resource Identifier for a block. 
     
-    It should be compatible with polymerutils.load
+    It is be compatible with polymerutils.load, and with contactmap finders, and is 
+    generally treated like a filename. 
+    
+    This function checks that the HDF5 file is openable (if read_error==True),
+    but does not check if individual datasets (blocks) exist in a file. 
+    If read_error==False, a non-openable file is fully ignored. 
+    NOTE: This covers the most typical case of corruption due to a terminated write,
+    because an HDF5 file becomes invalid in that case. 
+    
+    It does not check continuity of blocks (blocks_1-10.h5; blocks_20-30.h5 is valid)
+    But it does error if one block is listed twice (blocks_1-10.h5; blocks_5-15.h5 is invalid)     
+    
+    TODO: think about the above checks, and openable files too. 
+    
+    Parameters
+    ----------
+    
+    folder : str
+        folder to find conformations in 
+    empty_error : bool, optional
+        Raise error if the folder does not exist or has no files, default True
+    read_error : bool, optional 
+        Raise error if one of the HDF5 files cannot be read, default True
+    return_dict : bool, optional
+        True: return a dict of {block_number, URI}. 
+        False: return a list of URIs. This is a default.                   
+        
     """
     
     files = glob.glob(os.path.join(folder, "blocks_*-*.h5"))
