@@ -530,6 +530,7 @@ class Simulation():
         b = time.time()        
         coords = self.state.getPositions(asNumpy=True)
         newcoords = coords / nm
+        newcoords = np.array(newcoords, dtype=np.float32)
         self.time = self.state.getTime() / ps
 
         # calculate energies in KT/particle

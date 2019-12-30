@@ -61,9 +61,10 @@ def polymer_chains(
     for reporter in sim_object.reporters:
         reporter.report("forcekit_polymer_chains", reportDict)
     
-    force_list.append(
-        bond_force_func(sim_object, bonds, **bond_force_kwargs)
-    )
+    if bond_force_func is not None: 
+        force_list.append(
+            bond_force_func(sim_object, bonds, **bond_force_kwargs)
+        )
     
     if angle_force_func is not None:
         force_list.append(

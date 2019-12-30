@@ -16,7 +16,7 @@ cdef cython.double randnum():
     return drand48()
 
 
-cdef class smcTranslocatorDirectional(object):
+cdef class LEFTranslocatorDirectional(object):
     cdef int N
     cdef int M
     cdef cython.double [:] emission
@@ -26,8 +26,8 @@ cdef class smcTranslocatorDirectional(object):
     cdef cython.double [:] falloff
     cdef cython.double [:] pause
     cdef cython.double [:] cumEmission
-    cdef cython.long [:] SMCs1
-    cdef cython.long [:] SMCs2
+    cdef cython.long [:] LEFs1
+    cdef cython.long [:] LEFs2
     cdef cython.long [:] stalled1 
     cdef cython.long [:] stalled2
     cdef cython.long [:] occupied 
@@ -37,14 +37,14 @@ cdef class smcTranslocatorDirectional(object):
     cdef cython.long [:] ssarray  
  
     
-    def __init__(self, emissionProb, deathProb, stallProbLeft, stallProbRight, pauseProb, stallFalloffProb,  numSmc):
+    def __init__(self, emissionProb, deathProb, stallProbLeft, stallProbRight, pauseProb, stallFalloffProb,  numLEF):
         emissionProb[0] = 0
         emissionProb[len(emissionProb)-1] = 0
         emissionProb[stallProbLeft > 0.9] = 0        
         emissionProb[stallProbRight > 0.9] = 0        
         
         self.N = len(emissionProb)
-        self.M = numSmc
+        self.M = numLEF
         self.emission = emissionProb
         self.stallLeft = stallProbLeft
         self.stallRight = stallProbRight
@@ -53,8 +53,8 @@ cdef class smcTranslocatorDirectional(object):
         cumem = np.cumsum(emissionProb)
         cumem = cumem / float(cumem[len(cumem)-1])
         self.cumEmission = np.array(cumem, np.double)
-        self.SMCs1 = np.zeros((self.M), int)
-        self.SMCs2 = np.zeros((self.M), int)
+        self.LEFs1 = np.zeros((self.M), int)
+        self.LEFs2 = np.zeros((self.M), int)
         self.stalled1 = np.zeros(self.M, int)
         self.stalled2 = np.zeros(self.M, int)
         self.occupied = np.zeros(self.N, int)
@@ -84,13 +84,13 @@ cdef class smcTranslocatorDirectional(object):
             if self.occupied[pos] == 1:
                 continue
             
-            self.SMCs1[ind] = pos
-            self.SMCs2[ind] = pos
+            self.LEFs1[ind] = pos
+            self.LEFs2[ind] = pos
             self.occupied[pos] = 1
             
             if (pos < (self.N - 3)) and (self.occupied[pos+1] == 0):
                 if randnum() > 0.5:                  
-                    self.SMCs2[ind] = pos + 1
+                    self.LEFs2[ind] = pos + 1
                     self.occupied[pos+1] = 1
             
             return
@@ -102,18 +102,18 @@ cdef class smcTranslocatorDirectional(object):
          
         for i in xrange(self.M):
             if self.stalled1[i] == 0:
-                falloff1 = self.falloff[self.SMCs1[i]]
+                falloff1 = self.falloff[self.LEFs1[i]]
             else: 
-                falloff1 = self.stallFalloff[self.SMCs1[i]]
+                falloff1 = self.stallFalloff[self.LEFs1[i]]
             if self.stalled2[i] == 0:
-                falloff2 = self.falloff[self.SMCs2[i]]
+                falloff2 = self.falloff[self.LEFs2[i]]
             else:
-                falloff2 = self.stallFalloff[self.SMCs2[i]]              
+                falloff2 = self.stallFalloff[self.LEFs2[i]]              
             
             falloff = max(falloff1, falloff2)
             if randnum() < falloff:                 
-                self.occupied[self.SMCs1[i]] = 0
-                self.occupied[self.SMCs2[i]] = 0
+                self.occupied[self.LEFs1[i]] = 0
+                self.occupied[self.LEFs2[i]] = 0
                 self.stalled1[i] = 0
                 self.stalled2[i] = 0
                 self.birth(i)
@@ -138,8 +138,8 @@ cdef class smcTranslocatorDirectional(object):
         cdef int cur1
         cdef int cur2 
         for i in range(self.M):            
-            stall1 = self.stallLeft[self.SMCs1[i]]
-            stall2 = self.stallRight[self.SMCs2[i]]
+            stall1 = self.stallLeft[self.LEFs1[i]]
+            stall2 = self.stallRight[self.LEFs2[i]]
                                     
             if randnum() < stall1: 
                 self.stalled1[i] = 1
@@ -147,23 +147,23 @@ cdef class smcTranslocatorDirectional(object):
                 self.stalled2[i] = 1
 
                          
-            cur1 = self.SMCs1[i]
-            cur2 = self.SMCs2[i]
+            cur1 = self.LEFs1[i]
+            cur2 = self.LEFs2[i]
             
             if self.stalled1[i] == 0: 
                 if self.occupied[cur1-1] == 0:
-                    pause1 = self.pause[self.SMCs1[i]]
+                    pause1 = self.pause[self.LEFs1[i]]
                     if randnum() > pause1: 
                         self.occupied[cur1 - 1] = 1
                         self.occupied[cur1] = 0
-                        self.SMCs1[i] = cur1 - 1
+                        self.LEFs1[i] = cur1 - 1
             if self.stalled2[i] == 0:                
                 if self.occupied[cur2 + 1] == 0:                    
-                    pause2 = self.pause[self.SMCs2[i]]
+                    pause2 = self.pause[self.LEFs2[i]]
                     if randnum() > pause2: 
                         self.occupied[cur2 + 1] = 1
                         self.occupied[cur2] = 0
-                        self.SMCs2[i] = cur2 + 1
+                        self.LEFs2[i] = cur2 + 1
         
     def steps(self,N):
         cdef int i 
@@ -174,17 +174,17 @@ cdef class smcTranslocatorDirectional(object):
     def getOccupied(self):
         return np.array(self.occupied)
     
-    def getSMCs(self):
-        return np.array(self.SMCs1), np.array(self.SMCs2)
+    def getLEFs(self):
+        return np.array(self.LEFs1), np.array(self.LEFs2)
         
         
     def updateMap(self, cmap):
-        cmap[self.SMCs1, self.SMCs2] += 1
-        cmap[self.SMCs2, self.SMCs1] += 1
+        cmap[self.LEFs1, self.LEFs2] += 1
+        cmap[self.LEFs2, self.LEFs1] += 1
 
     def updatePos(self, pos, ind):
-        pos[ind, self.SMCs1] = 1
-        pos[ind, self.SMCs2] = 1
+        pos[ind, self.LEFs1] = 1
+        pos[ind, self.LEFs2] = 1
 
 
 
