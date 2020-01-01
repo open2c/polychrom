@@ -12,10 +12,9 @@ import scipy, scipy.stats  # @UnusedImport
 from polychrom.hdf5_format import load_URI
 import joblib
 import gzip
-import glob 
+import glob
 
 import io
-
 
 
 def load(filename):
@@ -42,13 +41,13 @@ def load(filename):
     """
     if "::" in filename:
         return hdf5_format.load_URI(filename)["pos"]
-        
+
     if not os.path.exists(filename):
         raise IOError("File not found :( \n %s" % filename)
 
-    try: #loading from a joblib file here
+    try:  # loading from a joblib file here
         return dict(joblib.load(filename)).pop("data")
-    except: #checking for a text file
+    except:  # checking for a text file
         data_file = open(filename)
         line0 = data_file.readline()
         try:
@@ -61,6 +60,7 @@ def load(filename):
         if len(data) != N:
             raise ValueError("N does not correspond to the number of lines!")
         return np.array(data)
+
 
 def fetch_block(folder, ind, full_output=False):
     """
@@ -90,7 +90,7 @@ def fetch_block(folder, ind, full_output=False):
         
         if full_output==True, then dict with data and metadata; XYZ is under key "pos"
     """
-    blocksh5 = glob.glob(os.path.join(folder,"blocks*.h5"))
+    blocksh5 = glob.glob(os.path.join(folder, "blocks*.h5"))
     blocksdat = glob.glob(os.path.join(folder, "block*.dat"))
     ind = int(ind)
     if (len(blocksh5) > 0) and (len(blocksdat) > 0):
@@ -98,7 +98,7 @@ def fetch_block(folder, ind, full_output=False):
 
     if len(blocksh5) > 0:
         fnames = [os.path.split(i)[-1] for i in blocksh5]
-        inds = [i.split("_")[-1].split(".")[0].split("-") for i in fnames]    
+        inds = [i.split("_")[-1].split(".")[0].split("-") for i in fnames]
         exists = [(int(i[0]) <= ind) and (int(i[1]) >= ind) for i in inds]
 
         if True not in exists:
@@ -106,7 +106,7 @@ def fetch_block(folder, ind, full_output=False):
         if exists.count(True) > 1:
             raise ValueError("Cannot find the file uniquely: names are wrong")
         pos = exists.index(True)
-        block = load_URI(blocksh5[pos]+f"::{ind}")
+        block = load_URI(blocksh5[pos] + f"::{ind}")
         if not full_output:
             block = block["pos"]
 
@@ -114,7 +114,8 @@ def fetch_block(folder, ind, full_output=False):
         block = load(os.path.join(folder, f"block{ind}.dat"))
     return block
 
-def save(data, filename, mode="txt",  pdbGroups=None):
+
+def save(data, filename, mode="txt", pdbGroups=None):
     """
     Basically unchanged polymerutils.save function from openmm-polymer
     
@@ -124,9 +125,9 @@ def save(data, filename, mode="txt",  pdbGroups=None):
     with nglview, pymol_show and others
     """
     data = np.asarray(data, dtype=np.float32)
-    
-    if mode.lower() == "joblib":                
-        joblib.dump({"data":data}, filename=filename, compress=9)
+
+    if mode.lower() == "joblib":
+        joblib.dump({"data": data}, filename=filename, compress=9)
         return
 
     if mode.lower() == "txt":
@@ -136,7 +137,7 @@ def save(data, filename, mode="txt",  pdbGroups=None):
             lines.append("{0:.3f} {1:.3f} {2:.3f}\n".format(*particle))
         if filename == None:
             return lines
-        
+
         elif isinstance(filename, six.string_types):
             with open(filename, 'w') as myfile:
                 myfile.writelines(lines)
@@ -144,7 +145,7 @@ def save(data, filename, mode="txt",  pdbGroups=None):
             filename.writelines(lines)
         else:
             raise ValueError("Not sure what to do with filename {0}".format(filename))
-                             
+
 
     elif mode == 'pdb':
         data = data - np.minimum(np.min(data, axis=0), np.zeros(3, float) - 100)[None, :]
@@ -154,7 +155,7 @@ def save(data, filename, mode="txt",  pdbGroups=None):
             if len(st) > n:
                 return st[:n]
             else:
-                return st + " " * (n - len(st) )
+                return st + " " * (n - len(st))
 
         if pdbGroups == None:
             pdbGroups = ["A" for i in range(len(data))]
@@ -173,7 +174,7 @@ def save(data, filename, mode="txt",  pdbGroups=None):
             ret = add(ret + group[0], 22)
             ret = add(ret + str(atomNum), 26)
             ret = add(ret + "         ", 30)
-            #ret = add(ret + "%i" % (atomNum), 30)
+            # ret = add(ret + "%i" % (atomNum), 30)
             ret = add(ret + ("%8.3f" % line[0]), 38)
             ret = add(ret + ("%8.3f" % line[1]), 46)
             ret = add(ret + ("%8.3f" % line[2]), 54)
@@ -186,14 +187,13 @@ def save(data, filename, mode="txt",  pdbGroups=None):
             f.write(retret)
             f.flush()
     elif mode == "pyxyz":
-        with open(filename, 'w') as f:             
-            for i in data: 
+        with open(filename, 'w') as f:
+            for i in data:
                 filename.write("C {0} {1} {2}".format(*i))
-            
+
 
     else:
         raise ValueError("Unknown mode : %s, use h5dict, joblib, txt or pdb" % mode)
-                            
 
 
 def rotation_matrix(rotate):
@@ -203,5 +203,3 @@ def rotation_matrix(rotate):
     Ry = np.array([[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]])
     Rz = np.array([[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]])
     return np.dot(Rx, np.dot(Ry, Rz))
-                             
-

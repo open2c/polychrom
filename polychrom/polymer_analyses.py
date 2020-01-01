@@ -1,10 +1,10 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 
-from . import  _polymer_math
+from . import _polymer_math
 from math import sqrt
 
 import numpy as np
-import pandas as pd 
+import pandas as pd
 
 from scipy.spatial import ckdtree
 
@@ -40,7 +40,7 @@ def calculate_contacts(data, cutoff=1.7, method="auto"):
 
 def generate_bins(N, start=4, bins_per_order_magn=10):
     lstart = np.log10(start)
-    lend = np.log10(N-1)  + 1e-6
+    lend = np.log10(N - 1) + 1e-6
     num = np.ceil((lend - lstart) * bins_per_order_magn)
     bins = np.unique(np.logspace(lstart, lend, dtype=int, num=num))
     assert bins[-1] == N - 1
@@ -51,7 +51,6 @@ def contact_scaling(
         data, bins0=None, cutoff=1.1, integrate=False,
         ring=False,
         bins_per_order_magn=10):
-
     """
     Returns contact probability scaling for a given polymer conformation
     Contact between monomers X and X+1 is counted as s=1 
@@ -86,9 +85,9 @@ def contact_scaling(
     N = data.shape[0]
     assert data.shape[1] == 3
 
-    if bins0 is None: 
+    if bins0 is None:
         bins0 = generate_bins(N, bins_per_order_magn=bins_per_order_magn)
-    
+
     bins0 = np.array(bins0)
     bins = [(bins0[i], bins0[i + 1]) for i in range(len(bins0) - 1)]
     contacts = np.array(calculate_contacts(data, cutoff))
@@ -98,9 +97,9 @@ def contact_scaling(
     if ring == True:
         mask = contacts > N // 2
         contacts[mask] = N - contacts[mask]
-        
+
     scontacts = np.sort(contacts)  # sorted contact lengthes
-    connumbers = np.diff(np.searchsorted(scontacts, bins0, side="left")) # count of contacts
+    connumbers = np.diff(np.searchsorted(scontacts, bins0, side="left"))  # count of contacts
 
     if ring == True:
         possible = np.diff(N * bins0)
@@ -125,11 +124,11 @@ def R2_scaling(data, bins=None, ring=False):
     bins: the same as in giveCpScaling
 
     """
-    data = np.asarray(data, float)    
+    data = np.asarray(data, float)
     N = data.shape[0]
-    assert data.shape[1] == 3 
+    assert data.shape[1] == 3
     data = data.T
-    
+
     if bins is None:
         bins = generate_bins(N)
     if ring == True:
@@ -140,10 +139,10 @@ def R2_scaling(data, bins=None, ring=False):
         length = bins[i]
         if ring == True:
             rads[i] = np.mean((np.sum((data[:, :N]
-                                           - data[:, length:length + N]) ** 2, 0)))
+                                       - data[:, length:length + N]) ** 2, 0)))
         else:
             rads[i] = np.mean((np.sum((data[:, :-
-                                            length] - data[:, length:]) ** 2, 0)))
+            length] - data[:, length:]) ** 2, 0)))
     return (np.array(bins), rads)
 
 
@@ -153,7 +152,7 @@ def Rg2(data):
     """
     data = np.asarray(data)
     assert data.shape[1] == 3
-    return np.mean((data - np.mean(data, axis=0))**2) * 3
+    return np.mean((data - np.mean(data, axis=0)) ** 2) * 3
 
 
 def Rg2_matrix(data):
@@ -161,21 +160,21 @@ def Rg2_matrix(data):
     Uses dynamic programming and vectorizing to calculate Rg for each subchain of the matrix 
     element [i,j] in resulting matrix is Rg of a subchain from i to j including  i and j 
     """
-    
+
     data = np.asarray(data, float)
     assert data.shape[1] == 3
     N = data.shape[0]
-    data = np.concatenate([[[0,0,0]], data])
+    data = np.concatenate([[[0, 0, 0]], data])
 
     coms = np.cumsum(data, 0)  # cumulative sum of locations to calculate COM
     coms2 = np.cumsum(data ** 2, 0)  # cumulative sum of locations^2 to calculate RG
 
-    dists = np.abs(np.arange(N)[:,None] - np.arange(N)[None,:])+1
-    coms2d = (-coms2[ :-1,None,:] +coms2[ None,1::,:]) /  dists[:,:,None]
-    comsd = ((coms[ :-1,None,:] - coms[ None,1:,:]) / dists[:,:,None]) ** 2 
+    dists = np.abs(np.arange(N)[:, None] - np.arange(N)[None, :]) + 1
+    coms2d = (-coms2[:-1, None, :] + coms2[None, 1::, :]) / dists[:, :, None]
+    comsd = ((coms[:-1, None, :] - coms[None, 1:, :]) / dists[:, :, None]) ** 2
     sums = np.sum(coms2d - comsd, 2)
     np.fill_diagonal(sums, 0)
-    mask = np.arange(N)[:,None] > np.arange(N)[None,:]
+    mask = np.arange(N)[:, None] > np.arange(N)[None, :]
     sums[mask] = sums.T[mask]
     return sums
 
@@ -190,17 +189,16 @@ def Rg2_scaling(data, bins=None, ring=False):
     bins: subchain lengths at which to calculate Rg
     ring: treat polymer as a ring (default: False) 
     """
-    
-    
+
     data = np.asarray(data, float)
     N = data.shape[0]
-    assert data.shape[1] == 3 
-    
-    data = np.concatenate([[[0,0,0]], data])    
-    
+    assert data.shape[1] == 3
+
+    data = np.concatenate([[[0, 0, 0]], data])
+
     if bins is None:
         bins = generate_bins(N)
-        
+
     coms = np.cumsum(data, 0)  # cumulative sum of locations to calculate COM
     coms2 = np.cumsum(data ** 2, 0)  # cumulative sum of locations^2 to calculate RG
 
@@ -209,17 +207,17 @@ def Rg2_scaling(data, bins=None, ring=False):
         if ring == True:
             comsadd = coms[1:len2, :].copy()
             coms2add = coms2[1:len2, :].copy()
-            comsadd += coms[-1, :][None,:]
-            coms2add += coms2[-1,:][None,:]
+            comsadd += coms[-1, :][None, :]
+            coms2add += coms2[-1, :][None, :]
             comsw = np.concatenate([coms, comsadd], axis=0)
-            coms2w = np.concatenate([coms2, coms2add], axis=0)              
+            coms2w = np.concatenate([coms2, coms2add], axis=0)
         else:
             comsw = coms
             coms2w = coms2
 
         coms2d = (-coms2w[:-len2, :] + coms2w[len2:, :]) / (len2)
-        comsd = ((comsw[:-len2, :] - comsw[len2:, :]) / (len2 )) ** 2
-        diffs = coms2d - comsd        
+        comsd = ((comsw[:-len2, :] - comsw[len2:, :]) / (len2)) ** 2
+        diffs = coms2d - comsd
         sums = (np.sum(diffs, 1))
         return np.mean(sums)
 
@@ -230,32 +228,30 @@ def Rg2_scaling(data, bins=None, ring=False):
 
 
 def _test_Rg_scalings():
-    a = np.random.lognormal(1,1,size=(30,3))  # array for testing 
+    a = np.random.lognormal(1, 1, size=(30, 3))  # array for testing
 
     gr = Rg2_matrix(a)  # calculate Rg matrix in a normal way 
-   
-    for i in range(len(a)+1):  # fill on eside of it with manually calculated Rg(i:j)
-        for j in range(i+1,len(a)):
-            gr[j,i] = Rg2(a[i:j+1])
+
+    for i in range(len(a) + 1):  # fill on eside of it with manually calculated Rg(i:j)
+        for j in range(i + 1, len(a)):
+            gr[j, i] = Rg2(a[i:j + 1])
             pass
 
     assert np.allclose(gr, gr.T)
 
-
-    scal = Rg2_scaling(a, bins = [5])  # 5th diagonal here means s=5 (5-monomer chains)
+    scal = Rg2_scaling(a, bins=[5])  # 5th diagonal here means s=5 (5-monomer chains)
     d1 = np.diagonal(gr, 4).mean()  # here Nth diagonal means N+1 monomer chain, so that the corner = whole chain    
     assert np.allclose(scal[1][0], d1)  # compare P(s) to manually calculated from Rg matrix 
-    
+
     scal = Rg2_scaling(a, bins=[3], ring=True)  # now we are testing ring there are (N-s+1) subchains of length s. 
-    d1 = (np.diagonal(gr,2).sum() + Rg2(np.array([a[0],a[-1], a[-2]])) + Rg2(np.array([a[0],a[1], a[-1]]))) / len(a)
-    assert np.allclose(scal[1][0], d1)  
+    d1 = (np.diagonal(gr, 2).sum() + Rg2(np.array([a[0], a[-1], a[-2]])) + Rg2(np.array([a[0], a[1], a[-1]]))) / len(a)
+    assert np.allclose(scal[1][0], d1)
     # compare with manually calculated rg(i,j) plus Rg of two 3-monomer subchains crossing the boundary
 
 
-def ndarray_groupby_aggregate(df, ndarray_cols, aggregate_cols, value_cols=[], 
+def ndarray_groupby_aggregate(df, ndarray_cols, aggregate_cols, value_cols=[],
                               sample_cols=[], preset="sum",
-                               ndarray_agg = lambda x:np.sum(x, axis=0), value_agg = lambda x:x.sum()):
-    
+                              ndarray_agg=lambda x: np.sum(x, axis=0), value_agg=lambda x: x.sum()):
     """
     A version of pd.groupby that is aware of numpy arrays as values of columns 
     
@@ -268,30 +264,29 @@ def ndarray_groupby_aggregate(df, ndarray_cols, aggregate_cols, value_cols=[],
     """
 
     if preset == "sum":
-        ndarray_agg = lambda x:np.sum(x, axis=0)
-        value_agg = lambda x:x.sum()
+        ndarray_agg = lambda x: np.sum(x, axis=0)
+        value_agg = lambda x: x.sum()
     elif preset == "mean":
-        ndarray_agg = lambda x:np.mean(x, axis=0)
-        value_agg = lambda x:x.mean()
+        ndarray_agg = lambda x: np.mean(x, axis=0)
+        value_agg = lambda x: x.mean()
     elif preset == "nanmean":
-        ndarray_agg = lambda x:np.nanmean(x, axis=0)
-        value_agg = lambda x:x.mean()        
-    
-    def combine_values(in_df):        
+        ndarray_agg = lambda x: np.nanmean(x, axis=0)
+        value_agg = lambda x: x.mean()
+
+    def combine_values(in_df):
         "splits into ndarrays, 'normal' values, and samples; performs aggregation, and returns a Series"
-        average_arrs = pd.Series(index=ndarray_cols, 
-                data=[ndarray_agg([np.asarray(j) for j in in_df[i].values]) for i in ndarray_cols])
+        average_arrs = pd.Series(index=ndarray_cols,
+                                 data=[ndarray_agg([np.asarray(j) for j in in_df[i].values]) for i in ndarray_cols])
         average_values = value_agg(in_df[value_cols])
         sample_values = in_df[sample_cols].iloc[0]
-        agg_series = pd.concat([average_arrs, average_values, sample_values])        
+        agg_series = pd.concat([average_arrs, average_values, sample_values])
         return agg_series
-    
-    return  df.groupby(aggregate_cols).apply(combine_values)
 
-    
-def streaming_ndarray_agg(in_stream,  ndarray_cols, aggregate_cols, value_cols=[],  sample_cols=[], 
-                  chunksize=30000, add_count_col=False, divide_by_count=False):
-    
+    return df.groupby(aggregate_cols).apply(combine_values)
+
+
+def streaming_ndarray_agg(in_stream, ndarray_cols, aggregate_cols, value_cols=[], sample_cols=[],
+                          chunksize=30000, add_count_col=False, divide_by_count=False):
     """
     Takes in_stream of dataframes
     
@@ -315,41 +310,40 @@ def streaming_ndarray_agg(in_stream,  ndarray_cols, aggregate_cols, value_cols=[
             add_count_col = "count"
         value_cols.append(add_count_col)
 
-    
     def agg_one(dfs, aggregate):
         """takes a list of DataFrames and old aggregate
         performs groupby and aggregation  and returns new aggregate"""
         if add_count_col is not False:
             for i in dfs:
                 i[add_count_col] = 1
-                
-        df = pd.concat(dfs + ([aggregate] if aggregate is not None else []) , sort=False)             
+
+        df = pd.concat(dfs + ([aggregate] if aggregate is not None else []), sort=False)
         aggregate = ndarray_groupby_aggregate(df, ndarray_cols=ndarray_cols, aggregate_cols=aggregate_cols,
-                                    value_cols=value_cols,  sample_cols=sample_cols, preset="sum")                
+                                              value_cols=value_cols, sample_cols=sample_cols, preset="sum")
         return aggregate.reset_index()
-    
+
     aggregate = None
     cur = []
-    count = 0 
+    count = 0
     for i in in_stream:
         cur.append(i)
         count += len(i)
         if count > chunksize:
             aggregate = agg_one(cur, aggregate)
             cur = []
-            count = 0 
+            count = 0
     if len(cur) > 0:
         aggregate = agg_one(cur, aggregate)
-        
+
     if divide_by_count is not False:
         if divide_by_count is True:
             divide_by_count = "count"
         for i in ndarray_cols + value_cols_orig:
             aggregate[i] = aggregate[i] / aggregate[divide_by_count]
-    
+
     return aggregate
 
-                             
+
 def kabsch_msd(P, Q):
     """
     Calculates MSD between two vectors using Kabash alcorithm 
@@ -382,7 +376,7 @@ def kabsch_msd(P, Q):
     
     """
     P = P - np.mean(P, axis=0)
-    Q = Q - np.mean(Q, axis=0)    
+    Q = Q - np.mean(Q, axis=0)
 
     C = np.dot(np.transpose(P), Q)
 
@@ -395,33 +389,34 @@ def kabsch_msd(P, Q):
 
     # Create Rotation matrix U
     U = np.dot(V, W)
-    
-    dist = np.mean((np.dot(P, U) - Q)**2)  * 3
+
+    dist = np.mean((np.dot(P, U) - Q) ** 2) * 3
 
     return dist
 
+
 kabsch_rmsd = kabsch_msd
 
+
 def _test_Rg_scalings():
-    a = np.random.lognormal(1,1,size=(30,3))  # array for testing 
+    a = np.random.lognormal(1, 1, size=(30, 3))  # array for testing
 
     gr = Rg2_matrix(a)  # calculate Rg matrix in a normal way 
-   
-    for i in range(len(a)+1):  # fill on eside of it with manually calculated Rg(i:j)
-        for j in range(i+1,len(a)):
-            gr[j,i] = Rg2(a[i:j+1])
+
+    for i in range(len(a) + 1):  # fill on eside of it with manually calculated Rg(i:j)
+        for j in range(i + 1, len(a)):
+            gr[j, i] = Rg2(a[i:j + 1])
             pass
 
     assert np.allclose(gr, gr.T)
 
-
-    scal = Rg2_scaling(a, bins = [5])  # 5th diagonal here means s=5 (5-monomer chains)
+    scal = Rg2_scaling(a, bins=[5])  # 5th diagonal here means s=5 (5-monomer chains)
     d1 = np.diagonal(gr, 4).mean()  # here Nth diagonal means N+1 monomer chain, so that the corner = whole chain    
     assert np.allclose(scal[1][0], d1)  # compare P(s) to manually calculated from Rg matrix 
-    
+
     scal = Rg2_scaling(a, bins=[3], ring=True)  # now we are testing ring there are (N-s+1) subchains of length s. 
-    d1 = (np.diagonal(gr,2).sum() + Rg2(np.array([a[0],a[-1], a[-2]])) + Rg2(np.array([a[0],a[1], a[-1]]))) / len(a)
-    assert np.allclose(scal[1][0], d1)  
+    d1 = (np.diagonal(gr, 2).sum() + Rg2(np.array([a[0], a[-1], a[-2]])) + Rg2(np.array([a[0], a[1], a[-1]]))) / len(a)
+    assert np.allclose(scal[1][0], d1)
     # compare with manually calculated rg(i,j) plus Rg of two 3-monomer subchains crossing the boundary
 
 

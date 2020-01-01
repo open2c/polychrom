@@ -1,21 +1,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
-import six
 import warnings
-import numpy as np
-import joblib
-import os
 from math import sqrt, sin, cos
-import numpy
-
-
-import scipy, scipy.stats  # @UnusedImport
 
 import numpy as np
-import joblib
-import gzip
-
-import io
-
 
 
 def create_spiral(r1, r2, N):
@@ -35,7 +22,7 @@ def create_spiral(r1, r2, N):
 
     def coord(phi):
         r = rad(phi)
-        return (r * sin(phi), r * cos(phi))
+        return r * sin(phi), r * cos(phi)
 
     def fullcoord(phi, z):
         c = coord(phi)
@@ -110,18 +97,17 @@ def create_random_walk(step_size, N):
     """
     theta = np.random.uniform(0., 1., N)
     theta = 2.0 * np.pi * theta
-    
+
     u = np.random.uniform(0., 1., N)
-    
+
     u = 2.0 * u - 1.0
-    x = step_size * np.sqrt(1. - u * u) * numpy.cos(theta)
-    y = step_size * np.sqrt(1. - u * u) * numpy.sin(theta)
+    x = step_size * np.sqrt(1. - u * u) * np.cos(theta)
+    y = step_size * np.sqrt(1. - u * u) * np.sin(theta)
     z = step_size * u
     x, y, z = np.cumsum(x), np.cumsum(y), np.cumsum(z)
     return np.vstack([x, y, z]).T
 
 
-                             
 def grow_cubic(N, boxSize, method="standard"):
     """
     This function grows a ring or linear polymer on a cubic lattice 
@@ -143,18 +129,17 @@ def grow_cubic(N, boxSize, method="standard"):
 
 
     """
-    if N > boxSize**3:
+    if N > boxSize ** 3:
         raise ValueError("Steps ahs to be less than size^3")
-    if N > 0.9 * boxSize**3:
-        warnings.warn("N > 0.9 * boxSize**3. It will be slow")                      
+    if N > 0.9 * boxSize ** 3:
+        warnings.warn("N > 0.9 * boxSize**3. It will be slow")
     if (N % 2 != 0) and (method != "linear"):
-        raise ValueError("N has to be multiple of 2 for rings")    
-                                                          
-    numpy = np
+        raise ValueError("N has to be multiple of 2 for rings")
+
     t = boxSize // 2
     if method == "standard":
         a = [(t, t, t), (t, t, t + 1), (t, t + 1, t + 1), (t, t + 1, t)]
-        
+
     elif method == "extended":
         a = []
         for i in range(1, boxSize):
@@ -170,57 +155,52 @@ def grow_cubic(N, boxSize, method="standard"):
         for i in range(0, boxSize + 1):
             a.append((t, t, i))
         if (len(a) % 2) != (N % 2):
-            a = a[1:]        
+            a = a[1:]
         if len(a) > N:
             raise ValueError("polymer too short for the box size")
 
     else:
         raise ValueError("select methon from standard, extended, or linear")
 
-    b = numpy.zeros((boxSize + 2, boxSize + 2, boxSize + 2), int)
+    b = np.zeros((boxSize + 2, boxSize + 2, boxSize + 2), int)
     for i in a:
         b[i] = 1
-        
+
     for i in range((N - len(a)) // 2):
         while True:
             if method == "linear":
-                t = numpy.random.randint(0, len(a)-1)
-            else: 
-                t = numpy.random.randint(0, len(a))
-            
-            if t != len(a) - 1:
-                c = numpy.abs(numpy.array(a[t]) - numpy.array(a[t + 1]))
-                t0 = numpy.array(a[t])
-                t1 = numpy.array(a[t + 1])
+                t = np.random.randint(0, len(a) - 1)
             else:
-                c = numpy.abs(numpy.array(a[t]) - numpy.array(a[0]))
-                t0 = numpy.array(a[t])
-                t1 = numpy.array(a[0])
-            cur_direction = numpy.argmax(c)
+                t = np.random.randint(0, len(a))
+
+            if t != len(a) - 1:
+                c = np.abs(np.array(a[t]) - np.array(a[t + 1]))
+                t0 = np.array(a[t])
+                t1 = np.array(a[t + 1])
+            else:
+                c = np.abs(np.array(a[t]) - np.array(a[0]))
+                t0 = np.array(a[t])
+                t1 = np.array(a[0])
+            cur_direction = np.argmax(c)
             while True:
-                direction = numpy.random.randint(0, 3)
+                direction = np.random.randint(0, 3)
                 if direction != cur_direction:
                     break
-            if numpy.random.random() > 0.5:
+            if np.random.random() > 0.5:
                 shift = 1
             else:
                 shift = -1
-            shiftar = numpy.array([0, 0, 0])
+            shiftar = np.array([0, 0, 0])
             shiftar[direction] = shift
             t3 = t0 + shiftar
             t4 = t1 + shiftar
-            if (b[tuple(t3)] == 0) and (b[tuple(t4)] == 0) and (numpy.min(t3) >= 1) and (numpy.min(t4) >= 1) and (
-                numpy.max(t3) < boxSize+1) and (numpy.max(t4) < boxSize+1):
+            if (b[tuple(t3)] == 0) and (b[tuple(t4)] == 0) and (np.min(t3) >= 1) and (np.min(t4) >= 1) and (
+                    np.max(t3) < boxSize + 1) and (np.max(t4) < boxSize + 1):
                 a.insert(t + 1, tuple(t3))
                 a.insert(t + 2, tuple(t4))
                 b[tuple(t3)] = 1
                 b[tuple(t4)] = 1
                 break
                 # print a
-    return numpy.array(a) - 1
+    return np.array(a) - 1
 
-def grow_rw(step, size, method="line"):
-    raise DeprecationWarning("grow_rw is being renamed to grow_cubic")
-    return grow_cubic(N, boxSize, method="line")
-                         
-                         
