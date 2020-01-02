@@ -64,7 +64,7 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
 
     if cutoff > min_cutoff:
         frac = 1 / cutoff
-        inds = np.random.random(len(data)) < frac
+        inds = np.nonzero(np.random.random(len(data)) < frac)[0]
 
         conts = calculate_contacts(data[inds], cutoff)
         conts[:,0] = inds[conts[:,0]]
