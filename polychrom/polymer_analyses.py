@@ -9,19 +9,15 @@ import pandas as pd
 from scipy.spatial import ckdtree
 
 
-def calculate_contacts(data, cutoff=1.7, method="auto"):
-    """Returns contacts of a single polymer with a given cutoff
-
-    .. warning:: Use this only to find contacts of a single polymer chain
-    with distance between monomers of 1.
-    Multiple chains will lead to silent bugs.
+def calculate_contacts(data, cutoff=1.7):
+    """Calculates contacts between points give the contact radius (cutoff)
 
     Parameters
     ----------
-    data : Nx3 or 3xN array
-        Polymer configuration. One chaon only.
+    data : Nx3 array
+        Coordinates of points
     cutoff : float , optional
-        Cutoff distance that defines contact
+        Cutoff distance (contact radius)
 
     Returns
     -------
@@ -36,6 +32,49 @@ def calculate_contacts(data, cutoff=1.7, method="auto"):
     tree = ckdtree.cKDTree(data)
     pairs = tree.query_pairs(cutoff, output_type="ndarray")
     return pairs
+
+def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
+    """Calculates contacts for a polymer, give the contact radius (cutoff)
+    This method takes each Xth monomer for cutoffs between X and X+1 (monomer diameters)
+
+    This is done to make contact finding faster, and because if cutoff radius is X, and
+    monomer (i,j) are in contact, then monomers (i+a), and (j+b) are likely in contact
+    if |a| + |b| <~ X  (the polymer could not run away by more than X in X steps)
+
+    This method will have # of contacts grow approximately linearly with contact radius,
+    not cubically, which should drastically speed up computations of contacts for
+    large (10+) contact radii. 
+
+    Parameters
+    ----------
+    data : Nx3 array
+        Polymer coordinates
+    cutoff : float , optional
+        Cutoff distance that defines contact
+
+    Returns
+    -------
+    k by 2 array of contacts. Each row corresponds to a contact.
+    """
+    if data.shape[1] != 3:
+        raise ValueError("Incorrect polymer data shape. Must be Nx3.")
+
+    if np.isnan(data).any():
+        raise RuntimeError("Data contains NANs")
+
+    if cutoff > min_cutoff:
+        X = int(np.floor(cutoff))
+        ar = np.arange(len(data))
+        st = np.random.randint(X)
+        inds = np.array(ar[st::X])  # selected monomers
+
+        conts = calculate_contacts(data[inds], cutoff)
+        conts[:,0] = inds[conts[:,0]]
+        conts[:,1] = inds[conts[:,1]]
+        return conts
+
+    else:
+        return calculate_contacts((data, cutoff))
 
 
 def generate_bins(N, start=4, bins_per_order_magn=10):
