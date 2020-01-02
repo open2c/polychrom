@@ -43,7 +43,7 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
 
     This method will have # of contacts grow approximately linearly with contact radius,
     not cubically, which should drastically speed up computations of contacts for
-    large (10+) contact radii. 
+    large (10+) contact radii.
 
     Parameters
     ----------
@@ -63,10 +63,8 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
         raise RuntimeError("Data contains NANs")
 
     if cutoff > min_cutoff:
-        X = int(np.floor(cutoff))
-        ar = np.arange(len(data))
-        st = np.random.randint(X)
-        inds = np.array(ar[st::X])  # selected monomers
+        frac = 1 / cutoff
+        inds = np.random.random(len(data)) < frac
 
         conts = calculate_contacts(data[inds], cutoff)
         conts[:,0] = inds[conts[:,0]]
