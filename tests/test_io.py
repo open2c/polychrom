@@ -20,9 +20,10 @@ def test_basic_simulation_and_hdf5(tmp_path):
     sim = Simulation(
         N=40,
         error_tol=0.001,
-        collision_rate=0.1,
+        collision_rate=0.2,
         integrator="variableLangevin",
         platform="reference",
+        max_Ek=40,
         reporters=[reporter],
     )
     sim.set_data(data)

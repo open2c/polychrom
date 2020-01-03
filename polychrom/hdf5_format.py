@@ -41,14 +41,16 @@ def _convert_to_hdf5_array(data):
         return ("ndarray", data)
 
 
-def _write_group(dataDict, group, dset_opts=DEFAULT_OPTS):
+def _write_group(dataDict, group, dset_opts=None):
     """
     Writes a dictionary of elements to an HDF5 group
     Puts all "items" into attrs, and all ndarrays into datasets 
     
     dset_opts is a dictionary of arguments passed to create_dataset function
-    (compression would be here for example)
+    (compression would be here for example). By default set to DEFAULT_OPTS
     """
+    if dset_opts is None:
+        dset_opts = DEFAULT_OPTS
     for name, data in dataDict.items():
         datatype, converted = _convert_to_hdf5_array(data)
         if datatype is None:
@@ -220,7 +222,8 @@ class HDF5Reporter(object):
                             os.remove(file_path)
                 else:
                     raise IOError(
-                        "Subfolder in traj folder; not deleting. Ensure folder is correct and delete manually. "
+                        "Subfolder in traj folder; not deleting. Ensure folder is "
+                        "correct and delete manually. "
                     )
 
         if check_exists:

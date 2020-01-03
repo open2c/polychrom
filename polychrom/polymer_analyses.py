@@ -58,6 +58,9 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
         Polymer coordinates
     cutoff : float , optional
         Cutoff distance that defines contact
+    min_cutoff : float, optional
+        Apply the "smart" reduction of contacts only when cutoff
+        is less than this value
 
     Returns
     -------
@@ -139,7 +142,7 @@ def contact_scaling(
 
     contacts = contacts[:, 1] - contacts[:, 0]  # contact lengthes
 
-    if ring == True:
+    if ring:
         mask = contacts > N // 2
         contacts[mask] = N - contacts[mask]
 
@@ -147,7 +150,7 @@ def contact_scaling(
     # count of contacts
     connumbers = np.diff(np.searchsorted(scontacts, bins0, side="left"))
 
-    if ring == True:
+    if ring:
         possible = np.diff(N * bins0)
     else:
         possible = np.diff(N * bins0 + 0.5 * bins0 - 0.5 * (bins0 ** 2))
@@ -155,7 +158,7 @@ def contact_scaling(
     connumbers = connumbers / possible
 
     a = [sqrt(i[0] * (i[1] - 1)) for i in bins]
-    return (a, connumbers)
+    return a, connumbers
 
 
 def R2_scaling(data, bins=None, ring=False):
@@ -178,19 +181,19 @@ def R2_scaling(data, bins=None, ring=False):
 
     if bins is None:
         bins = generate_bins(N)
-    if ring == True:
+    if ring:
         data = np.concatenate([data, data], axis=1)
 
     rads = [0.0 for i in range(len(bins))]
     for i in range(len(bins)):
         length = bins[i]
-        if ring == True:
+        if ring:
             rads[i] = np.mean(
                 (np.sum((data[:, :N] - data[:, length : length + N]) ** 2, 0))
             )
         else:
             rads[i] = np.mean((np.sum((data[:, :-length] - data[:, length:]) ** 2, 0)))
-    return (np.array(bins), rads)
+    return np.array(bins), rads
 
 
 def Rg2(data):
@@ -252,7 +255,7 @@ def Rg2_scaling(data, bins=None, ring=False):
 
     def radius_gyration(len2):
         data
-        if ring == True:
+        if ring:
             comsadd = coms[1:len2, :].copy()
             coms2add = coms2[1:len2, :].copy()
             comsadd += coms[-1, :][None, :]
@@ -263,8 +266,8 @@ def Rg2_scaling(data, bins=None, ring=False):
             comsw = coms
             coms2w = coms2
 
-        coms2d = (-coms2w[:-len2, :] + coms2w[len2:, :]) / (len2)
-        comsd = ((comsw[:-len2, :] - comsw[len2:, :]) / (len2)) ** 2
+        coms2d = (-coms2w[:-len2, :] + coms2w[len2:, :]) / len2
+        comsd = ((comsw[:-len2, :] - comsw[len2:, :]) / len2) ** 2
         diffs = coms2d - comsd
         sums = np.sum(diffs, 1)
         return np.mean(sums)
@@ -272,7 +275,7 @@ def Rg2_scaling(data, bins=None, ring=False):
     rads = [0.0 for i in range(len(bins))]
     for i in range(len(bins)):
         rads[i] = radius_gyration(int(bins[i]))
-    return (np.array(bins), rads)
+    return np.array(bins), rads
 
 
 def ndarray_groupby_aggregate(
@@ -431,29 +434,34 @@ def kabsch_msd(P, Q):
     """
     P = P - np.mean(P, axis=0)
     Q = Q - np.mean(Q, axis=0)
-
     C = np.dot(np.transpose(P), Q)
 
     V, S, W = np.linalg.svd(C)
     d = (np.linalg.det(V) * np.linalg.det(W)) < 0.0
-
     if d:
         S[-1] = -S[-1]
         V[:, -1] = -V[:, -1]
 
     # Create Rotation matrix U
     U = np.dot(V, W)
-
     dist = np.mean((np.dot(P, U) - Q) ** 2) * 3
-
     return dist
 
 
 kabsch_rmsd = kabsch_msd
 
 
-
 def mutualSimplify(a, b, verbose=False):
+    """
+    Ported here from openmmlib.
+
+    Given two polymer rings, it attempts to reduce the number of monomers in each of
+    them while preserving the linking between them. It does so by trying to remove
+    monomers one-by-one. If no other bonds pass through the triangle formed by the 2
+    old bonds and 1 new bond, it accepts removal of the monomer. It does so until no
+    monomers in either of the rings can be removed.
+
+    """
     if verbose:
         print("Starting mutual simplification of polymers")
     while True:
@@ -474,6 +482,10 @@ def mutualSimplify(a, b, verbose=False):
 
 
 def getLinkingNumber(data1, data2, simplify=True, randomOffset=True, verbose=False):
+    """
+    Ported here from openmmlib as well.
+
+    """
     if simplify:
         data1, data2 = mutualSimplify(a=data1, b=data2, verbose=verbose)
     return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)

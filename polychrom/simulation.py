@@ -124,8 +124,6 @@ class Simulation(object):
             Using one decimal is safe most of the time, and reduces storage to 40% of int32. 
             NOTE that using periodic boundary conditions will make storage advantage less. 
             
-        
-
 
         """
         default_args = {
@@ -213,15 +211,8 @@ class Simulation(object):
                     kwargs["collision_rate"] * (1 / ps),
                     kwargs["timestep"] * fs,
                 )
-            else:
-                logging.info(
-                    "Using the provided integrator object"
-                    # 'please select from "langevin", "variablelangevin", '
-                    # '"verlet", "variableVerlet", '
-                    # '"brownian" or provide an integrator object'
-                )
-                self.integrator = integrator
         else:
+            logging.info("Using the provided integrator object")
             self.integrator = self.integrator_type
             self.integrator_type = "UserDefined"
             kwargs["integrator"] = "user_defined"
@@ -248,7 +239,7 @@ class Simulation(object):
         self.conlen = 1.0 * nm * self.length_scale
 
         self.kbondScalingFactor = float(
-            (2 * self.kT / (self.conlen) ** 2) / (units.kilojoule_per_mole / nm ** 2)
+            (2 * self.kT / self.conlen ** 2) / (units.kilojoule_per_mole / nm ** 2)
         )
 
         self.system = openmm.System()
@@ -277,7 +268,7 @@ class Simulation(object):
 
     def get_scaled_data(self):
         """Returns data, scaled back to PBC box """
-        if self.PBC != True:
+        if not self.PBC:
             return self.get_data()
         alldata = self.get_data()
         boxsize = np.array(self.kwargs["PBCbox"])
@@ -301,7 +292,10 @@ class Simulation(object):
             
         random_offset: float or None
             add random offset to each particle
-            Recommended for integer starting conformations and in general 
+            Recommended for integer starting conformations and in general
+
+        report : bool, optional
+            If set to False, will not report this action to reporters.
 
          """
 
@@ -376,7 +370,7 @@ class Simulation(object):
         Forces should not be modified after that, unless you do it carefully
         (see openmm reference)."""
 
-        if self.forces_applied == True:
+        if self.forces_applied:
             return
 
         self.masses = np.zeros(self.N, dtype=float) + self.kwargs["mass"]
@@ -565,7 +559,7 @@ class Simulation(object):
             If true, will not increment self.block and self.steps counters
         """
 
-        if self.forces_applied == False:
+        if not self.forces_applied:
             if self.verbose:
                 logging.info("applying forces")
                 sys.stdout.flush()
@@ -604,7 +598,7 @@ class Simulation(object):
         if np.isnan(newcoords).any():
             raise IntegrationFailError("Coordinates are NANs")
         if eK > self.eK_critical:
-            raise EKExceedsError("Ek exceeds {0}".format(self.eK_critical))
+            raise EKExceedsError("Ek={1} exceeds {0}".format(self.eK_critical, eK))
         if (np.isnan(eK)) or (np.isnan(eP)):
             raise IntegrationFailError("Energy is NAN)")
         if check_fail:
@@ -779,7 +773,7 @@ class Simulation(object):
         newData[-1, 3] = colors[-1]
 
         towrite = tempfile.NamedTemporaryFile()
-        towrite.write(((("{:d}\n\n".format(int(len(newData))).encode("utf-8")))))
+        towrite.write(("{:d}\n\n".format(int(len(newData))).encode("utf-8")))
 
         # number of atoms and a blank line after is a requirement of rasmol
         for i in newData:
