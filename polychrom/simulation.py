@@ -34,7 +34,6 @@ class EKExceedsError(Exception):
 
 
 class Simulation(object):
-
     def __init__(self, **kwargs):
         """Base class for openmm simulations
 
@@ -129,22 +128,33 @@ class Simulation(object):
 
 
         """
-        default_args = {"platform": "CUDA",
-                        "GPU": "0",
-                        "integrator": "variablelangevin",
-                        "temperature": 300,
-                        "PBCbox": False,
-                        "length_scale": 1.0,
-                        "mass": 100,
-                        "reporters": [],
-                        "max_Ek": 10,
-                        "precision": "mixed",
-                        "save_decimals": 2,
-                        "verbose": False}
-        valid_names = list(default_args.keys()) + ["N", "error_tol", "collision_rate", "timestep"]
+        default_args = {
+            "platform": "CUDA",
+            "GPU": "0",
+            "integrator": "variablelangevin",
+            "temperature": 300,
+            "PBCbox": False,
+            "length_scale": 1.0,
+            "mass": 100,
+            "reporters": [],
+            "max_Ek": 10,
+            "precision": "mixed",
+            "save_decimals": 2,
+            "verbose": False,
+        }
+        valid_names = list(default_args.keys()) + [
+            "N",
+            "error_tol",
+            "collision_rate",
+            "timestep",
+        ]
         for i in kwargs.keys():
             if i not in valid_names:
-                raise ValueError("incorrect argument provided: {0}. Allowed are {1}".format(i, valid_names))
+                raise ValueError(
+                    "incorrect argument provided: {0}. Allowed are {1}".format(
+                        i, valid_names
+                    )
+                )
         default_args.update(kwargs)
         kwargs = default_args
         self.kwargs = kwargs
@@ -160,13 +170,13 @@ class Simulation(object):
         self.properties = properties
 
         if platform.lower() == "opencl":
-            platform_object = openmm.Platform.getPlatformByName('OpenCL')
+            platform_object = openmm.Platform.getPlatformByName("OpenCL")
         elif platform.lower() == "reference":
-            platform_object = openmm.Platform.getPlatformByName('Reference')
+            platform_object = openmm.Platform.getPlatformByName("Reference")
         elif platform.lower() == "cuda":
-            platform_object = openmm.Platform.getPlatformByName('CUDA')
+            platform_object = openmm.Platform.getPlatformByName("CUDA")
         elif platform.lower() == "cpu":
-            platform_object = openmm.Platform.getPlatformByName('CPU')
+            platform_object = openmm.Platform.getPlatformByName("CPU")
         else:
             raise RuntimeError("Undefined platform: {0}".format(platform))
         self.platform = platform_object
@@ -179,25 +189,33 @@ class Simulation(object):
         if isinstance(self.integrator_type, string_types):
             self.integrator_type = str(self.integrator_type)
             if self.integrator_type.lower() == "langevin":
-                self.integrator = openmm.LangevinIntegrator(self.temperature,
-                                                            kwargs["collision_rate"] * (1 / ps),
-                                                            kwargs["timestep"] * fs)
+                self.integrator = openmm.LangevinIntegrator(
+                    self.temperature,
+                    kwargs["collision_rate"] * (1 / ps),
+                    kwargs["timestep"] * fs,
+                )
             elif self.integrator_type.lower() == "variablelangevin":
-                self.integrator = openmm.VariableLangevinIntegrator(self.temperature,
-                                                                    kwargs["collision_rate"] * (1 / ps),
-                                                                    kwargs["error_tol"])
+                self.integrator = openmm.VariableLangevinIntegrator(
+                    self.temperature,
+                    kwargs["collision_rate"] * (1 / ps),
+                    kwargs["error_tol"],
+                )
             elif self.integrator_type.lower() == "verlet":
-                self.integrator = openmm.VariableVerletIntegrator(kwargs["timestep"] * fs)
+                self.integrator = openmm.VariableVerletIntegrator(
+                    kwargs["timestep"] * fs
+                )
             elif self.integrator_type.lower() == "variableverlet":
                 self.integrator = openmm.VariableVerletIntegrator(kwargs["error_tol"])
 
-            elif self.integrator_type.lower() == 'brownian':
-                self.integrator = openmm.BrownianIntegrator(self.temperature,
-                                                            kwargs["collision_rate"] * (1 / ps),
-                                                            kwargs["timestep"] * fs)
+            elif self.integrator_type.lower() == "brownian":
+                self.integrator = openmm.BrownianIntegrator(
+                    self.temperature,
+                    kwargs["collision_rate"] * (1 / ps),
+                    kwargs["timestep"] * fs,
+                )
             else:
                 logging.info(
-                    'Using the provided integrator object'
+                    "Using the provided integrator object"
                     # 'please select from "langevin", "variablelangevin", '
                     # '"verlet", "variableVerlet", '
                     # '"brownian" or provide an integrator object'
@@ -221,29 +239,30 @@ class Simulation(object):
         self.time = 0
 
         self.nm = nm
-        self.kB = units.BOLTZMANN_CONSTANT_kB * \
-                  units.AVOGADRO_CONSTANT_NA  # Boltzmann constant
-        self.kT = self.kB * self.temperature * units.kelvin  # thermal energy        
+
+        self.kB = units.BOLTZMANN_CONSTANT_kB * units.AVOGADRO_CONSTANT_NA
+        self.kT = self.kB * self.temperature * units.kelvin  # thermal energy
 
         # All masses are the same,
         # unless individual mass multipliers are specified in self.load()
-        self.conlen = 1. * nm * self.length_scale
+        self.conlen = 1.0 * nm * self.length_scale
 
         self.kbondScalingFactor = float(
-            (2 * self.kT / (self.conlen) ** 2)
-            / (units.kilojoule_per_mole / nm ** 2))
+            (2 * self.kT / (self.conlen) ** 2) / (units.kilojoule_per_mole / nm ** 2)
+        )
 
         self.system = openmm.System()
 
         # adding PBC
         self.PBC = False
-        if (kwargs["PBCbox"] is not False):
+        if kwargs["PBCbox"] is not False:
             self.PBC = True
             PBCbox = np.array(kwargs["PBCbox"])
             self.system.setDefaultPeriodicBoxVectors(
-                [float(PBCbox[0]), 0., 0.],
-                [0., float(PBCbox[1]), 0.],
-                [0., 0., float(PBCbox[2])])
+                [float(PBCbox[0]), 0.0, 0.0],
+                [0.0, float(PBCbox[1]), 0.0],
+                [0.0, 0.0, float(PBCbox[2])],
+            )
 
         self.force_dict = {}  # Dictionary to store forces
 
@@ -291,7 +310,11 @@ class Simulation(object):
             raise ValueError(f"length of data, {len(data)} does not match N, {self.N}")
 
         if data.shape[1] != 3:
-            raise ValueError("Data is not shaped correctly. Needs (N,3), provided: {0}".format(data.shape))
+            raise ValueError(
+                "Data is not shaped correctly. Needs (N,3), provided: {0}".format(
+                    data.shape
+                )
+            )
         if np.isnan(data).any():
             raise ValueError("Data contains NANs")
 
@@ -308,7 +331,10 @@ class Simulation(object):
         self.data = units.Quantity(data, nm)
         if report:
             for reporter in self.reporters:
-                reporter.report("starting_conformation", {"pos": data, "time": self.time, "block": self.block})
+                reporter.report(
+                    "starting_conformation",
+                    {"pos": data, "time": self.time, "block": self.block},
+                )
 
         if hasattr(self, "context"):
             self.init_positions()
@@ -339,7 +365,8 @@ class Simulation(object):
         else:
             if force.name in self.force_dict:
                 raise ValueError(
-                    'A force named {} was added to the system twice!'.format(force.name))
+                    "A force named {} was added to the system twice!".format(force.name)
+                )
             forces._prepend_force_name_to_params(force)
             self.force_dict[force.name] = force
 
@@ -366,13 +393,19 @@ class Simulation(object):
                 else:
                     force.setNonbondedMethod(force.CutoffNonPeriodic)
 
-            logging.info("adding force {} {}".format(
-                i, self.system.addForce(self.force_dict[i])))
+            logging.info(
+                "adding force {} {}".format(i, self.system.addForce(self.force_dict[i]))
+            )
 
         for reporter in self.reporters:
-            reporter.report("applied_forces", {i: j.__getstate__() for i, j in self.force_dict.items()})
+            reporter.report(
+                "applied_forces",
+                {i: j.__getstate__() for i, j in self.force_dict.items()},
+            )
 
-        self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
+        self.context = openmm.Context(
+            self.system, self.integrator, self.platform, self.properties
+        )
         self.init_positions()
         self.init_velocities()
         self.forces_applied = True
@@ -387,8 +420,9 @@ class Simulation(object):
         try:
             self.context
         except:
-            raise ValueError("No context, cannot set velocs." \
-                             "Initialize context before that")
+            raise ValueError(
+                "No context, cannot set velocs." "Initialize context before that"
+            )
 
         if temperature == "current":
             temperature = self.temperature
@@ -403,11 +437,16 @@ class Simulation(object):
         try:
             self.context
         except:
-            raise ValueError("No context, cannot set positions." \
-                             " Initialize context before that")
+            raise ValueError(
+                "No context, cannot set positions." " Initialize context before that"
+            )
 
         self.context.setPositions(self.data)
-        eP = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
+        eP = (
+            self.context.getState(getEnergy=True).getPotentialEnergy()
+            / self.N
+            / self.kT
+        )
         logging.info("Particles loaded. Potential energy is %lf" % eP)
 
     def reinitialize(self):
@@ -419,7 +458,9 @@ class Simulation(object):
         self.init_positions()
         self.init_velocities()
 
-    def local_energy_minimization(self, tolerance=0.3, maxIterations=0, random_offset=0.02):
+    def local_energy_minimization(
+        self, tolerance=0.3, maxIterations=0, random_offset=0.02
+    ):
         """        
         A wrapper to the build-in OpenMM Local Energy Minimization
         
@@ -475,30 +516,43 @@ class Simulation(object):
 
         self._apply_forces()
 
-        self.state = self.context.getState(getPositions=False,
-                                           getEnergy=True)
-        eK = (self.state.getKineticEnergy() / self.N / self.kT)
+        self.state = self.context.getState(getPositions=False, getEnergy=True)
+        eK = self.state.getKineticEnergy() / self.N / self.kT
         eP = self.state.getPotentialEnergy() / self.N / self.kT
         locTime = self.state.getTime()
-        logging.info("before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
+        logging.info(
+            "before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime)
+        )
 
         openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)
 
         self.state = self.context.getState(getPositions=True, getEnergy=True)
-        eK = (self.state.getKineticEnergy() / self.N / self.kT)
+        eK = self.state.getKineticEnergy() / self.N / self.kT
         eP = self.state.getPotentialEnergy() / self.N / self.kT
 
         coords = self.state.getPositions(asNumpy=True)
         self.data = coords
         self.set_data(self.get_data(), random_offset=random_offset, report=False)
         for reporter in self.reporters:
-            reporter.report("energy_minimization", {"pos": self.get_data(), "time": self.time, "block": self.block})
+            reporter.report(
+                "energy_minimization",
+                {"pos": self.get_data(), "time": self.time, "block": self.block},
+            )
 
         locTime = self.state.getTime()
 
-        logging.info("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
+        logging.info(
+            "after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime)
+        )
 
-    def do_block(self, steps=None, check_functions=[], get_velocities=False, save=True, save_extras={}):
+    def do_block(
+        self,
+        steps=None,
+        check_functions=[],
+        get_velocities=False,
+        save=True,
+        save_extras={},
+    ):
         """performs one block of simulations, doing steps timesteps,
         or steps_per_block if not specified.
 
@@ -521,8 +575,9 @@ class Simulation(object):
         a = time.time()
         self.integrator.step(steps)  # integrate!
 
-        self.state = self.context.getState(getPositions=True, getVelocities=get_velocities,
-                                           getEnergy=True)
+        self.state = self.context.getState(
+            getPositions=True, getVelocities=get_velocities, getEnergy=True
+        )
 
         b = time.time()
         coords = self.state.getPositions(asNumpy=True)
@@ -534,7 +589,7 @@ class Simulation(object):
         self.time = self.state.getTime() / ps
 
         # calculate energies in KT/particle
-        eK = (self.state.getKineticEnergy() / self.N / self.kT)
+        eK = self.state.getKineticEnergy() / self.N / self.kT
         eP = self.state.getPotentialEnergy() / self.N / self.kT
         curtime = self.state.getTime() / units.picosecond
 
@@ -548,7 +603,7 @@ class Simulation(object):
 
         if np.isnan(newcoords).any():
             raise IntegrationFailError("Coordinates are NANs")
-        if (eK > self.eK_critical):
+        if eK > self.eK_critical:
             raise EKExceedsError("Ek exceeds {0}".format(self.eK_critical))
         if (np.isnan(eK)) or (np.isnan(eP)):
             raise IntegrationFailError("Energy is NAN)")
@@ -563,19 +618,29 @@ class Simulation(object):
         msg += "Rg=%.3lf " % self.RG()
         msg += "SPS=%.0lf " % (steps / (float(b - a)))
 
-        if (self.integrator_type.lower() == 'variablelangevin'
-                or self.integrator_type.lower() == 'variableverlet'):
+        if (
+            self.integrator_type.lower() == "variablelangevin"
+            or self.integrator_type.lower() == "variableverlet"
+        ):
             dt = self.integrator.getStepSize()
-            msg += 'dt=%.1lffs ' % (dt / fs)
+            msg += "dt=%.1lffs " % (dt / fs)
             mass = self.system.getParticleMass(1)
-            dx = (units.sqrt(2.0 * eK * self.kT / mass) * dt)
-            msg += 'dx=%.2lfpm ' % (dx / nm * 1000.0)
+            dx = units.sqrt(2.0 * eK * self.kT / mass) * dt
+            msg += "dx=%.2lfpm " % (dx / nm * 1000.0)
 
         logging.info(msg)
 
-        result = {"pos": newcoords, "potentialEnergy": eP, "kineticEnergy": eK, "time": curtime, "block": self.block}
+        result = {
+            "pos": newcoords,
+            "potentialEnergy": eP,
+            "kineticEnergy": eK,
+            "time": curtime,
+            "block": self.block,
+        }
         if get_velocities:
-            result["vel"] = self.state.getVelocities() / (units.nanometer / units.picosecond)
+            result["vel"] = self.state.getVelocities() / (
+                units.nanometer / units.picosecond
+            )
         result.update(save_extras)
         if save:
             for reporter in self.reporters:
@@ -590,8 +655,9 @@ class Simulation(object):
         """Prints detailed statistics of a system.
         Will be run every 50 steps
         """
-        state = self.context.getState(getPositions=True,
-                                      getVelocities=True, getEnergy=True)
+        state = self.context.getState(
+            getPositions=True, getVelocities=True, getEnergy=True
+        )
 
         eP = state.getPotentialEnergy()
         pos = np.array(state.getPositions() / nm)
@@ -607,18 +673,22 @@ class Simulation(object):
         centredPos = pos - cm[None, :]
         dists = np.sqrt(np.sum(centredPos ** 2, axis=1))
         per95 = np.percentile(dists, 95)
-        den = (0.95 * self.N) / ((4. * np.pi * per95 ** 3) / 3)
+        den = (0.95 * self.N) / ((4.0 * np.pi * per95 ** 3) / 3)
         per5 = np.percentile(dists, 5)
-        den5 = (0.05 * self.N) / ((4. * np.pi * per5 ** 3) / 3)
+        den5 = (0.05 * self.N) / ((4.0 * np.pi * per5 ** 3) / 3)
         x, y, z = pos[:, 0], pos[:, 1], pos[:, 2]
         minmedmax = lambda x: (x.min(), np.median(x), x.mean(), x.max())
 
         print("\n Statistics: number of particles: %d\n" % (self.N,))
         print("Statistics for particle position")
-        print("     mean position is: ", np.mean(
-            pos, axis=0), "  Rg = ", self.RG())
+        print("     mean position is: ", np.mean(pos, axis=0), "  Rg = ", self.RG())
         print("     median bond size is ", np.median(bonds))
-        print("     three shortest/longest (<10)/ bonds are ", sbonds[:3], "  ", sbonds[sbonds < 10][-3:])
+        print(
+            "     three shortest/longest (<10)/ bonds are ",
+            sbonds[:3],
+            "  ",
+            sbonds[sbonds < 10][-3:],
+        )
         if (sbonds > 10).sum() > 0:
             print("longest 10 bonds are", sbonds[-10:])
 
@@ -631,10 +701,10 @@ class Simulation(object):
         print("     z: %.2lf, %.2lf, %.2lf, %.2lf" % minmedmax(z))
         print()
         print("Statistics for velocities:")
-        print("     mean kinetic energy is: ", np.mean(
-            EkPerParticle), "should be:", 1.5)
-        print("     fastest particles are (in kT): ", np.sort(
-            EkPerParticle)[-5:])
+        print(
+            "     mean kinetic energy is: ", np.mean(EkPerParticle), "should be:", 1.5
+        )
+        print("     fastest particles are (in kT): ", np.sort(EkPerParticle)[-5:])
 
         print()
         print("Statistics for the system:")
@@ -642,7 +712,7 @@ class Simulation(object):
         print()
         print("Potential Energy Ep = ", eP / self.N / self.kT)
 
-    def show(self, shifts=[0., 0.2, 0.4, 0.6, 0.8], scale="auto"):
+    def show(self, shifts=[0.0, 0.2, 0.4, 0.6, 0.8], scale="auto"):
         """shows system in rasmol by drawing spheres
         draws 4 spheres in between any two points (5 * N spheres total)
         """
@@ -659,8 +729,9 @@ class Simulation(object):
             return
         # determining the 95 percentile distance between particles,
         if scale == "auto":
-            meandist = np.percentile(np.sqrt(
-                np.sum(np.diff(data, axis=0) ** 2, axis=1)), 95)
+            meandist = np.percentile(
+                np.sqrt(np.sum(np.diff(data, axis=0) ** 2, axis=1)), 95
+            )
             # rescaling the data, so that bonds are of the order of 1.
             # This is because rasmol spheres are of the fixed diameter.
             data /= meandist
@@ -676,49 +747,58 @@ class Simulation(object):
                     count += 1
             if count > 100:
                 raise RuntimeError(
-                    "Too many particles are close together. " \
-                    "This will cause rasmol to choke")
+                    "Too many particles are close together. "
+                    "This will cause rasmol to choke"
+                )
 
         rascript = tempfile.NamedTemporaryFile()
         # writing the rasmol script. Spacefill controls radius of the sphere.
-        rascript.write(b"""wireframe off
+        rascript.write(
+            b"""wireframe off
         color temperature
         spacefill 100
         background white
-        """)
+        """
+        )
         rascript.flush()
 
         # creating the array, linearly chanhing from -225 to 225
         # to serve as an array of colors
-        colors = np.array([int((j * 450.) / (len(data))) -
-                           225 for j in range(len(data))])
+        colors = np.array(
+            [int((j * 450.0) / (len(data))) - 225 for j in range(len(data))]
+        )
 
         # creating spheres along the trajectory
-        newData = np.zeros(
-            (len(data) * len(shifts) - (len(shifts) - 1), 4))
+        newData = np.zeros((len(data) * len(shifts) - (len(shifts) - 1), 4))
         for i in range(len(shifts)):
-            newData[i:-1:len(shifts), :3] = data[:-1] * shifts[
-                i] + data[1:] * (1 - shifts[i])
-            newData[i:-1:len(shifts), 3] = colors[:-1]
+            newData[i : -1 : len(shifts), :3] = data[:-1] * shifts[i] + data[1:] * (
+                1 - shifts[i]
+            )
+            newData[i : -1 : len(shifts), 3] = colors[:-1]
         newData[-1, :3] = data[-1]
         newData[-1, 3] = colors[-1]
 
         towrite = tempfile.NamedTemporaryFile()
-        towrite.write(((("{:d}\n\n".format(int(len(newData))).encode('utf-8')))))
+        towrite.write(((("{:d}\n\n".format(int(len(newData))).encode("utf-8")))))
 
         # number of atoms and a blank line after is a requirement of rasmol
         for i in newData:
-            towrite.write(("CA\t{:f}\t{:f}\t{:f}\t{:d}\n".format(i[0], i[1], i[2], int(i[3]))).encode('utf-8'))
+            towrite.write(
+                (
+                    "CA\t{:f}\t{:f}\t{:f}\t{:d}\n".format(i[0], i[1], i[2], int(i[3]))
+                ).encode("utf-8")
+            )
 
         towrite.flush()
         "TODO: rewrite using subprocess.popen"
 
         if os.name == "posix":  # if linux
-            os.system("rasmol -xyz %s -script %s" % (
-                towrite.name, rascript.name))
+            os.system("rasmol -xyz %s -script %s" % (towrite.name, rascript.name))
         else:  # if windows
-            os.system("C:/RasWin/raswin.exe -xyz %s -script %s" % (
-                towrite.name, rascript.name))
+            os.system(
+                "C:/RasWin/raswin.exe -xyz %s -script %s"
+                % (towrite.name, rascript.name)
+            )
 
         rascript.close()
         towrite.close()

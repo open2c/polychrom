@@ -39,7 +39,7 @@ def create_spiral(r1, r2, N):
         phi2 = phi + 0.7 * Pi
         mid = phi2
         while abs(dist(phi, mid) - 1) > 0.00001:
-            mid = (phi1 + phi2) / 2.
+            mid = (phi1 + phi2) / 2.0
             if dist(phi, mid) > 1:
                 phi2 = mid
             else:
@@ -53,7 +53,7 @@ def create_spiral(r1, r2, N):
         mid = phi2
 
         while abs(dist(phi, mid) - 1) > 0.00001:
-            mid = (phi1 + phi2) / 2.
+            mid = (phi1 + phi2) / 2.0
             if dist(phi, mid) > 1:
                 phi2 = mid
             else:
@@ -78,14 +78,14 @@ def create_spiral(r1, r2, N):
         if forward == True:
             curphi = nextphi(curphi)
             add_point(fullcoord(curphi, z))
-            if (rad(curphi) > r2):
+            if rad(curphi) > r2:
                 forward = False
                 z += 1
                 add_point(fullcoord(curphi, z))
         else:
             curphi = prevphi(curphi)
             add_point(fullcoord(curphi, z))
-            if (rad(curphi) < r1):
+            if rad(curphi) < r1:
                 forward = True
                 z += 1
                 add_point(fullcoord(curphi, z))
@@ -95,14 +95,14 @@ def create_random_walk(step_size, N):
     """
     Creates a freely joined chain of length N with step step_size 
     """
-    theta = np.random.uniform(0., 1., N)
+    theta = np.random.uniform(0.0, 1.0, N)
     theta = 2.0 * np.pi * theta
 
-    u = np.random.uniform(0., 1., N)
+    u = np.random.uniform(0.0, 1.0, N)
 
     u = 2.0 * u - 1.0
-    x = step_size * np.sqrt(1. - u * u) * np.cos(theta)
-    y = step_size * np.sqrt(1. - u * u) * np.sin(theta)
+    x = step_size * np.sqrt(1.0 - u * u) * np.cos(theta)
+    y = step_size * np.sqrt(1.0 - u * u) * np.sin(theta)
     z = step_size * u
     x, y, z = np.cumsum(x), np.cumsum(y), np.cumsum(z)
     return np.vstack([x, y, z]).T
@@ -194,8 +194,14 @@ def grow_cubic(N, boxSize, method="standard"):
             shiftar[direction] = shift
             t3 = t0 + shiftar
             t4 = t1 + shiftar
-            if (b[tuple(t3)] == 0) and (b[tuple(t4)] == 0) and (np.min(t3) >= 1) and (np.min(t4) >= 1) and (
-                    np.max(t3) < boxSize + 1) and (np.max(t4) < boxSize + 1):
+            if (
+                (b[tuple(t3)] == 0)
+                and (b[tuple(t4)] == 0)
+                and (np.min(t3) >= 1)
+                and (np.min(t4) >= 1)
+                and (np.max(t3) < boxSize + 1)
+                and (np.max(t4) < boxSize + 1)
+            ):
                 a.insert(t + 1, tuple(t3))
                 a.insert(t + 2, tuple(t4))
                 b[tuple(t3)] = 1
@@ -203,4 +209,3 @@ def grow_cubic(N, boxSize, method="standard"):
                 break
                 # print a
     return np.array(a) - 1
-
