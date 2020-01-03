@@ -1,31 +1,24 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 import six
-import warnings
 import numpy as np
-import joblib
 import os
-from math import sqrt, sin, cos
-import numpy
 
 from . import hdf5_format
-import scipy, scipy.stats  # @UnusedImport
 from polychrom.hdf5_format import load_URI
 import joblib
-import gzip
 import glob
 
 import io
 
 
 def load(filename):
-    """Universal load function for any type of data file
-    It always returns just XYZ positions - use fetch_block 
-    or hdf5_format.load_URI for loading the whole metadata
+    """Universal load function for any type of data file It always returns just XYZ
+    positions - use fetch_block or hdf5_format.load_URI for loading the whole metadata
     
     Accepted file types
     -------------------
     
-    New-style URIs (HDF5 based storageo)
+    New-style URIs (HDF5 based storage)
     
     Text files in openmm-polymer format
     joblib files in openmm-polymer format 
@@ -35,9 +28,7 @@ def load(filename):
     
     filename: str 
         filename to load or a URI
-        
-    
-    
+
     """
     if "::" in filename:
         return hdf5_format.load_URI(filename)["pos"]
@@ -54,7 +45,6 @@ def load(filename):
             N = int(line0)
         except (ValueError, UnicodeDecodeError):
             raise TypeError("Could not read the file. Not text or joblib.")
-        # data = Cload(filename, center=False)
         data = [list(map(float, i.split())) for i in data_file.readlines()]
 
         if len(data) != N:
@@ -95,6 +85,9 @@ def fetch_block(folder, ind, full_output=False):
     ind = int(ind)
     if (len(blocksh5) > 0) and (len(blocksdat) > 0):
         raise ValueError("both .h5 and .dat files found in folder - exiting")
+    if (len(blocksh5) == 0) and (len(blocksdat) == 0):
+        raise ValueError("no blocks found")
+
 
     if len(blocksh5) > 0:
         fnames = [os.path.split(i)[-1] for i in blocksh5]

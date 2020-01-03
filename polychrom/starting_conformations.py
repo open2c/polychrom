@@ -7,7 +7,9 @@ import numpy as np
 
 def create_spiral(r1, r2, N):
     """
-    Creates a "propagating spiral", often used as an easy mitotic-like starting conformation.
+    Creates a "propagating spiral", often used as an easy mitotic-like
+    starting conformation.
+
     Run it with r1=10, r2 = 13, N=5000, and see what it does.
     """
     Pi = 3.141592

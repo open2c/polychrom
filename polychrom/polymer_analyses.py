@@ -204,8 +204,9 @@ def Rg2(data):
 
 def Rg2_matrix(data):
     """
-    Uses dynamic programming and vectorizing to calculate Rg for each subchain of the matrix 
-    element [i,j] in resulting matrix is Rg of a subchain from i to j including  i and j 
+    Uses dynamic programming and vectorizing to calculate Rg for each subchain of the
+    matrix element [i,j] in resulting matrix is Rg of a subchain from i to j
+    including  i and j
     """
 
     data = np.asarray(data, float)
@@ -274,35 +275,6 @@ def Rg2_scaling(data, bins=None, ring=False):
     return (np.array(bins), rads)
 
 
-def _test_Rg_scalings():
-    a = np.random.lognormal(1, 1, size=(30, 3))  # array for testing
-
-    gr = Rg2_matrix(a)  # calculate Rg matrix in a normal way
-
-    for i in range(len(a) + 1):  # fill on eside of it with manually calculated Rg(i:j)
-        for j in range(i + 1, len(a)):
-            gr[j, i] = Rg2(a[i : j + 1])
-            pass
-
-    assert np.allclose(gr, gr.T)
-
-    scal = Rg2_scaling(a, bins=[5])  # 5th diagonal here means s=5 (5-monomer chains)
-    # here Nth diagonal means N+1 monomer chain, so that the corner = whole chain
-    d1 = np.diagonal(gr, 4).mean()
-    # compare P(s) to manually calculated from Rg matrix
-    assert np.allclose(scal[1][0], d1)
-
-    # now we are testing ring there are (N-s+1) subchains of length s.
-    scal = Rg2_scaling(a, bins=[3], ring=True)
-    d1 = (
-        np.diagonal(gr, 2).sum()
-        + Rg2(np.array([a[0], a[-1], a[-2]]))
-        + Rg2(np.array([a[0], a[1], a[-1]]))
-    ) / len(a)
-    assert np.allclose(scal[1][0], d1)
-    # compare with manually calculated rg(i,j) plus Rg of two 3-monomer subchains crossing the boundary
-
-
 def ndarray_groupby_aggregate(
     df,
     ndarray_cols,
@@ -316,10 +288,10 @@ def ndarray_groupby_aggregate(
     """
     A version of pd.groupby that is aware of numpy arrays as values of columns 
     
-    It aggregates columns ndarray_cols using ndarray_agg aggregator
-    It aggregates value_cols using value_agg aggregator
-    It takes the first element in sample_cols
-    and aggregates over aggregate_cols 
+    * aggregates columns ndarray_cols using ndarray_agg aggregator,
+    * aggregates value_cols using value_agg aggregator,
+    * takes the first element in sample_cols,
+    * aggregates over aggregate_cols
     
     It has presets for sum, mean and nanmean. 
     """
@@ -335,7 +307,10 @@ def ndarray_groupby_aggregate(
         value_agg = lambda x: x.mean()
 
     def combine_values(in_df):
-        "splits into ndarrays, 'normal' values, and samples; performs aggregation, and returns a Series"
+        """
+        splits into ndarrays, 'normal' values, and samples;
+        performs aggregation, and returns a Series
+        """
         average_arrs = pd.Series(
             index=ndarray_cols,
             data=[
@@ -373,7 +348,6 @@ def streaming_ndarray_agg(
 
     if divide_by_counts is True, divides result by column "count". 
     If it's a string, divides by divide_by_count column
-    
     
     """
     value_cols_orig = [i for i in value_cols]
@@ -477,33 +451,6 @@ def kabsch_msd(P, Q):
 
 kabsch_rmsd = kabsch_msd
 
-
-def _test_Rg_scalings():
-    a = np.random.lognormal(1, 1, size=(30, 3))  # array for testing
-
-    gr = Rg2_matrix(a)  # calculate Rg matrix in a normal way
-
-    for i in range(len(a) + 1):  # fill on eside of it with manually calculated Rg(i:j)
-        for j in range(i + 1, len(a)):
-            gr[j, i] = Rg2(a[i : j + 1])
-            pass
-
-    assert np.allclose(gr, gr.T)
-
-    scal = Rg2_scaling(a, bins=[5])  # 5th diagonal here means s=5 (5-monomer chains)
-    # here Nth diagonal means N+1 monomer chain, so that the corner = whole chain
-    d1 = np.diagonal(gr, 4).mean()
-    # compare P(s) to manually calculated from Rg matrix
-    assert np.allclose(scal[1][0], d1)
-    # now we are testing ring there are (N-s+1) subchains of length s.
-    scal = Rg2_scaling(a, bins=[3], ring=True)
-    d1 = (
-        np.diagonal(gr, 2).sum()
-        + Rg2(np.array([a[0], a[-1], a[-2]]))
-        + Rg2(np.array([a[0], a[1], a[-1]]))
-    ) / len(a)
-    assert np.allclose(scal[1][0], d1)
-    # compare with manually calculated rg(i,j) plus Rg of two 3-monomer subchains crossing the boundary
 
 
 def mutualSimplify(a, b, verbose=False):

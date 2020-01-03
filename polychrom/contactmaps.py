@@ -8,27 +8,44 @@ from . import polymerutils
 import warnings
 from . import polymer_analyses
 
-"""
-This module is the main workhorse of tools to calculate contactmaps, both from polymer simulations and from other simulations (e.g. 1D simulations of loop extrusion). All of the functions here are designed to be parallelized, and lots of efforts were put into making this possible. 
+"""This module is the main workhorse of tools to calculate contactmaps, both from 
+polymer simulations and from other simulations (e.g. 1D simulations of loop 
+extrusion). All of the functions here are designed to be parallelized, and lots of 
+efforts were put into making this possible. 
 
 The reasons we need parallel contactmap code is the following: 
 
--- Calculating contact maps is slow, esp. at large contact radii, and benefits greatly from parallelizing
--- Doing regular multiprocesing.map has limitations
-    -- It can only handle heataps up to some size, and transferring gigabyte-sized heatmaps between processes takes minutes 
-    -- It can only do as many heatmaps as fits in RAM, which on 20-core 128GB machine is no more than 5GB/heatmap 
+* Calculating contact maps is slow, esp. at large contact radii, and benefits greatly 
+  from parallelizing
+* Doing regular multiprocesing.map has limitations
+* It can only handle heataps up to some size, and transferring gigabyte-sized heatmaps between processes takes minutes 
+* It can only do as many heatmaps as fits in RAM, which on 20-core 128GB machine is no more than 5GB/heatmap 
 
 The structure of this class is as follows. 
 
-On the outer level, it  provides three methods to average contactmaps: monomerResolutionContactMap, binnedContactMap, 
-and monomerResolutionContactMapSubchains
-The first two create contact map from an entire file: either monomer-resolution or binned. The last one creates contact maps from sub-chains in a file, starting at a given set of starting points. It is useful when doing contact maps from several copies of a system in one simulation.
+On the outer level, it  provides three methods to average contactmaps: 
+monomerResolutionContactMap, binnedContactMap, 
+and monomerResolutionContactMapSubchains.  The first two create contact map from an 
+entire file: either monomer-resolution or binned. The last one creates contact maps 
+from sub-chains in a file, starting at a given set of starting points. It is useful 
+when doing contact maps from several copies of a system in one simulation. 
 
-The first two methods have a legacy implementation from the old library that is still here to do the tests. 
+The first two methods have a legacy implementation from the old library that is still 
+here to do the tests. 
 
-On the middle level, it provides a method "averageContacts". This method accepts a "contact iterator", and can be used to average contacts from both a set of filenames and from a simulation of some kind (e.g. averaging positions of loop extruding factors from a 1D loop extrusion simulation). All of the outer level functions (monomerResolutionContactMap for example) are implemented using this method. 
+On the middle level, it provides a method "averageContacts". This method accepts a 
+"contact iterator", and can be used to average contacts from both a set of filenames 
+and from a simulation of some kind (e.g. averaging positions of loop extruding 
+factors from a 1D loop extrusion simulation). All of the outer level functions (
+monomerResolutionContactMap for example) are implemented using this method. 
 
-On the lower level, there are internals of the "averageContacts" method and an associated "worker" function. There is generally no need to understand the code of those functions. There exists a reference implementation of both the worker and the averageContacts function, named "simpleWorker" and "averageContactsSimple". They do all the things that "averageContacts" do, but on only one core. In fact, "averageContacts" defaults to "averageContactsSimple" if requested to run on one core because it is a little bit faster. 
+On the lower level, there are internals of the "averageContacts" method and an 
+associated "worker" function. There is generally no need to understand the code of 
+those functions. There exists a reference implementation of both the worker and the 
+averageContacts function, named "simpleWorker" and "averageContactsSimple". They do 
+all the things that "averageContacts" do, but on only one core. In fact, 
+"averageContacts" defaults to "averageContactsSimple" if requested to run on one core 
+because it is a little bit faster. 
 
 """
 
@@ -107,11 +124,14 @@ def chunk(mylist, chunksize):
 def simple_worker(x, uniqueContacts):
     """
     A "reference" version of "worker" function below that runs on only one core.
-     Unlike the actual multicore worker, it can write contacts to the matrix directly without sorting.
-     This is useful when your contact finding is faster than sorting a 1D array fo contacts
-     uniqueContacts: bool
-        if True, assume that contactFinder outputs only unique contacts (like pure contact map)
-        if False, do not assume that (like in binned contact map)
+    Unlike the actual multicore worker, it can write contacts to the matrix directly
+    without sorting. This is useful when your contact finding is faster than sorting
+    a 1D array fo contacts
+
+     If uniqueContacts True, assume that contactFinder outputs only unique contacts (
+     like pure contact map) if False, do not assume that (like in binned contact
+     map). Using False is always safe, but True will add a minor speed up, especially
+     for very large contact radius.
 
     """
     my_iterator = contactIterator__(x, *classInitArgs__, **classInitKwargs__)
@@ -284,31 +304,43 @@ def worker(x):
 
 def averageContacts(contactIterator, inValues, N, **kwargs):
     """
-    A main workhorse for averaging contacts on multiple cores into one shared contact map. 
-    It mostly does managing the arguments, and initializing the variables. All of the logic of 
-    how contacts are actually put in shared memory buckets is in the worker defined above. 
-    Args:
-        contactIterator:
-            an iterator. See descriptions of "filenameContactMap" class below for example and explanations
-        inValues:
-            an array of values to pass to contactIterator. Would be an array of arrays of filenames or something like that.
-        N:
-            Size of the resulting contactmap
+    A main workhorse for averaging contacts on multiple cores into one shared contact
+    map. It mostly does managing the arguments, and initializing the variables. All
+    of the logic of how contacts are actually put in shared memory buckets is in the
+    worker defined above.
 
-        **kwargs:
-            arrayDtype: ctypes dtype (default c_int32) for the contact map
-            classInitArgs: args to pass to the constructor of contact iterator as second+ args (first is the file list)
-            classInitKwargs: dict of keyword args to pass to the constructor
-            contactProcessing: function f(contacts), should return processed contacts
-            nproc : int, number of processors(default 4)
-            bucketNum: int (default = nproc) Number of memory bukcets to use
-            contactBlock: int (default 500k) Number of contacts to aggregate before writing to memory
-            useFmap: True, or callable, fork-map (or regular map) function; not multiprocessing.map! 
-                     defaults to mirnylib.systemutils.fmap if true. Otherwise, uses provided function
+    PARAMETERS
+    ----------
+        contactIterator : iterator
+            an iterator. See descriptions of "filenameContactMap" class below for
+            example and explanations
+        inValues : iterable
+            an array of values to pass to contactIterator. Would be an array of arrays
+            of filenames or something like that.
+        N : int
+            Size of one side of the resulting contactmap
+
+        arrayDtype : ctypes dtype (default c_int32) for the contact map
+        classInitArgs : args to pass to the constructor of contact iterator
+        classInitKwargs: dict of keyword args to pass to the constructor
+        contactProcessing: function f(contacts), should return processed contacts
+        nproc : int, number of processors(default 4)
+        bucketNum: int (default = nproc) Number of memory buckets to use
+        contactBlock: int (default 500k) Number of contacts to aggregate before writing
+
+        useFmap : True, False, or callable
+            If True, uses mirnylib.systemutils.fmap
+            If False, uses multiprocessing.Pool.map
+            Otherwise, uses provided function, assuming it of a fork-map type
+            (different initializations are needed for forkmap and
+            multiprocessing-style map)
+
+            Sorry, no outside multiprocessing-style maps for now, it's easy to fix
+            Let me know if it is needed.
                      
                      
-    Code that calcualtes a contactmap from a set of polymer conformation is in the methods 
-    below (averageMonomerResolutionContactMap, etc.) 
+    Code that calcualtes a contactmap from a set of polymer conformation is in the
+    methods below (averageMonomerResolutionContactMap, etc.)
     
     An example code that would run a contactmap from a simulation is pasted below. 
     
@@ -357,10 +389,14 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
 
     if (
         not useFmap
-    ):  # for mp.map we need initializer because shared memory cannot be pickled or passed as an argument in inValues
+    ):  # for mp.map we need initializer because shared memory cannot be pickled
+        # # or passed as an argument in inValues
         with closing(mp.Pool(processes=nproc, initializer=init, initargs=argset)) as p:
             p.map(worker, inValues)
-    else:  # diffent strategy for a local map - shared memory is just a global variable created by init()
+
+    # diffent strategy for a local map
+    # shared memory is just a global variable created by init()
+    else:
         init(*argset)  # creating global variables here
         if callable(useFmap):
             fmap = useFmap
@@ -388,11 +424,13 @@ class filenameContactMap(object):
         contactFunction=None,
     ):
         """
-        Init accepts arguments to initialize the iterator.
-        filenames will be one of the items in the inValues list of the "averageContacts" function
-        cutoff and loadFunction should be provided either in classInitArgs or classInitKwargs of averageContacts
+        Init accepts arguments to initialize the iterator. filenames will be one of
+        the items in the inValues list of the "averageContacts" function cutoff and
+        loadFunction should be provided either in classInitArgs or classInitKwargs of
+        averageContacts
 
-        When initialized, the iterator should store these args properly and create all necessary constructs
+        When initialized, the iterator should store these args properly and create
+        all necessary constructs
         """
         self.filenames = filenames
         self.cutoff = cutoff
@@ -403,10 +441,10 @@ class filenameContactMap(object):
 
     def next(self):
         """
-        This is the method which gets called by the worker asking for contacts.
-         This method should return new set of contacts each time it is called
-         When there are no more contacts to return (all filenames are gone, or simulation is over),
-         then this method should raise StopIteration
+        This is the method which gets called by the worker asking for contacts. This
+        method should return new set of contacts each time it is called When there
+        are no more contacts to return (all filenames are gone, or simulation is
+        over), then this method should raise StopIteration
         """
         if self.i == len(self.filenames):
             raise StopIteration
@@ -456,9 +494,6 @@ def binnedContactMap(
     useFmap=False,
 ):
     n = min(n, len(filenames))
-    subvalues = [filenames[i::n] for i in range(n)]
-
-    datas = []
     N = findN(filenames, loadFunction, exceptionsToIgnore)
 
     if chains is None:
@@ -520,11 +555,13 @@ class filenameContactMapRepeat(object):
         contactFunction=None,
     ):
         """
-        Init accepts arguments to initialize the iterator.
-        filenames will be one of the items in the inValues list of the "averageContacts" function
-        cutoff and loadFunction should be provided either in classInitArgs or classInitKwargs of averageContacts
+        Init accepts arguments to initialize the iterator. filenames will be one of
+        the items in the inValues list of the "averageContacts" function cutoff and
+        loadFunction should be provided either in classInitArgs or classInitKwargs of
+        averageContacts
 
-        When initialized, the iterator should store these args properly and create all necessary constructs
+        When initialized, the iterator should store these args properly and create
+        all necessary constructs
         """
         self.filenames = filenames
         self.cutoff = cutoff
@@ -539,10 +576,10 @@ class filenameContactMapRepeat(object):
 
     def next(self):
         """
-        This is the method which gets called by the worker asking for contacts.
-         This method should return new set of contacts each time it is called
-         When there are no more contacts to return (all filenames are gone, or simulation is over),
-         then this method should raise StopIteration
+        This is the method which gets called by the worker asking for contacts. This
+        method should return new set of contacts each time it is called When there
+        are no more contacts to return (all filenames are gone, or simulation is
+        over), then this method should raise StopIteration
         """
 
         try:
@@ -587,77 +624,4 @@ def monomerResolutionContactMapSubchains(
     )
 
 
-class dummyContactMap(object):
-    "contactmap 'finder' for testing that returns fixed contacts (a) + constant(x)"
 
-    def __init__(self, x, a):
-        self.a = a + x
-        self.M = 15
-
-    def next(self):
-        if self.M == 0:
-            raise StopIteration
-        self.M -= 1
-        return self.a
-
-
-def _test():
-    ars = [np.random.random((60, 3)) * 4 for _ in range(200)]
-    conts = polymer_analyses.calculate_contacts(ars[0], 1)
-    print(conts.shape)
-    args = np.repeat(np.arange(20, dtype=int), 10)
-    cmap1 = averageContacts(dummyContactMap, args, 100, classInitArgs=[conts], nproc=20)
-    cmap4 = averageContacts(dummyContactMap, args, 100, classInitArgs=[conts], nproc=1)
-    cmap2 = averageContactsSimple(dummyContactMap, args, 100, classInitArgs=[conts])
-    cmap3 = np.zeros((100, 100))
-    for i in args:
-        cmap3[conts[:, 0] + i, conts[:, 1] + i] += 15
-    cmap3 = cmap3 + cmap3.T
-
-    print(cmap1.sum())
-    print(cmap2.sum())
-    print(cmap3.sum())
-    print(cmap4.sum())
-    assert np.allclose(cmap1, cmap2)
-    assert np.allclose(cmap1, cmap4)
-    assert np.allclose(cmap1, cmap3)
-
-    from .legacy.contactmaps import averagePureContactMap as cmapPureMap
-    from .legacy.contactmaps import averageBinnedContactMap as cmapBinnedMap
-
-    for n in [1, 5, 20]:
-        cmap6 = monomerResolutionContactMap(
-            range(200), cutoff=1, loadFunction=lambda x: ars[x], n=n
-        )
-        cmap5 = cmapPureMap(
-            range(200),
-            cutoff=1,
-            loadFunction=lambda x: ars[x],
-            n=n,
-            printProbability=0.001,
-        )
-        print(cmap5.sum(), cmap6.sum())
-        assert np.allclose(cmap6, cmap5)
-
-        cmap7 = binnedContactMap(
-            range(200),
-            chains=[(0, 27), (27, 60)],
-            binSize=2,
-            cutoff=1,
-            loadFunction=lambda x: ars[x],
-            n=n,
-        )[0]
-
-        cmap8 = cmapBinnedMap(
-            range(200),
-            chains=[(0, 27), (27, 60)],
-            binSize=2,
-            cutoff=1,
-            loadFunction=lambda x: ars[x],
-            n=n,
-            printProbability=0.001,
-        )[0]
-        print(cmap7.sum(), cmap8.sum())
-        assert np.allclose(cmap7, cmap8)
-
-    print("All tests passed")

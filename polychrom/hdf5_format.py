@@ -4,6 +4,7 @@ import h5py
 import glob
 import os
 
+DEFAULT_OPTS = {"compression_opts": 9, "compression": "gzip"}
 
 def _read_h5_group(gr):
     """
@@ -40,7 +41,7 @@ def _convert_to_hdf5_array(data):
         return ("ndarray", data)
 
 
-def _write_group(dataDict, group, dset_opts={"compression": "gzip"}):
+def _write_group(dataDict, group, dset_opts=DEFAULT_OPTS):
     """
     Writes a dictionary of elements to an HDF5 group
     Puts all "items" into attrs, and all ndarrays into datasets 
@@ -76,9 +77,10 @@ def list_URIs(folder, empty_error=True, read_error=True, return_dict=False):
     because an HDF5 file becomes invalid in that case. 
     
     It does not check continuity of blocks (blocks_1-10.h5; blocks_20-30.h5 is valid)
-    But it does error if one block is listed twice (blocks_1-10.h5; blocks_5-15.h5 is invalid)     
+    But it does error if one block is listed twice
+    (e.g. blocks_1-10.h5; blocks_5-15.h5 is invalid)
     
-    TODO: think about the above checks, and openable files too. 
+    TODO: think about the above checks, and check for readable datasets as well
     
     Parameters
     ----------
@@ -97,13 +99,14 @@ def list_URIs(folder, empty_error=True, read_error=True, return_dict=False):
 
     files = glob.glob(os.path.join(folder, "blocks_*-*.h5"))
     if len(files) == 0:
-        raise ValueError(f"No files found in folder {folder}")
+        if empty_error:
+            raise ValueError(f"No files found in folder {folder}")
     filenames = {}
     for file in files:
         try:
             f1 = h5py.File(file, "r")
         except:
-            if readError:
+            if read_error:
                 raise ValueError(f"Cannot read file {file}")
         sted = os.path.split(file)[-1].split("_")[1].split(".h5")[0]
         st, end = [int(i) for i in sted.split("-")]
@@ -134,10 +137,12 @@ def load_URI(dset_path):
         return _read_h5_group(myfile[group])
 
 
-def save_hdf5_file(filename, data_dict, dset_opts={"compression": "gzip"}, mode="w"):
+def save_hdf5_file(filename, data_dict, dset_opts=None, mode="w"):
     """
     Saves data_dict to filename 
     """
+    if dset_opts is None:
+        dset_opts = DEFAULT_OPTS
     with h5py.File(filename, mode=mode) as file:
         _write_group(data_dict, file, dset_opts=dset_opts)
 
@@ -153,13 +158,13 @@ def load_hdf5_file(fname):
 
 class HDF5Reporter(object):
     def __init__(
-        self,
-        folder,
-        max_data_length=50,
-        h5py_dset_opts={"compression": "gzip"},
-        overwrite=False,
-        blocks_only=False,
-        check_exists=True,
+            self,
+            folder,
+            max_data_length=50,
+            h5py_dset_opts=None,
+            overwrite=False,
+            blocks_only=False,
+            check_exists=True,
     ):
         """
         Creates a reporter object that saves a trajectory to a folder 
@@ -186,6 +191,8 @@ class HDF5Reporter(object):
         
         """
 
+        if h5py_dset_opts is None:
+            h5py_dset_opts = DEFAULT_OPTS
         self.prefixes = [
             "blocks",
             "applied_forces",
@@ -287,7 +294,7 @@ class HDF5Reporter(object):
         inds_tosave = np.nonzero((uri_fnames == uri_fnames[ind]) * (uri_inds <= ind))[0]
 
         for (
-            saveind
+                saveind
         ) in inds_tosave:  # we are saving some data and deleting the whole last file
             self.datas[uri_inds[saveind]] = load_URI(uri_vals[saveind])
         self.counter["data"] = ind + 1
