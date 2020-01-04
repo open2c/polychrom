@@ -18,6 +18,8 @@ jobs:
         conda install --file requirements.txt
         conda install -c omnia openmm 
         conda init 
+        echo $PATH
+        ls -la ~ 
         pip install -e .
     - name: Test with pytest
       run: |
