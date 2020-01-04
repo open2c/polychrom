@@ -54,14 +54,12 @@ def interpolateData(data, targetN=90000, colorArrays=[]):
     splined = np.zeros((len(targetRange), numDim), float)
     colorsSplined = []
     for coor in range(numDim):
-        spline = InterpolatedUnivariateSpline(evaluateRange,
-                                        data[:, coor], k=3)
+        spline = InterpolatedUnivariateSpline(evaluateRange, data[:, coor], k=3)
         evaled = spline(targetRange)
         splined[:, coor] = evaled
 
     for color in colorArrays:
-        spline = InterpolatedUnivariateSpline(evaluateRange,
-                                        color, k=2)
+        spline = InterpolatedUnivariateSpline(evaluateRange, color, k=2)
         evaled = spline(targetRange)
         colorsSplined.append(evaled)
 
@@ -80,9 +78,9 @@ def interpolateData(data, targetN=90000, colorArrays=[]):
 
     colorReturn = [i[searched] for i in colorsSplined]
 
-    evaled = p2[:, None] * splined[searched] + \
-    p1[:, None] * splined[searched - 1]
+    evaled = p2[:, None] * splined[searched] + p1[:, None] * splined[searched - 1]
     return evaled, colorReturn
+
 
 def createRegions(a):
     """
@@ -99,20 +97,30 @@ def createRegions(a):
 
     return np.transpose(np.array([a1, a2]))
 
-def do_coloring(data, regions, colors, transparencies,
-                showGui=True, saveTo=None, showChain="worm",
-                returnScriptName=None,
-                showMainChain=True, 
-                chainRadius=0.02, subchainRadius=0.04,
-                chainTransparency=0.5, support="",
-                transparentBackground=True,
-                multiplier=.4,
-                spherePositions=[],
-                pdbGroups=None,
-                sphereRadius=.3,
-                sphereColor="grey60", 
-                force=False,
-                miscArguments=""):
+
+def do_coloring(
+    data,
+    regions,
+    colors,
+    transparencies,
+    showGui=True,
+    saveTo=None,
+    showChain="worm",
+    returnScriptName=None,
+    showMainChain=True,
+    chainRadius=0.02,
+    subchainRadius=0.04,
+    chainTransparency=0.5,
+    support="",
+    transparentBackground=True,
+    multiplier=0.4,
+    spherePositions=[],
+    pdbGroups=None,
+    sphereRadius=0.3,
+    sphereColor="grey60",
+    force=False,
+    miscArguments="",
+):
 
     """
     !!! Please read this completely. Otherwise you'll suck :( !!!
@@ -177,6 +185,7 @@ def do_coloring(data, regions, colors, transparencies,
     Run an example method below to see how the code works.
     See full automation examples below.
     """
+
     def getSelectionString(start, end):
         if start > end:
             raise ValueError("start should be less than end")
@@ -189,18 +198,20 @@ def do_coloring(data, regions, colors, transparencies,
         if seg1 == seg2:
             return "resi {atom1}-{atom2} and segi {seg1}".format(**locals())
         elif np.abs(seg1 - seg2) == 1:
-            return "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(**locals())
-        
+            return "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(
+                **locals()
+            )
+
         elif np.abs(seg1 - seg2) >= 2:
-            
-             
-            line = "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(**locals())
+
+            line = "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(
+                **locals()
+            )
             for i in range(seg1 + 1, seg2):
-                line = line +  " or (segi {0})".format(i)
-            return  line
+                line = line + " or (segi {0})".format(i)
+            return line
         else:
             raise ValueError("Atoms are too far")
-
 
     data = np.array(data)
     data *= multiplier
@@ -211,11 +222,11 @@ def do_coloring(data, regions, colors, transparencies,
         subchainRadius = [subchainRadius for _ in regions]
     subchainRadius = [i * multiplier for i in subchainRadius]
 
-    tmpPdbFile = tempfile.NamedTemporaryFile(mode='w', suffix=".pdb")
+    tmpPdbFile = tempfile.NamedTemporaryFile(mode="w", suffix=".pdb")
     tmpPdbFilename = tmpPdbFile.name
-    pdbname = os.path.split(tmpPdbFilename)[-1].replace(".pdb","")
+    pdbname = os.path.split(tmpPdbFilename)[-1].replace(".pdb", "")
     tmpPdbFile.close()
-    polymerutils.save(data, tmpPdbFilename, mode='pdb', pdbGroups=pdbGroups)
+    polymerutils.save(data, tmpPdbFilename, mode="pdb", pdbGroups=pdbGroups)
 
     # starting background check
     N = len(data)
@@ -236,14 +247,16 @@ def do_coloring(data, regions, colors, transparencies,
         starts = regions[:-1, 0]
 
         if (force is False) and (starts < ends).any():
-            raise ValueError("Overlapped regions detected! Rasmol will not work. "\
-                             "E.g. valid regions are ((0,10),(10,20)), but not ((0,10),(9,20))")
+            raise ValueError(
+                "Overlapped regions detected! Rasmol will not work. "
+                "E.g. valid regions are ((0,10),(10,20)), but not ((0,10),(9,20))"
+            )
 
     bgcolor = "grey"
     letters = [i for i in "1234567890abcdefghijklmnopqrstuvwxyz"]
     names = [i + j + k for i in letters for j in letters for k in letters]
 
-    out = tempfile.NamedTemporaryFile(mode='w')
+    out = tempfile.NamedTemporaryFile(mode="w")
 
     if returnScriptName is not None:
         pdbname = returnScriptName
@@ -275,7 +288,6 @@ def do_coloring(data, regions, colors, transparencies,
     else:
         raise ValueError("please select showChain to be 'worm' or 'spheres' or 'none'")
     for i in range(len(regions)):
-        
 
         name = "subchain%s" % names[i]
         if showChain == "worm":
@@ -294,9 +306,11 @@ def do_coloring(data, regions, colors, transparencies,
         elif (showChain == "none") or (not showChain):
             pass
         else:
-            raise ValueError("please select showChain to be 'worm' or 'spheres' or 'none'")
+            raise ValueError(
+                "please select showChain to be 'worm' or 'spheres' or 'none'"
+            )
 
-    for i  in spherePositions:
+    for i in spherePositions:
         out.write("select {0} and  {1}\n".format(name, getSelectionString(i, i)))
         out.write("show spheres, sele\n")
         out.write("alter sele, vdw={1}\n".format(i, 1.5 * sphereRadius))
@@ -314,9 +328,7 @@ def do_coloring(data, regions, colors, transparencies,
         out.flush()
         return "".join(open(out.name).readlines())
 
-
     # out.write("alter all, vdw={0} \n".format(sphereRadius))
-
 
     script = "".join(open(out.name).readlines())
     if not (saveTo is None):
@@ -329,29 +341,42 @@ def do_coloring(data, regions, colors, transparencies,
 
     out.flush()
 
-
     # saving data
 
-
     from time import sleep
+
     sleep(0.5)
 
-    print(os.system("pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename,
-                                                  miscArguments)))
+    print(
+        os.system(
+            "pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename, miscArguments)
+        )
+    )
     return script
 
-def new_coloring(data, regions, colors, transparencies,
-                showGui=True, saveTo=None, showChain="worm",
-                returnScriptName=None,
-                chainRadius=0.02, subchainRadius=0.04,
-                chainTransparency=0.5, support="", presupport="",
-                transparentBackground=True,
-                multiplier=.4,
-                spherePositions=[],
-                pdbGroups=None,
-                sphereRadius=.3,
-                force=False,
-                miscArguments=""):
+
+def new_coloring(
+    data,
+    regions,
+    colors,
+    transparencies,
+    showGui=True,
+    saveTo=None,
+    showChain="worm",
+    returnScriptName=None,
+    chainRadius=0.02,
+    subchainRadius=0.04,
+    chainTransparency=0.5,
+    support="",
+    presupport="",
+    transparentBackground=True,
+    multiplier=0.4,
+    spherePositions=[],
+    pdbGroups=None,
+    sphereRadius=0.3,
+    force=False,
+    miscArguments="",
+):
 
     """
     !!! Please read this completely. Otherwise you'll suck :( !!!
@@ -425,16 +450,16 @@ def new_coloring(data, regions, colors, transparencies,
         subchainRadius = [subchainRadius for _ in regions]
     subchainRadius = [i * multiplier for i in subchainRadius]
 
-    tmpPdbFile = tempfile.NamedTemporaryFile(mode='w', suffix=".pdb")
+    tmpPdbFile = tempfile.NamedTemporaryFile(mode="w", suffix=".pdb")
     tmpPdbFilename = tmpPdbFile.name
     pdbname = os.path.split(tmpPdbFilename)[-1]
     tmpPdbFile.close()
-    polymerutils.save(data, tmpPdbFilename, mode='pdb', pdbGroups=pdbGroups)
+    polymerutils.save(data, tmpPdbFilename, mode="pdb", pdbGroups=pdbGroups)
 
     letters = [i for i in "1234567890abcdefghijklmnopqrstuvwxyz"]
     names = [i + j + k for i in letters for j in letters for k in letters]
 
-    out = tempfile.NamedTemporaryFile(mode='w')
+    out = tempfile.NamedTemporaryFile(mode="w")
 
     if returnScriptName is not None:
         pdbname = returnScriptName
@@ -467,7 +492,6 @@ def new_coloring(data, regions, colors, transparencies,
             out.write("color %s,subchain%s\n" % (colors[i], names[i]))
             out.write("set sphere_transparency,%f,%s\n" % (transparencies[i], name))
 
-
     # if showChain == "worm":
     #    out.write("show cartoon,name ca\n")
     # out.write("zoom %s\n" % pdbname)
@@ -480,9 +504,7 @@ def new_coloring(data, regions, colors, transparencies,
         out.flush()
         return "".join(open(out.name).readlines())
 
-
     # out.write("alter all, vdw={0} \n".format(sphereRadius))
-
 
     script = "".join(open(out.name).readlines())
     if not (saveTo is None):
@@ -495,30 +517,31 @@ def new_coloring(data, regions, colors, transparencies,
 
     out.flush()
 
-
     # saving data
 
-
     from time import sleep
+
     sleep(0.5)
 
-    print(os.system("pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename,
-                                                  miscArguments)))
+    print(
+        os.system(
+            "pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename, miscArguments)
+        )
+    )
     return script
 
 
-
-
-
-
 def getTmpPath(folder=None, **kwargs):
-    tmpFile = tempfile.NamedTemporaryFile(dir=folder, mode='w', **kwargs)
+    tmpFile = tempfile.NamedTemporaryFile(dir=folder, mode="w", **kwargs)
     tmpPath = tmpFile.name
     tmpFilename = os.path.split(tmpPath)[-1]
     tmpFile.close()
     return tmpPath, tmpFilename
 
-def show_chain(data, showGui=True, saveTo=None, showChain="worm", chains=None, support = "",  **kwargs):
+
+def show_chain(
+    data, showGui=True, saveTo=None, showChain="worm", chains=None, support="", **kwargs
+):
     """Shows a single rainbow-colored chain using PyMOL.
 
     Arguments:
@@ -531,21 +554,21 @@ def show_chain(data, showGui=True, saveTo=None, showChain="worm", chains=None, s
     """
     if isinstance(data, str):
         data = polymerutils.load(data)
-    chain_radius = kwargs.get('chain_radius', 0.1)
+    chain_radius = kwargs.get("chain_radius", 0.1)
     data -= np.min(data, axis=0)[None, :]
     print(data.min())
 
-    tmpPdbPath, pdbname = getTmpPath(suffix = ".pdb")
+    tmpPdbPath, pdbname = getTmpPath(suffix=".pdb")
     if chains == None:
         polymerutils.save(data, tmpPdbPath, mode="pdb")
     else:
         pdbArray = np.zeros(len(data))
         for j, i in enumerate(chains):
-            pdbArray[i[0]:i[1]] = j
+            pdbArray[i[0] : i[1]] = j
         polymerutils.save(data, tmpPdbPath, mode="pdb", pdbGroups=pdbArray)
-    pdbname = pdbname.replace(".pdb","")
+    pdbname = pdbname.replace(".pdb", "")
 
-    tmpScript = tempfile.NamedTemporaryFile(mode='w')
+    tmpScript = tempfile.NamedTemporaryFile(mode="w")
     tmpScript.write("hide all\n")
     tmpScript.write("bg white\n")
     tmpScript.write("set ray_opaque_background, off\n")
@@ -578,17 +601,25 @@ def show_chain(data, showGui=True, saveTo=None, showChain="worm", chains=None, s
 
     tmpScript.flush()
 
-    os.system("pymol {0} {1} -u {2}".format(
-        tmpPdbPath,
-        '' if showGui else '-c',
-        tmpScript.name))
+    os.system(
+        "pymol {0} {1} -u {2}".format(
+            tmpPdbPath, "" if showGui else "-c", tmpScript.name
+        )
+    )
     tmpScript.close()
 
+
 def makeMoviePymol(
-    fileList, destFolder, fps=10, aviFilename='output.avi',
+    fileList,
+    destFolder,
+    fps=10,
+    aviFilename="output.avi",
     rotationPeriod=0.0,
     resolution=(600, 600),
-    fiberWidth=1.0, rescalingFactor=1.0, pymolScript=None):
+    fiberWidth=1.0,
+    rescalingFactor=1.0,
+    pymolScript=None,
+):
     """
     experimental example script for making a movie...
     """
@@ -598,8 +629,8 @@ def makeMoviePymol(
     pdbPaths = []
 
     destFolder = os.path.abspath(destFolder)
-    pdbFolder = destFolder + '/pdb'
-    imgFolder = destFolder + '/img'
+    pdbFolder = destFolder + "/pdb"
+    imgFolder = destFolder + "/img"
     for folder in [destFolder, pdbFolder, imgFolder]:
         if not os.path.isdir(folder):
             os.mkdir(folder)
@@ -609,25 +640,27 @@ def makeMoviePymol(
         d[:, 0], d[:, 2] = d[:, 2].copy(), d[:, 0].copy()
         d *= rescalingFactor
         d -= np.mean(d, axis=0)[None, :]
-        pdbFilename = '{0:0{width}}.pdb'.format(i, width=numDigits)
-        savePath = pdbFolder + '/' + pdbFilename
-        polymerutils.save(d, savePath, mode='pdb')
+        pdbFilename = "{0:0{width}}.pdb".format(i, width=numDigits)
+        savePath = pdbFolder + "/" + pdbFilename
+        polymerutils.save(d, savePath, mode="pdb")
         pdbPaths.append(os.path.abspath(savePath))
 
-    script = 'hide all\n'
+    script = "hide all\n"
     for i in pdbPaths:
-        script += 'load {0}, mov\n'.format(i)
+        script += "load {0}, mov\n".format(i)
 
     script += "smooth mov\n"
 
-    rotationCode = ''
+    rotationCode = ""
     if rotationPeriod > 0:
         for i in range(numFrames // rotationPeriod + 1):
-            rotationCode += 'util.mroll {0},{1},0\n'.format(
-                i * rotationPeriod + 1, (i + 1) * rotationPeriod)
+            rotationCode += "util.mroll {0},{1},0\n".format(
+                i * rotationPeriod + 1, (i + 1) * rotationPeriod
+            )
 
     if pymolScript == None:
-        script += textwrap.dedent("""
+        script += textwrap.dedent(
+            """
 
         rotate [1,1,1], 90, mov
         turn [1,1,1], 45
@@ -649,46 +682,50 @@ def makeMoviePymol(
         mview reinterpolate, power=1
         mpng mov
         clip slab, 20000
-        """.format(fiberWidth,
-                    resolution[0], resolution[1],
-                    numFrames,
-                    rotationCode,
-                    max(0, len(fileList) - fps * 2),
-                    ))
+        """.format(
+                fiberWidth,
+                resolution[0],
+                resolution[1],
+                numFrames,
+                rotationCode,
+                max(0, len(fileList) - fps * 2),
+            )
+        )
     else:
         script += pymolScript
 
-
-    tmpScriptPath = os.path.abspath(destFolder + '/movie.pymol')
-    tmpScript = open(tmpScriptPath, 'w')
+    tmpScriptPath = os.path.abspath(destFolder + "/movie.pymol")
+    tmpScript = open(tmpScriptPath, "w")
     tmpScript.write(script)
     tmpScript.flush()
 
     os.system("cd {0}; pymol -c -u {1}; cd -".format(imgFolder, tmpScriptPath))
 
     _mencoder(imgFolder, fps, aviFilename)
-    shutil.move(os.path.join(imgFolder, aviFilename), os.path.join(destFolder, aviFilename))
+    shutil.move(
+        os.path.join(imgFolder, aviFilename), os.path.join(destFolder, aviFilename)
+    )
+
 
 def _mencoder(imgFolder, fps, aviFilename):
     subprocess.call(
-        ("cd {0}; ".format(imgFolder) +
-         "mencoder \"mf://*.png\" -mf fps={0} -o {1} ".format(fps, aviFilename) +
-         "-ovc lavc -lavcopts vcodec=mpeg4"),
-        shell=True)
+        (
+            "cd {0}; ".format(imgFolder)
+            + 'mencoder "mf://*.png" -mf fps={0} -o {1} '.format(fps, aviFilename)
+            + "-ovc lavc -lavcopts vcodec=mpeg4"
+        ),
+        shell=True,
+    )
 
-def makeMovie(fileList, imgFolder, fps=15, aviFilename='output.avi'):
+
+def makeMovie(fileList, imgFolder, fps=15, aviFilename="output.avi"):
     if not fileList:
         return
     numFrames = len(fileList)
     numDigits = int(np.ceil(np.log10(numFrames)))
     for i, dataPath in enumerate(fileList):
         d = polymerutils.load(dataPath)
-        savePath = imgFolder + '/{0:0{width}}.png'.format(i, width=numDigits)
-        show_chain(
-            d,
-            showGui=False,
-            saveTo=savePath,
-            showChain='spheres')
+        savePath = imgFolder + "/{0:0{width}}.png".format(i, width=numDigits)
+        show_chain(d, showGui=False, saveTo=savePath, showChain="spheres")
 
     _mencoder(imgFolder, fps, aviFilename)
-

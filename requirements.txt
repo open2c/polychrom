@@ -1,0 +1,8 @@
+six
+cython
+numpy>=1.9
+scipy>=0.16
+h5py>=2.5
+pandas>=0.19
+joblib
+pytest

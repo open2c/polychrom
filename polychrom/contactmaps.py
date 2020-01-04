@@ -8,29 +8,48 @@ from . import polymerutils
 import warnings
 from . import polymer_analyses
 
-"""
-This module is the main workhorse of tools to calculate contactmaps, both from polymer simulations and from other simulations (e.g. 1D simulations of loop extrusion). All of the functions here are designed to be parallelized, and lots of efforts were put into making this possible. 
+"""This module is the main workhorse of tools to calculate contactmaps, both from 
+polymer simulations and from other simulations (e.g. 1D simulations of loop 
+extrusion). All of the functions here are designed to be parallelized, and lots of 
+efforts were put into making this possible. 
 
 The reasons we need parallel contactmap code is the following: 
 
--- Calculating contact maps is slow, esp. at large contact radii, and benefits greatly from parallelizing
--- Doing regular multiprocesing.map has limitations
-    -- It can only handle heataps up to some size, and transferring gigabyte-sized heatmaps between processes takes minutes 
-    -- It can only do as many heatmaps as fits in RAM, which on 20-core 128GB machine is no more than 5GB/heatmap 
+* Calculating contact maps is slow, esp. at large contact radii, and benefits greatly 
+  from parallelizing
+* Doing regular multiprocesing.map has limitations
+* It can only handle heataps up to some size, and transferring gigabyte-sized heatmaps between processes takes minutes 
+* It can only do as many heatmaps as fits in RAM, which on 20-core 128GB machine is no more than 5GB/heatmap 
 
 The structure of this class is as follows. 
 
-On the outer level, it  provides three methods to average contactmaps: monomerResolutionContactMap, binnedContactMap, 
-and monomerResolutionContactMapSubchains
-The first two create contact map from an entire file: either monomer-resolution or binned. The last one creates contact maps from sub-chains in a file, starting at a given set of starting points. It is useful when doing contact maps from several copies of a system in one simulation.
+On the outer level, it  provides three methods to average contactmaps: 
+monomerResolutionContactMap, binnedContactMap, 
+and monomerResolutionContactMapSubchains.  The first two create contact map from an 
+entire file: either monomer-resolution or binned. The last one creates contact maps 
+from sub-chains in a file, starting at a given set of starting points. It is useful 
+when doing contact maps from several copies of a system in one simulation. 
 
-The first two methods have a legacy implementation from the old library that is still here to do the tests. 
+The first two methods have a legacy implementation from the old library that is still 
+here to do the tests. 
 
-On the middle level, it provides a method "averageContacts". This method accepts a "contact iterator", and can be used to average contacts from both a set of filenames and from a simulation of some kind (e.g. averaging positions of loop extruding factors from a 1D loop extrusion simulation). All of the outer level functions (monomerResolutionContactMap for example) are implemented using this method. 
+On the middle level, it provides a method "averageContacts". This method accepts a 
+"contact iterator", and can be used to average contacts from both a set of filenames 
+and from a simulation of some kind (e.g. averaging positions of loop extruding 
+factors from a 1D loop extrusion simulation). All of the outer level functions (
+monomerResolutionContactMap for example) are implemented using this method. 
 
-On the lower level, there are internals of the "averageContacts" method and an associated "worker" function. There is generally no need to understand the code of those functions. There exists a reference implementation of both the worker and the averageContacts function, named "simpleWorker" and "averageContactsSimple". They do all the things that "averageContacts" do, but on only one core. In fact, "averageContacts" defaults to "averageContactsSimple" if requested to run on one core because it is a little bit faster. 
+On the lower level, there are internals of the "averageContacts" method and an 
+associated "worker" function. There is generally no need to understand the code of 
+those functions. There exists a reference implementation of both the worker and the 
+averageContacts function, named "simpleWorker" and "averageContactsSimple". They do 
+all the things that "averageContacts" do, but on only one core. In fact, 
+"averageContacts" defaults to "averageContactsSimple" if requested to run on one core 
+because it is a little bit faster. 
 
 """
+
+
 def indexing(smaller, larger, M):
     """converts x-y indexes to index in the upper triangular matrix"""
     return larger + smaller * (M - 1) - smaller * (smaller - 1) // 2
@@ -53,15 +72,15 @@ def tonumpyarray(mp_arr):
 
 def findN(filenames, loadFunction, exceptions):
     "Finds length of data in filenames, handling the fact that files could be not loadable"
-    for i in range(30):   
+    for i in range(30):
         if i == 29:
             raise ValueError("Could not load any of the 30 randomly selected files")
         try:
             N = len(loadFunction(random.choice(filenames)))
             break
         except tuple(exceptions):
-            continue 
-    return N 
+            continue
+    return N
 
 
 def init(*args):
@@ -102,20 +121,23 @@ def chunk(mylist, chunksize):
     return [mylist[i:j] for i, j in zip(chunks[:-1], chunks[1:])]
 
 
-def simpleWorker(x, uniqueContacts):
+def simple_worker(x, uniqueContacts):
     """
     A "reference" version of "worker" function below that runs on only one core.
-     Unlike the actual multicore worker, it can write contacts to the matrix directly without sorting.
-     This is useful when your contact finding is faster than sorting a 1D array fo contacts
-     uniqueContacts: bool
-        if True, assume that contactFinder outputs only unique contacts (like pure contact map)
-        if False, do not assume that (like in binned contact map)
+    Unlike the actual multicore worker, it can write contacts to the matrix directly
+    without sorting. This is useful when your contact finding is faster than sorting
+    a 1D array fo contacts
+
+     If uniqueContacts True, assume that contactFinder outputs only unique contacts (
+     like pure contact map) if False, do not assume that (like in binned contact
+     map). Using False is always safe, but True will add a minor speed up, especially
+     for very large contact radius.
 
     """
-    myIterator = contactIterator__(x, *classInitArgs__, **classInitKwargs__)
+    my_iterator = contactIterator__(x, *classInitArgs__, **classInitKwargs__)
     while True:
         try:
-            contacts = myIterator.next()
+            contacts = my_iterator.next()
             if contacts is None:
                 continue
             contacts = np.asarray(contacts)
@@ -123,7 +145,7 @@ def simpleWorker(x, uniqueContacts):
             if contacts.shape[1] != 2:
                 raise ValueError("Contacts.shape[1] must be 2. Exiting.")
             contacts = contactProcessing__(contacts)
-            ctrue = indexing(contacts[:,0], contacts[:,1], N__)
+            ctrue = indexing(contacts[:, 0], contacts[:, 1], N__)
             if not uniqueContacts:
                 position, counts = np.unique(ctrue, return_counts=True)
                 sharedArrays__[0][position] += counts
@@ -131,6 +153,7 @@ def simpleWorker(x, uniqueContacts):
                 sharedArrays__[0][ctrue] += 1
         except StopIteration:
             return
+
 
 def averageContactsSimple(contactIterator, inValues, N, **kwargs):
     """
@@ -162,13 +185,21 @@ def averageContactsSimple(contactIterator, inValues, N, **kwargs):
     uniqueContacts = kwargs.get("uniqueContacts", False)
     contactProcessing = kwargs.get("contactProcessing", lambda x: x)
     finalSize = N * (N + 1) // 2
-    sharedArrays = [np.zeros(finalSize, dtype = arrayDtype)]   # just an array, not a shared array here bc 1 core
-    argset = list(sharedArrays) + [contactProcessing, classInitArgs, classInitKwargs, contactIterator, contactBlock, N]
+    sharedArrays = [
+        np.zeros(finalSize, dtype=arrayDtype)
+    ]  # just an array, not a shared array here bc 1 core
+    argset = list(sharedArrays) + [
+        contactProcessing,
+        classInitArgs,
+        classInitKwargs,
+        contactIterator,
+        contactBlock,
+        N,
+    ]
     init(*argset)
-    [simpleWorker(x, uniqueContacts) for x in inValues]   # just calling workers 
+    [simple_worker(x, uniqueContacts) for x in inValues]  # just calling workers
     final = triagToNormal(sharedArrays[0], N)
     return final
-
 
 
 def worker(x):
@@ -180,16 +211,20 @@ def worker(x):
     All the locks etc. for shared memory objects are handeled here as well 
     """
     import numpy as np
+
     np.random.seed()
     import random
-    random.seed()   # making sure our bucket selectors are really randomized
+
+    random.seed()  # making sure our bucket selectors are really randomized
 
     sharedNumpy = list(map(tonumpyarray, sharedArrays__))  # shared numpy arrays
     allContacts = []
     contactSum = 0
-    myIterator = contactIterator__(x, *classInitArgs__, **classInitKwargs__)  # acquiring and initializing iterator
+    myIterator = contactIterator__(
+        x, *classInitArgs__, **classInitKwargs__
+    )  # acquiring and initializing iterator
     stopped = False
-    while True:   #main event loop
+    while True:  # main event loop
         try:
             contacts = myIterator.next()  # fetch contacts
             if contacts is None:
@@ -203,45 +238,65 @@ def worker(x):
         except StopIteration:
             stopped = True
 
-        if (contactSum > contactBlock__) or stopped:  # we aggregated enough contacts.  ready to dump them.
+        if (
+            contactSum > contactBlock__
+        ) or stopped:  # we aggregated enough contacts.  ready to dump them.
             if len(allContacts) == 0:
-                return   # no contacts found at all - exiting (we must be stopped)
+                return  # no contacts found at all - exiting (we must be stopped)
             contactSum = 0
             contacts = np.concatenate(allContacts, axis=0)
             contacts = contactProcessing__(contacts)
             if len(contacts) == 0:
                 if stopped:  # contactProcessing killed all contacts? are we done?
-                    return   #if yes, exiting
+                    return  # if yes, exiting
                 continue  # if not, going to the next bucket
-            ctrue = indexing(contacts[:,0], contacts[:,1], N__)  # converting to 1D contacts
-            position, counts = np.unique(ctrue, return_counts=True) #unique contacts
+            ctrue = indexing(
+                contacts[:, 0], contacts[:, 1], N__
+            )  # converting to 1D contacts
+            position, counts = np.unique(ctrue, return_counts=True)  # unique contacts
             assert position[0] >= 0
-            assert position[-1] < N__ * (N__+1) // 2   #boundary check for contacts
-            chunks = np.array(np.r_[0, np.cumsum(list(map(len, sharedArrays__)))], dtype=int)
-            inds = np.searchsorted(position, chunks)  # assinging contacts to chunks here
+            assert position[-1] < N__ * (N__ + 1) // 2  # boundary check for contacts
+            chunks = np.array(
+                np.r_[0, np.cumsum(list(map(len, sharedArrays__)))], dtype=int
+            )
+            inds = np.searchsorted(
+                position, chunks
+            )  # assinging contacts to chunks here
             if inds[-1] != len(position):
-                raise ValueError   # last chunks boundary must be after all contacts)
+                raise ValueError  # last chunks boundary must be after all contacts)
             indszip = list(zip(inds[:-1], inds[1:]))  # extents of contact buckets
 
             indarray = list(range(len(sharedArrays__)))
-            random.shuffle(indarray)   # shuffled array of contactmap bucket indices we are going to work with 
-            for j,(st,end) in enumerate(indszip):
-                position[st:end] -= chunks[j]    # pre-subtracting offsets now - not to do it when the lock is being held
+            random.shuffle(
+                indarray
+            )  # shuffled array of contactmap bucket indices we are going to work with
+            for j, (st, end) in enumerate(indszip):
+                position[st:end] -= chunks[
+                    j
+                ]  # pre-subtracting offsets now - not to do it when the lock is being held
 
-            while len(indarray) > 0:   # continue until all contacts are put in buckets
-                for i in range(len(indarray)): #going over all buckets
-                    ind = indarray[i]      # select current bucket
+            while len(indarray) > 0:  # continue until all contacts are put in buckets
+                for i in range(len(indarray)):  # going over all buckets
+                    ind = indarray[i]  # select current bucket
                     lock = sharedArrays__[ind].get_lock()  # get lock state
-                    if i == len(indarray):   #is this the last bucket? 
-                        lock.acquire()       # wait for it to be free, and work with it
+                    if i == len(indarray):  # is this the last bucket?
+                        lock.acquire()  # wait for it to be free, and work with it
                     else:
-                        if not lock.acquire(0):  # not the last bucket? Try to acquire the lock
-                            continue             # if failed, move to the next bucket
-                    st, end = indszip[ind]     #succeeded acquiring the lock? Then do things with our bucket
-                    sharedNumpy[ind][position[st:end]] += counts[st:end]  # add to the current bucket
+                        if not lock.acquire(
+                            0
+                        ):  # not the last bucket? Try to acquire the lock
+                            continue  # if failed, move to the next bucket
+                    st, end = indszip[
+                        ind
+                    ]  # succeeded acquiring the lock? Then do things with our bucket
+                    sharedNumpy[ind][position[st:end]] += counts[
+                        st:end
+                    ]  # add to the current bucket
                     lock.release()
-                    indarray.pop(i)  # remove the index of the bucket because it's finished
-                    break            #back to the main loop 
+                    indarray.pop(
+                        i
+                    )  # remove the index of the bucket because it's finished
+                    break  # back to the main loop
             allContacts = []
             if stopped:
                 return
@@ -249,31 +304,43 @@ def worker(x):
 
 def averageContacts(contactIterator, inValues, N, **kwargs):
     """
-    A main workhorse for averaging contacts on multiple cores into one shared contact map. 
-    It mostly does managing the arguments, and initializing the variables. All of the logic of 
-    how contacts are actually put in shared memory buckets is in the worker defined above. 
-    Args:
-        contactIterator:
-            an iterator. See descriptions of "filenameContactMap" class below for example and explanations
-        inValues:
-            an array of values to pass to contactIterator. Would be an array of arrays of filenames or something like that.
-        N:
-            Size of the resulting contactmap
+    A main workhorse for averaging contacts on multiple cores into one shared contact
+    map. It mostly does managing the arguments, and initializing the variables. All
+    of the logic of how contacts are actually put in shared memory buckets is in the
+    worker defined above.
 
-        **kwargs:
-            arrayDtype: ctypes dtype (default c_int32) for the contact map
-            classInitArgs: args to pass to the constructor of contact iterator as second+ args (first is the file list)
-            classInitKwargs: dict of keyword args to pass to the constructor
-            contactProcessing: function f(contacts), should return processed contacts
-            nproc : int, number of processors(default 4)
-            bucketNum: int (default = nproc) Number of memory bukcets to use
-            contactBlock: int (default 500k) Number of contacts to aggregate before writing to memory
-            useFmap: True, or callable, fork-map (or regular map) function; not multiprocessing.map! 
-                     defaults to mirnylib.systemutils.fmap if true. Otherwise, uses provided function
+    PARAMETERS
+    ----------
+        contactIterator : iterator
+            an iterator. See descriptions of "filenameContactMap" class below for
+            example and explanations
+        inValues : iterable
+            an array of values to pass to contactIterator. Would be an array of arrays
+            of filenames or something like that.
+        N : int
+            Size of one side of the resulting contactmap
+
+        arrayDtype : ctypes dtype (default c_int32) for the contact map
+        classInitArgs : args to pass to the constructor of contact iterator
+        classInitKwargs: dict of keyword args to pass to the constructor
+        contactProcessing: function f(contacts), should return processed contacts
+        nproc : int, number of processors(default 4)
+        bucketNum: int (default = nproc) Number of memory buckets to use
+        contactBlock: int (default 500k) Number of contacts to aggregate before writing
+
+        useFmap : True, False, or callable
+            If True, uses mirnylib.systemutils.fmap
+            If False, uses multiprocessing.Pool.map
+            Otherwise, uses provided function, assuming it of a fork-map type
+            (different initializations are needed for forkmap and
+            multiprocessing-style map)
+
+            Sorry, no outside multiprocessing-style maps for now, it's easy to fix
+            Let me know if it is needed.
                      
                      
-    Code that calcualtes a contactmap from a set of polymer conformation is in the methods 
-    below (averageMonomerResolutionContactMap, etc.) 
+    Code that calcualtes a contactmap from a set of polymer conformation is in the
+    methods below (averageMonomerResolutionContactMap, etc.)
     
     An example code that would run a contactmap from a simulation is pasted below. 
     
@@ -308,25 +375,38 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
     classInitKwargs = kwargs.get("classInitKwargs", {})
     contactProcessing = kwargs.get("contactProcessing", lambda x: x)
     finalSize = N * (N + 1) // 2
-    boundaries = np.linspace(0, finalSize, bucketNum + 1, dtype = int)
+    boundaries = np.linspace(0, finalSize, bucketNum + 1, dtype=int)
     chunks = zip(boundaries[:-1], boundaries[1:])
     sharedArrays = [mp.Array(arrayDtype, int(j - i)) for i, j in chunks]
-    argset = list(sharedArrays) + [contactProcessing, classInitArgs, classInitKwargs, contactIterator, contactBlock, N]
+    argset = list(sharedArrays) + [
+        contactProcessing,
+        classInitArgs,
+        classInitKwargs,
+        contactIterator,
+        contactBlock,
+        N,
+    ]
 
-    if not useFmap:   # for mp.map we need initializer because shared memory cannot be pickled or passed as an argument in inValues
+    if (
+        not useFmap
+    ):  # for mp.map we need initializer because shared memory cannot be pickled
+        # # or passed as an argument in inValues
         with closing(mp.Pool(processes=nproc, initializer=init, initargs=argset)) as p:
             p.map(worker, inValues)
-    else:   #diffent strategy for a local map - shared memory is just a global variable created by init() 
+
+    # diffent strategy for a local map
+    # shared memory is just a global variable created by init()
+    else:
         init(*argset)  # creating global variables here
         if callable(useFmap):
             fmap = useFmap
-        else: 
+        else:
             from mirnylib.systemutils import fmap
         fmap(worker, inValues, nproc=nproc)
-        
+
     res = np.concatenate([tonumpyarray(i) for i in sharedArrays])
-    del sharedArrays   # save memory 
-    final = triagToNormal(res, N)    
+    del sharedArrays  # save memory
+    final = triagToNormal(res, N)
     return final
 
 
@@ -334,14 +414,23 @@ class filenameContactMap(object):
     """
     This is the iterator for the contact map finder
     """
-    def __init__(self, filenames, cutoff = 1.7, loadFunction=None, exceptionsToIgnore=[], 
-                contactFunction=None):
-        """
-        Init accepts arguments to initialize the iterator.
-        filenames will be one of the items in the inValues list of the "averageContacts" function
-        cutoff and loadFunction should be provided either in classInitArgs or classInitKwargs of averageContacts
 
-        When initialized, the iterator should store these args properly and create all necessary constructs
+    def __init__(
+        self,
+        filenames,
+        cutoff=1.7,
+        loadFunction=None,
+        exceptionsToIgnore=[],
+        contactFunction=None,
+    ):
+        """
+        Init accepts arguments to initialize the iterator. filenames will be one of
+        the items in the inValues list of the "averageContacts" function cutoff and
+        loadFunction should be provided either in classInitArgs or classInitKwargs of
+        averageContacts
+
+        When initialized, the iterator should store these args properly and create
+        all necessary constructs
         """
         self.filenames = filenames
         self.cutoff = cutoff
@@ -352,16 +441,16 @@ class filenameContactMap(object):
 
     def next(self):
         """
-        This is the method which gets called by the worker asking for contacts.
-         This method should return new set of contacts each time it is called
-         When there are no more contacts to return (all filenames are gone, or simulation is over),
-         then this method should raise StopIteration
+        This is the method which gets called by the worker asking for contacts. This
+        method should return new set of contacts each time it is called When there
+        are no more contacts to return (all filenames are gone, or simulation is
+        over), then this method should raise StopIteration
         """
         if self.i == len(self.filenames):
             raise StopIteration
-        try: 
+        try:
             data = self.loadFunction(self.filenames[self.i])
-        except tuple(self.exceptionsToIgnore): 
+        except tuple(self.exceptionsToIgnore):
             print("contactmap manager could not load file", self.filenames[self.i])
             self.i += 1
             return None
@@ -369,53 +458,67 @@ class filenameContactMap(object):
         self.i += 1
         return contacts
 
-def monomerResolutionContactMap(filenames,
-                          cutoff=5,
-                          n=8,  # Num threads
-                          contactFinder = polymer_analyses.calculate_contacts,
-                          loadFunction=polymerutils.load,
-                          exceptionsToIgnore=[], useFmap=False):
 
-    N =  findN(filenames, loadFunction, exceptionsToIgnore)        
+def monomerResolutionContactMap(
+    filenames,
+    cutoff=5,
+    n=8,  # Num threads
+    contactFinder=polymer_analyses.calculate_contacts,
+    loadFunction=polymerutils.load,
+    exceptionsToIgnore=[],
+    useFmap=False,
+):
+    N = findN(filenames, loadFunction, exceptionsToIgnore)
     args = [cutoff, loadFunction, exceptionsToIgnore, contactFinder]
     values = [filenames[i::n] for i in range(n)]
-    return averageContacts(filenameContactMap,values,N, classInitArgs=args, useFmap=useFmap, uniqueContacts = True, nproc=n)
+    return averageContacts(
+        filenameContactMap,
+        values,
+        N,
+        classInitArgs=args,
+        useFmap=useFmap,
+        uniqueContacts=True,
+        nproc=n,
+    )
 
 
-def binnedContactMap(filenames, chains=None, binSize=5, cutoff=5,
-                            n=8,  # Num threads
-                            contactFinder = polymer_analyses.calculate_contacts,
-                            loadFunction=polymerutils.load,
-                            exceptionsToIgnore=None, useFmap=False):
+def binnedContactMap(
+    filenames,
+    chains=None,
+    binSize=5,
+    cutoff=5,
+    n=8,  # Num threads
+    contactFinder=polymer_analyses.calculate_contacts,
+    loadFunction=polymerutils.load,
+    exceptionsToIgnore=None,
+    useFmap=False,
+):
     n = min(n, len(filenames))
-    subvalues = [filenames[i::n] for i in range(n)]
+    N = findN(filenames, loadFunction, exceptionsToIgnore)
 
-    datas = []
-    N =  findN(filenames, loadFunction, exceptionsToIgnore)
-    
     if chains is None:
         chains = [[0, N]]
-        
+
     bins = []
     chains = np.asarray(chains)
-    chainBinNums = (np.ceil((chains[:, 1] - chains[:, 0]) / (0.0 + binSize)))
-    
+    chainBinNums = np.ceil((chains[:, 1] - chains[:, 0]) / (0.0 + binSize))
+
     for i in range(len(chainBinNums)):
-        bins.append(binSize * (np.arange(int(chainBinNums[i])))
-                    + chains[i, 0])
+        bins.append(binSize * (np.arange(int(chainBinNums[i]))) + chains[i, 0])
     bins.append(np.array([chains[-1, 1] + 1]))
     bins = np.concatenate(bins) - 0.5
     Nbase = len(bins) - 1
 
     if Nbase > 25000:
-        warnings.warn(UserWarning('very large contact map'
-                                  ' may be difficult to visualize'))
+        warnings.warn(
+            UserWarning("very large contact map" " may be difficult to visualize")
+        )
 
     chromosomeStarts = np.cumsum(chainBinNums)
     chromosomeStarts = np.hstack((0, chromosomeStarts))
 
-    def contactAction(contacts, myBins = [bins]):
-        contacts = np.asarray(contacts, order = "C")
+    def contactAction(contacts, myBins=[bins]):
+        contacts = np.asarray(contacts, order="C")
         cshape = contacts.shape
         contacts.shape = (-1,)
         contacts = np.searchsorted(myBins[0], contacts) - 1
@@ -424,7 +527,15 @@ def binnedContactMap(filenames, chains=None, binSize=5, cutoff=5,
 
     args = [cutoff, loadFunction, exceptionsToIgnore, contactFinder]
     values = [filenames[i::n] for i in range(n)]
-    mymap =  averageContacts(filenameContactMap,values,Nbase, classInitArgs=args, useFmap=useFmap, contactProcessing=contactAction, nproc=n)
+    mymap = averageContacts(
+        filenameContactMap,
+        values,
+        Nbase,
+        classInitArgs=args,
+        useFmap=useFmap,
+        contactProcessing=contactAction,
+        nproc=n,
+    )
     return mymap, chromosomeStarts
 
 
@@ -432,14 +543,25 @@ class filenameContactMapRepeat(object):
     """
     This is a interator for the repeated contact map finder
     """
-    def __init__(self, filenames, mapStarts, mapN, cutoff = 1.7, loadFunction=None, exceptionsToIgnore=[], 
-                contactFunction=None,):
-        """
-        Init accepts arguments to initialize the iterator.
-        filenames will be one of the items in the inValues list of the "averageContacts" function
-        cutoff and loadFunction should be provided either in classInitArgs or classInitKwargs of averageContacts
 
-        When initialized, the iterator should store these args properly and create all necessary constructs
+    def __init__(
+        self,
+        filenames,
+        mapStarts,
+        mapN,
+        cutoff=1.7,
+        loadFunction=None,
+        exceptionsToIgnore=[],
+        contactFunction=None,
+    ):
+        """
+        Init accepts arguments to initialize the iterator. filenames will be one of
+        the items in the inValues list of the "averageContacts" function cutoff and
+        loadFunction should be provided either in classInitArgs or classInitKwargs of
+        averageContacts
+
+        When initialized, the iterator should store these args properly and create
+        all necessary constructs
         """
         self.filenames = filenames
         self.cutoff = cutoff
@@ -448,111 +570,58 @@ class filenameContactMapRepeat(object):
         self.mapN = mapN
         self.contactFunction = contactFunction
         self.loadFunction = loadFunction
-        
+
         self.i = 0
         self.curStarts = []
 
     def next(self):
         """
-        This is the method which gets called by the worker asking for contacts.
-         This method should return new set of contacts each time it is called
-         When there are no more contacts to return (all filenames are gone, or simulation is over),
-         then this method should raise StopIteration
+        This is the method which gets called by the worker asking for contacts. This
+        method should return new set of contacts each time it is called When there
+        are no more contacts to return (all filenames are gone, or simulation is
+        over), then this method should raise StopIteration
         """
 
-            
         try:
             if len(self.curStarts) == 0:
                 if self.i == len(self.filenames):
                     raise StopIteration
                 self.data = self.loadFunction(self.filenames[self.i])
                 self.curStarts = list(self.mapStarts)
-                self.i += 1 
+                self.i += 1
             start = self.curStarts.pop()
-            data = self.data[start:start+self.mapN]
+            data = self.data[start : start + self.mapN]
             assert len(data) == self.mapN
-        except tuple(self.exceptionsToIgnore): 
+        except tuple(self.exceptionsToIgnore):
             print("contactmap manager could not load file", self.filenames[self.i])
             self.i += 1
             return None
         contacts = self.contactFunction(data, cutoff=self.cutoff)
         return contacts
 
-def monomerResolutionContactMapSubchains(filenames,
-                          mapStarts, 
-                          mapN,
-                          cutoff=5,
-                          n=8,  # Num threads
-                          method = polymer_analyses.calculate_contacts,                          
-                          loadFunction=polymerutils.load,
-                          exceptionsToIgnore=[], useFmap=False):
 
-    args = [ mapStarts, mapN,cutoff, loadFunction, exceptionsToIgnore, method]
+def monomerResolutionContactMapSubchains(
+    filenames,
+    mapStarts,
+    mapN,
+    cutoff=5,
+    n=8,  # Num threads
+    method=polymer_analyses.calculate_contacts,
+    loadFunction=polymerutils.load,
+    exceptionsToIgnore=[],
+    useFmap=False,
+):
+    args = [mapStarts, mapN, cutoff, loadFunction, exceptionsToIgnore, method]
     values = [filenames[i::n] for i in range(n)]
-    return averageContacts(filenameContactMapRepeat,values,mapN, classInitArgs=args, useFmap=useFmap, uniqueContacts = True, nproc=n)
-
-
-
-
-
-
-class dummyContactMap(object):
-    "contactmap 'finder' for testing that returns fixed contacts (a) + constant(x)"
-    def __init__(self, x, a):
-        self.a = a + x
-        self.M = 15
-    def next(self):
-        if self.M == 0:
-            raise StopIteration
-        self.M -= 1
-        return self.a
-
-  
-def _test():
-    ars = [np.random.random((60,3)) * 4 for _ in range(200)]
-    conts = polymer_analyses.calculate_contacts(ars[0],1)
-    print(conts.shape)
-    args = np.repeat(np.arange(20, dtype=int), 10)
-    cmap1 = averageContacts(dummyContactMap, args, 100, classInitArgs=[conts], nproc=20)
-    cmap4 = averageContacts(dummyContactMap, args, 100, classInitArgs=[conts], nproc=1)
-    cmap2 = averageContactsSimple(dummyContactMap, args, 100, classInitArgs=[conts])
-    cmap3 = np.zeros((100,100))
-    for i in args:
-        cmap3[conts[:,0] + i , conts[:,1] + i] += 15
-    cmap3 = cmap3 + cmap3.T
-
-    print(cmap1.sum())
-    print(cmap2.sum())
-    print(cmap3.sum())
-    print(cmap4.sum())
-    assert np.allclose(cmap1, cmap2)
-    assert np.allclose(cmap1, cmap4)
-    assert np.allclose(cmap1, cmap3)
-
-    from .legacy.contactmaps import averagePureContactMap as cmapPureMap
-    from .legacy.contactmaps import averageBinnedContactMap as cmapBinnedMap
-
-    for n in [1, 5, 20]:
-        cmap6 = monomerResolutionContactMap(range(200), cutoff = 1, loadFunction=lambda x:ars[x], n=n)
-        cmap5 = cmapPureMap(range(200), cutoff = 1, loadFunction=lambda x:ars[x], n=n, printProbability=0.001)
-        print(cmap5.sum(), cmap6.sum())
-        assert np.allclose(cmap6, cmap5)
-
-        cmap7 = binnedContactMap(range(200), chains= [(0,27),(27,60)], binSize = 2, cutoff = 1, loadFunction=lambda x:ars[x], n=n)[0]
-
-        cmap8 = cmapBinnedMap(range(200), chains= [(0,27),(27,60)], binSize = 2, cutoff = 1, loadFunction=lambda x:ars[x], n=n, printProbability=0.001)[0]
-        print(cmap7.sum(), cmap8.sum())
-        assert np.allclose(cmap7, cmap8)
-       
-    
-    print("All tests passed")
-
-
-
-
-
-
-
+    return averageContacts(
+        filenameContactMapRepeat,
+        values,
+        mapN,
+        classInitArgs=args,
+        useFmap=useFmap,
+        uniqueContacts=True,
+        nproc=n,
+    )
 
 
 

@@ -70,8 +70,8 @@ def rescaledMap(data, bins, cutoff=1.7, contactMap=None):
     assert y.max() < len(bins) - 1
     matrixSize = len(bins) - 1
     index = matrixSize * x + y
-    
-    unique, inds = np.unique(index, return_counts=True)    
+
+    unique, inds = np.unique(index, return_counts=True)
     uniquex = unique // matrixSize
     uniquey = unique % matrixSize
 
@@ -114,16 +114,17 @@ def pureMap(data, cutoff=1.7, contactMap=None):
     return contactMap
 
 
-
-
-
-
-
-def averageBinnedContactMap(filenames, chains=None, binSize=None, cutoff=1.7,
-                            n=4,  # Num threads
-                            loadFunction=load,
-                            exceptionsToIgnore=None, printProbability=1, 
-                           map_function = map):
+def averageBinnedContactMap(
+    filenames,
+    chains=None,
+    binSize=None,
+    cutoff=1.7,
+    n=4,  # Num threads
+    loadFunction=load,
+    exceptionsToIgnore=None,
+    printProbability=1,
+    map_function=map,
+):
     """
     Returns an average contact map of a set of conformations.
     Non-existing files are ignored if exceptionsToIgnore is set to IOError.
@@ -187,19 +188,18 @@ def averageBinnedContactMap(filenames, chains=None, binSize=None, cutoff=1.7,
 
     bins = []
     chains = np.asarray(chains)
-    chainBinNums = (
-        np.ceil((chains[:, 1] - chains[:, 0]) / (0.0 + binSize)))
+    chainBinNums = np.ceil((chains[:, 1] - chains[:, 0]) / (0.0 + binSize))
     for i in range(len(chainBinNums)):
-        bins.append(binSize * (np.arange(int(chainBinNums[i])))
-                    + chains[i, 0])
+        bins.append(binSize * (np.arange(int(chainBinNums[i]))) + chains[i, 0])
     bins.append(np.array([chains[-1, 1] + 1]))
     bins = np.concatenate(bins)
-    bins = bins - .5
+    bins = bins - 0.5
     Nbase = len(bins) - 1
 
     if Nbase > 10000:
-        warnings.warn(UserWarning('very large contact map'
-                                  ' may be difficult to visualize'))
+        warnings.warn(
+            UserWarning("very large contact map" " may be difficult to visualize")
+        )
 
     chromosomeStarts = np.cumsum(chainBinNums)
     chromosomeStarts = np.hstack((0, chromosomeStarts))
@@ -219,7 +219,6 @@ def averageBinnedContactMap(filenames, chains=None, binSize=None, cutoff=1.7,
                 data = data.T
             if mysum is None:  # if it's the first filename,
 
-
                 mysum = rescaledMap(data, bins, cutoff)  # create a map
 
             else:  # if not
@@ -238,13 +237,15 @@ def averageBinnedContactMap(filenames, chains=None, binSize=None, cutoff=1.7,
     return a, chromosomeStarts
 
 
-def averagePureContactMap(filenames,
-                          cutoff=1.7,
-                          n=4,  # Num threads
-                          loadFunction=load,
-                          exceptionsToIgnore=[],
-                          printProbability=0.005, 
-                         map_function = map ):
+def averagePureContactMap(
+    filenames,
+    cutoff=1.7,
+    n=4,  # Num threads
+    loadFunction=load,
+    exceptionsToIgnore=[],
+    printProbability=0.005,
+    map_function=map,
+):
     """
         Parameters
     ----------
@@ -298,11 +299,18 @@ def averagePureContactMap(filenames,
             if mysum is None:  # if it's the first filename,
 
                 if len(data) > 6000:
-                    warnings.warn(UserWarning('very large contact map'
-                                              ' may cause errors. these may be fixed with n=1 threads.'))
+                    warnings.warn(
+                        UserWarning(
+                            "very large contact map"
+                            " may cause errors. these may be fixed with n=1 threads."
+                        )
+                    )
                 if len(data) > 20000:
-                    warnings.warn(UserWarning('very large contact map'
-                                              ' may be difficult to visualize.'))
+                    warnings.warn(
+                        UserWarning(
+                            "very large contact map" " may be difficult to visualize."
+                        )
+                    )
 
                 mysum = pureMap(data, cutoff)  # create a map
 

@@ -1,20 +1,19 @@
-import numpy as np 
+import numpy as np
 import warnings
-import h5py 
+import h5py
 import glob
-import simtk.openmm 
-import os 
-import shutil
+import os
 
+DEFAULT_OPTS = {"compression_opts": 9, "compression": "gzip"}
 
 def _read_h5_group(gr):
     """
     Reads all attributes of an HDF5 group, and returns a dict of them
     """
-    result = {i:j[:] for i,j in gr.items()}
-    for i,j in gr.attrs.items():
+    result = {i: j[:] for i, j in gr.items()}
+    for i, j in gr.attrs.items():
         result[i] = j
-    return result     
+    return result
 
 
 def _convert_to_hdf5_array(data):
@@ -31,30 +30,31 @@ def _convert_to_hdf5_array(data):
     """
     if type(data) == str:
         data = np.array(data, dtype="S")
-    data = np.array(data)    
-    
-    if data.dtype ==  np.dtype("O"):        
-        return None,None
+    data = np.array(data)
+
+    if data.dtype == np.dtype("O"):
+        return None, None
 
     if len(data.shape) == 0:
         return ("item", data.item())
     else:
         return ("ndarray", data)
 
-    
-    
-def _write_group(dataDict, group, dset_opts={"compression":"gzip"}):
+
+def _write_group(dataDict, group, dset_opts=None):
     """
     Writes a dictionary of elements to an HDF5 group
     Puts all "items" into attrs, and all ndarrays into datasets 
     
     dset_opts is a dictionary of arguments passed to create_dataset function
-    (compression would be here for example)
+    (compression would be here for example). By default set to DEFAULT_OPTS
     """
-    for name,data in dataDict.items():
+    if dset_opts is None:
+        dset_opts = DEFAULT_OPTS
+    for name, data in dataDict.items():
         datatype, converted = _convert_to_hdf5_array(data)
         if datatype is None:
-            warnings.warn(f"Could not convert record {name}")            
+            warnings.warn(f"Could not convert record {name}")
         elif datatype == "item":
             group.attrs[name] = data
         elif datatype == "ndarray":
@@ -63,36 +63,66 @@ def _write_group(dataDict, group, dset_opts={"compression":"gzip"}):
             raise ValueError("Unknown datatype")
 
 
+def list_URIs(folder, empty_error=True, read_error=True, return_dict=False):
+    """
+    Makes a list of URIs (path-like records for each block). for a trajectory folder
+    Now we store multiple blocks per file, and URI is a 
+    Universal Resource Identifier for a block. 
+    
+    It is be compatible with polymerutils.load, and with contactmap finders, and is 
+    generally treated like a filename. 
+    
+    This function checks that the HDF5 file is openable (if read_error==True),
+    but does not check if individual datasets (blocks) exist in a file. 
+    If read_error==False, a non-openable file is fully ignored. 
+    NOTE: This covers the most typical case of corruption due to a terminated write,
+    because an HDF5 file becomes invalid in that case. 
+    
+    It does not check continuity of blocks (blocks_1-10.h5; blocks_20-30.h5 is valid)
+    But it does error if one block is listed twice
+    (e.g. blocks_1-10.h5; blocks_5-15.h5 is invalid)
+    
+    TODO: think about the above checks, and check for readable datasets as well
+    
+    Parameters
+    ----------
+    
+    folder : str
+        folder to find conformations in 
+    empty_error : bool, optional
+        Raise error if the folder does not exist or has no files, default True
+    read_error : bool, optional 
+        Raise error if one of the HDF5 files cannot be read, default True
+    return_dict : bool, optional
+        True: return a dict of {block_number, URI}. 
+        False: return a list of URIs. This is a default.                   
         
+    """
 
-def list_URIs(folder, readError=True, return_dict=False):    
-    """
-    Takes a trajectory folder and makes a list of dset paths for each block. 
-    It is needed because now we store multiple blocks per file. 
-    
-    It should be compatible with polymerutils.load
-    """
-    
     files = glob.glob(os.path.join(folder, "blocks_*-*.h5"))
     if len(files) == 0:
-        raise ValueError(f"No files found in folder {folder}")
+        if empty_error:
+            raise ValueError(f"No files found in folder {folder}")
     filenames = {}
     for file in files:
         try:
-            f1 = h5py.File(file,'r')
+            f1 = h5py.File(file, "r")
         except:
-            if readError:
+            if read_error:
                 raise ValueError(f"Cannot read file {file}")
         sted = os.path.split(file)[-1].split("_")[1].split(".h5")[0]
-        st,end = [int(i) for i in sted.split("-")]
-        for i in range(st,end+1):
+        st, end = [int(i) for i in sted.split("-")]
+        for i in range(st, end + 1):
             if i in filenames:
                 raise ValueError(f"Block {i} exists more than once")
-            filenames[i] =  file+f"::{i}"
+            filenames[i] = file + f"::{i}"
     if not return_dict:
-        return [i[1] for i in sorted(filenames.items(), key=lambda x:int(x[0]))]
+        return [i[1] for i in sorted(filenames.items(), key=lambda x: int(x[0]))]
     else:
-        return {int(i[0]):i[1] for i in sorted(filenames.items(), key=lambda x:int(x[0]))}
+        return {
+            int(i[0]): i[1] for i in sorted(filenames.items(), key=lambda x: int(x[0]))
+        }
+
 
 def load_URI(dset_path):
     """
@@ -103,36 +133,41 @@ def load_URI(dset_path):
     
     where Z is the block number 
     """
-    
+
     fname, group = dset_path.split("::")
-    with h5py.File(fname, mode='r') as myfile:        
+    with h5py.File(fname, mode="r") as myfile:
         return _read_h5_group(myfile[group])
 
-def save_hdf5_file(filename, data_dict, dset_opts={"compression":"gzip"}, mode='w'):
+
+def save_hdf5_file(filename, data_dict, dset_opts=None, mode="w"):
     """
     Saves data_dict to filename 
     """
-    with h5py.File(filename, mode=mode) as file: 
+    if dset_opts is None:
+        dset_opts = DEFAULT_OPTS
+    with h5py.File(filename, mode=mode) as file:
         _write_group(data_dict, file, dset_opts=dset_opts)
 
-    
+
 def load_hdf5_file(fname):
     """
     Loads a saved HDF5 files, reading all datasets and attributes. 
     We save arrays as datasets, and regular types as attributes in HDF5
     """
-    with h5py.File(fname, mode='r') as myfile:        
+    with h5py.File(fname, mode="r") as myfile:
         return _read_h5_group(myfile)
-    
-            
-            
+
+
 class HDF5Reporter(object):
-    def __init__(self, folder, max_data_length=50, 
-                 h5py_dset_opts={"compression":"gzip"}, 
-                 overwrite=False, 
-                 blocks_only=False, 
-                 check_exists=True
-                ):
+    def __init__(
+            self,
+            folder,
+            max_data_length=50,
+            h5py_dset_opts=None,
+            overwrite=False,
+            blocks_only=False,
+            check_exists=True,
+    ):
         """
         Creates a reporter object that saves a trajectory to a folder 
         
@@ -157,40 +192,50 @@ class HDF5Reporter(object):
 
         
         """
-        
-        self.prefixes = ["blocks", "applied_forces", "initArgs", "starting_conformation", "energy_minimization", 
-                        "forcekit_polymer_chains"]  # these are used for inferring if a file belongs to a trajectory or not 
-        self.counter = {}  # initializing all the options and dictionaries 
+
+        if h5py_dset_opts is None:
+            h5py_dset_opts = DEFAULT_OPTS
+        self.prefixes = [
+            "blocks",
+            "applied_forces",
+            "initArgs",
+            "starting_conformation",
+            "energy_minimization",
+            "forcekit_polymer_chains",
+        ]  # these are used for inferring if a file belongs to a trajectory or not
+        self.counter = {}  # initializing all the options and dictionaries
         self.datas = {}
         self.max_data_length = max_data_length
         self.h5py_dset_opts = h5py_dset_opts
         self.folder = folder
         self.blocks_only = blocks_only
-                                
-        
+
         if not os.path.exists(folder):
             os.mkdir(folder)
 
-        if overwrite: 
+        if overwrite:
             for the_file in os.listdir(folder):
                 file_path = os.path.join(folder, the_file)
-                if os.path.isfile(file_path):                    
+                if os.path.isfile(file_path):
                     for prefix in self.prefixes:
                         if the_file.startswith(prefix):
                             os.remove(file_path)
                 else:
-                    raise IOError("Subfolder in traj folder; not deleting. Ensure folder is correct and delete manually. ")
-
+                    raise IOError(
+                        "Subfolder in traj folder; not deleting. Ensure folder is "
+                        "correct and delete manually. "
+                    )
 
         if check_exists:
             if len(os.listdir(folder)) != 0:
-                for the_file in os.listdir(folder):            
+                for the_file in os.listdir(folder):
                     for prefix in self.prefixes:
                         if the_file.startswith(prefix):
-                            raise RuntimeError(f"folder {folder} is not empty: set check_exists=False to ignore")
+                            raise RuntimeError(
+                                f"folder {folder} is not empty: set check_exists=False to ignore"
+                            )
 
-    def continue_trajectory(self, continue_from=None, 
-                       continue_max_delete = 5 ):
+    def continue_trajectory(self, continue_from=None, continue_max_delete=5):
         """        
         Continues a simulation in a current folder (i.e. continues from the last block, or the block you specify).
         By default, takes the last block. Otherwise, takes the continue_from block 
@@ -226,7 +271,9 @@ class HDF5Reporter(object):
             """
 
         uris = list_URIs(self.folder, return_dict=True)
-        uri_inds = np.array(list(uris.keys()))  # making a list of all URIs and filenames 
+        uri_inds = np.array(
+            list(uris.keys())
+        )  # making a list of all URIs and filenames
         uri_vals = np.array(list(uris.values()))
         uri_fnames = np.array([i.split("::")[0] for i in uris.values()])
         if continue_from is None:
@@ -235,23 +282,31 @@ class HDF5Reporter(object):
         if int(continue_from) not in uris:
             raise ValueError(f"block {continue_from} not in folder")
 
-        ind = np.nonzero(uri_inds == continue_from)[0][0]  # position of a starting block in arrays 
+        ind = np.nonzero(uri_inds == continue_from)[0][
+            0
+        ]  # position of a starting block in arrays
         newdata = load_URI(uri_vals[ind])
 
         todelete = np.nonzero(uri_inds >= continue_from)[0]
         if len(todelete) > continue_max_delete:
-            raise ValueError("Refusing to delete {uris_delete} blocks - set continue_max_delete accordingly")             
+            raise ValueError(
+                "Refusing to delete {uris_delete} blocks - set continue_max_delete accordingly"
+            )
 
-        fnames_delete = np.unique(uri_fnames[todelete])                        
+        fnames_delete = np.unique(uri_fnames[todelete])
         inds_tosave = np.nonzero((uri_fnames == uri_fnames[ind]) * (uri_inds <= ind))[0]
 
-        for saveind in inds_tosave:  # we are saving some data and deleting the whole last file 
+        for (
+                saveind
+        ) in inds_tosave:  # we are saving some data and deleting the whole last file
             self.datas[uri_inds[saveind]] = load_URI(uri_vals[saveind])
-        self.counter["data"] = ind + 1 
+        self.counter["data"] = ind + 1
 
-        files = os.listdir(self.folder)  # some heuristics to infer values of counters - not crucial but maybe useful 
+        files = os.listdir(
+            self.folder
+        )  # some heuristics to infer values of counters - not crucial but maybe useful
         for prefix in self.prefixes:
-            if prefix is not "data": 
+            if prefix is not "data":
                 myfiles = [i for i in files if i.startswith(prefix)]
                 inds = []
                 for i in myfiles:
@@ -259,15 +314,15 @@ class HDF5Reporter(object):
                         inds.append(int(i.split("_")[-1].split(".h5")[0]))
                     except:
                         pass
-                    self.counter[prefix] = max(inds, default=-1)+1
+                    self.counter[prefix] = max(inds, default=-1) + 1
 
-        for fdelete in fnames_delete: # actually deleting files that we need to delete 
+        for fdelete in fnames_delete:  # actually deleting files that we need to delete
             os.remove(fdelete)
 
         if len(self.datas) >= self.max_data_length:
-            self.dump_data()  
+            self.dump_data()
 
-        return (uri_inds[ind], newdata)        
+        return uri_inds[ind], newdata
 
     def report(self, name, values):
         """        
@@ -284,34 +339,27 @@ class HDF5Reporter(object):
             to a np-array of numbers or strings/bytes.            
         
         """
-        count = self.counter.get(name, 0)        
-        
+        count = self.counter.get(name, 0)
+
         if name not in ["data"]:
             if not self.blocks_only:
                 filename = f"{name}_{count}.h5"
-                with h5py.File(os.path.join(self.folder,filename)) as file: 
+                with h5py.File(os.path.join(self.folder, filename)) as file:
                     _write_group(values, file, dset_opts=self.h5py_dset_opts)
-                
+
         else:
-            self.datas[count] = values 
+            self.datas[count] = values
             if len(self.datas) >= self.max_data_length:
                 self.dump_data()
         self.counter[name] = count + 1
-                
-                
+
     def dump_data(self):
         if len(self.datas) > 0:
             cmin = min(self.datas.keys())
             cmax = max(self.datas.keys())
             filename = f"blocks_{cmin}-{cmax}.h5"
-            with h5py.File(os.path.join(self.folder,filename)) as file: 
-                for count, values in self.datas.items():                     
+            with h5py.File(os.path.join(self.folder, filename)) as file:
+                for count, values in self.datas.items():
                     gr = file.create_group(str(count))
                     _write_group(values, gr, dset_opts=self.h5py_dset_opts)
             self.datas = {}
-
-            
-
-            
-            
-                

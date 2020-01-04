@@ -2,7 +2,7 @@ import re
 import itertools
 from collections.abc import Iterable
 
-import numpy as np 
+import numpy as np
 
 import simtk.openmm as openmm
 import simtk.unit as units
@@ -13,16 +13,16 @@ ps = units.second * 1e-12
 
 
 def _prepend_force_name_to_params(force):
-    if not hasattr(force, 'getEnergyFunction'):
+    if not hasattr(force, "getEnergyFunction"):
         return
 
     energy = force.getEnergyFunction()
-    if hasattr(force, 'getNumGlobalParameters'):
+    if hasattr(force, "getNumGlobalParameters"):
         for i in range(force.getNumGlobalParameters()):
             old_name = force.getGlobalParameterName(i)
-            new_name = force.name + '_' + old_name
+            new_name = force.name + "_" + old_name
             force.setGlobalParameterName(i, new_name)
-            energy = re.sub(f'(?<!\w){old_name}(?!\w)', new_name, energy)
+            energy = re.sub(f"(?<!\w){old_name}(?!\w)", new_name, energy)
 
     force.setEnergyFunction(energy)
 
@@ -32,19 +32,16 @@ def _to_array_1d(scalar_or_array, arrlen, dtype=float):
         outarr = np.full(arrlen, scalar_or_array, dtype)
     else:
         outarr = np.asarray(scalar_or_array, dtype=dtype)
-    
+
     if len(outarr) != arrlen:
-        raise ValueError('The length of the array differs from the expected one!')
-        
+        raise ValueError("The length of the array differs from the expected one!")
+
     return outarr
 
 
-def harmonic_bonds(sim_object,
-                  bonds,
-                  bondWiggleDistance=0.05,
-                  bondLength=1.0,
-                  name="harmonic_bonds",
-                  ):
+def harmonic_bonds(
+    sim_object, bonds, bondWiggleDistance=0.05, bondLength=1.0, name="harmonic_bonds",
+):
     """Adds harmonic bonds
 
     Parameters
@@ -60,36 +57,36 @@ def harmonic_bonds(sim_object,
         The length of the bond.
         Can be provided per-particle.
     """
-    
-    force =  openmm.HarmonicBondForce()
+
+    force = openmm.HarmonicBondForce()
     force.name = name
 
     bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
-    bondWiggleDistance = _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
-    
+    bondWiggleDistance = (
+        _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
+    )
+
     # using kbondScalingFactor because force accepts parameters with units
-    kbond = sim_object.kbondScalingFactor / (bondWiggleDistance ** 2)  
+    kbond = sim_object.kbondScalingFactor / (bondWiggleDistance ** 2)
     kbond[bondWiggleDistance == 0] = 0
 
     for bond_idx, (i, j) in enumerate(bonds):
         if (i >= sim_object.N) or (j >= sim_object.N):
-            raise ValueError("\nCannot add bond with monomers %d,%d that"\
-            "are beyound the polymer length %d" % (i, j, sim_object.N))
-        
-        force.addBond(int(i), 
-                      int(j), 
-                      float(bondLength[bond_idx]), 
-                      float(kbond[bond_idx]))
-        
+            raise ValueError(
+                "\nCannot add bond with monomers %d,%d that"
+                "are beyound the polymer length %d" % (i, j, sim_object.N)
+            )
+
+        force.addBond(
+            int(i), int(j), float(bondLength[bond_idx]), float(kbond[bond_idx])
+        )
+
     return force
-    
-    
-def FENE_bonds(sim_object,
-              bonds,
-              bondWiggleDistance=0.05,
-              bondLength=1.0,
-              name="FENE_bonds",
-              ):
+
+
+def FENE_bonds(
+    sim_object, bonds, bondWiggleDistance=0.05, bondLength=1.0, name="FENE_bonds",
+):
     """Adds harmonic bonds
 
     Parameters
@@ -104,13 +101,15 @@ def FENE_bonds(sim_object,
         The length of the bond.
         Can be provided per-particle.
     """
-    
-    energy = f"(1. / wiggle) * univK * "\
-                f"(sqrt((r-r0 * conlen)* "\
-                f" (r - r0 * conlen) + a * a) - a)"
+
+    energy = (
+        f"(1. / wiggle) * univK * "
+        f"(sqrt((r-r0 * conlen)* "
+        f" (r - r0 * conlen) + a * a) - a)"
+    )
     force = openmm.CustomBondForce(energy)
     force.name = name
-    
+
     force.addPerBondParameter("wiggle")
     force.addPerBondParameter("r0")
     force.addGlobalParameter("univK", sim_object.kT / sim_object.conlen)
@@ -118,27 +117,27 @@ def FENE_bonds(sim_object,
     force.addGlobalParameter("conlen", sim_object.conlen)
 
     bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
-    bondWiggleDistance = _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
-    
+    bondWiggleDistance = (
+        _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
+    )
+
     for bond_idx, (i, j) in enumerate(bonds):
         if (i >= sim_object.N) or (j >= sim_object.N):
-            raise ValueError("\nCannot add bond with monomers %d,%d that"\
-            "are beyound the polymer length %d" % (i, j, sim_object.N))
-        
-        force.addBond(int(i), 
-                             int(j), 
-                             [float(bondWiggleDistance[bond_idx]), 
-                              float(bondLength[bond_idx])]) 
-        
+            raise ValueError(
+                "\nCannot add bond with monomers %d,%d that"
+                "are beyound the polymer length %d" % (i, j, sim_object.N)
+            )
+
+        force.addBond(
+            int(i),
+            int(j),
+            [float(bondWiggleDistance[bond_idx]), float(bondLength[bond_idx])],
+        )
+
     return force
 
 
-def angle_force(
-        sim_object, 
-        triplets,
-        k=1.5,
-        theta_0=np.pi,
-        name='angle'):
+def angle_force(sim_object, triplets, k=1.5, theta_0=np.pi, name="angle"):
     """Adds harmonic angle bonds. k specifies energy in kT at one radian
     If k is an array, it has to be of the length N.
     Xth value then specifies stiffness of the angle centered at
@@ -158,31 +157,27 @@ def angle_force(
               
         
     """
-    
-    k = _to_array_1d(k, len(triplets)) 
+
+    k = _to_array_1d(k, len(triplets))
     theta_0 = _to_array_1d(theta_0, len(triplets))
-        
+
     energy = "kT*angK * (theta - angT0) * (theta - angT0) * (0.5)"
     force = openmm.CustomAngleForce(energy)
     force.name = name
-    
+
     force.addGlobalParameter("kT", sim_object.kT)
     force.addPerAngleParameter("angK")
     force.addPerAngleParameter("angT0")
 
-    
     for triplet_idx, (p1, p2, p3) in enumerate(triplets):
         force.addAngle(p1, p2, p3, [k[triplet_idx], theta_0[triplet_idx]])
-    
+
     return force
 
 
 def polynomial_repulsive(
-        sim_object, 
-        trunc=3.0, 
-        radiusMult=1.,
-        name='polynomial_repulsive'
-    ):
+    sim_object, trunc=3.0, radiusMult=1.0, name="polynomial_repulsive"
+):
     """This is a simple polynomial repulsive potential. It has the value
     of `trunc` at zero, stays flat until 0.6-0.7 and then drops to zero
     together with its first derivative at r=1.0.
@@ -201,33 +196,37 @@ def polynomial_repulsive(
         "rsc12 = rsc4 * rsc4 * rsc4;"
         "rsc4 = rsc2 * rsc2;"
         "rsc2 = rsc * rsc;"
-        "rsc = r / REPsigma * rmin12;")
+        "rsc = r / REPsigma * rmin12;"
+    )
 
     force = openmm.CustomNonbondedForce(repul_energy)
     force.name = name
 
-    force.addGlobalParameter('REPe', trunc * sim_object.kT)
-    force.addGlobalParameter('REPsigma', radius)
+    force.addGlobalParameter("REPe", trunc * sim_object.kT)
+    force.addGlobalParameter("REPsigma", radius)
     # Coefficients for x^8*(x*x-1)
     # force.addGlobalParameter('emin12', 256.0 / 3125.0)
     # force.addGlobalParameter('rmin12', 2.0 / np.sqrt(5.0))
     # Coefficients for x^12*(x*x-1)
-    force.addGlobalParameter('emin12', 46656.0 / 823543.0)
-    force.addGlobalParameter('rmin12', np.sqrt(6.0 / 7.0))
+    force.addGlobalParameter("emin12", 46656.0 / 823543.0)
+    force.addGlobalParameter("rmin12", np.sqrt(6.0 / 7.0))
 
     for _ in range(sim_object.N):
         force.addParticle(())
 
     force.setCutoffDistance(nbCutOffDist)
-    
+
     return force
 
 
-def smooth_square_well(sim_object,
-    repulsionEnergy=3.0, repulsionRadius=1.,
-    attractionEnergy=0.5, attractionRadius=2.0,
-    name='smooth_square_well'
-    ):
+def smooth_square_well(
+    sim_object,
+    repulsionEnergy=3.0,
+    repulsionRadius=1.0,
+    attractionEnergy=0.5,
+    attractionRadius=2.0,
+    name="smooth_square_well",
+):
     """
     This is a simple and fast polynomial force that looks like a smoothed
     version of the square-well potential. The energy equals `repulsionEnergy`
@@ -271,40 +270,42 @@ def smooth_square_well(sim_object,
         "rshft4 = rshft2 * rshft2;"
         "rshft2 = rshft * rshft;"
         "rshft = (r - REPsigma - ATTRdelta) / ATTRdelta * rmin12"
+    )
 
-        )
-    
     force = openmm.CustomNonbondedForce(energy)
     force.name = name
 
-    force.addGlobalParameter('REPe', repulsionEnergy * sim_object.kT)
-    force.addGlobalParameter('REPsigma', repulsionRadius * sim_object.conlen)
+    force.addGlobalParameter("REPe", repulsionEnergy * sim_object.kT)
+    force.addGlobalParameter("REPsigma", repulsionRadius * sim_object.conlen)
 
-    force.addGlobalParameter('ATTRe', attractionEnergy * sim_object.kT)
-    force.addGlobalParameter('ATTRdelta',
-        sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0)
+    force.addGlobalParameter("ATTRe", attractionEnergy * sim_object.kT)
+    force.addGlobalParameter(
+        "ATTRdelta", sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0
+    )
     # Coefficients for the minimum of x^12*(x*x-1)
-    force.addGlobalParameter('emin12', 46656.0 / 823543.0)
-    force.addGlobalParameter('rmin12', np.sqrt(6.0 / 7.0))
+    force.addGlobalParameter("emin12", 46656.0 / 823543.0)
+    force.addGlobalParameter("rmin12", np.sqrt(6.0 / 7.0))
 
     for _ in range(sim_object.N):
         force.addParticle(())
 
     force.setCutoffDistance(nbCutOffDist)
-    
+
     return force
 
-    
-def selective_SSW(sim_object,
+
+def selective_SSW(
+    sim_object,
     stickyParticlesIdxs,
     extraHardParticlesIdxs,
     repulsionEnergy=3.0,
-    repulsionRadius=1.,
+    repulsionRadius=1.0,
     attractionEnergy=3.0,
     attractionRadius=1.5,
     selectiveRepulsionEnergy=20.0,
     selectiveAttractionEnergy=1.0,
-    name='selective_SSW'):
+    name="selective_SSW",
+):
     """
     This is a simple and fast polynomial force that looks like a smoothed
     version of the square-well potential. The energy equals `repulsionEnergy`
@@ -374,31 +375,30 @@ def selective_SSW(sim_object,
         "rshft2 = rshft * rshft;"
         "rshft = (r - REPsigma - ATTRdelta) / ATTRdelta * rmin12;"
         ""
-        )
+    )
 
-    if selectiveRepulsionEnergy == float('inf'):
-        energy += (
-        "REPeAdd = 4 * ((REPsigma / (2.0^(1.0/6.0)) / r)^12 - (REPsigma / (2.0^(1.0/6.0)) / r)^6) + 1;"
-        )
+    if selectiveRepulsionEnergy == float("inf"):
+        energy += "REPeAdd = 4 * ((REPsigma / (2.0^(1.0/6.0)) / r)^12 - (REPsigma / (2.0^(1.0/6.0)) / r)^6) + 1;"
 
     force = openmm.CustomNonbondedForce(energy)
     force.name = name
 
     force.setCutoffDistance(attractionRadius * sim_object.conlen)
 
-    force.addGlobalParameter('REPe', repulsionEnergy * sim_object.kT)
-    if selectiveRepulsionEnergy != float('inf'):
-        force.addGlobalParameter('REPeAdd', selectiveRepulsionEnergy * sim_object.kT)
-    force.addGlobalParameter('REPsigma', repulsionRadius * sim_object.conlen)
+    force.addGlobalParameter("REPe", repulsionEnergy * sim_object.kT)
+    if selectiveRepulsionEnergy != float("inf"):
+        force.addGlobalParameter("REPeAdd", selectiveRepulsionEnergy * sim_object.kT)
+    force.addGlobalParameter("REPsigma", repulsionRadius * sim_object.conlen)
 
-    force.addGlobalParameter('ATTRe', attractionEnergy * sim_object.kT)
-    force.addGlobalParameter('ATTReAdd', selectiveAttractionEnergy * sim_object.kT)
-    force.addGlobalParameter('ATTRdelta',
-        sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0)
+    force.addGlobalParameter("ATTRe", attractionEnergy * sim_object.kT)
+    force.addGlobalParameter("ATTReAdd", selectiveAttractionEnergy * sim_object.kT)
+    force.addGlobalParameter(
+        "ATTRdelta", sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0
+    )
 
     # Coefficients for x^12*(x*x-1)
-    force.addGlobalParameter('emin12', 46656.0 / 823543.0)
-    force.addGlobalParameter('rmin12', np.sqrt(6.0 / 7.0))
+    force.addGlobalParameter("emin12", 46656.0 / 823543.0)
+    force.addGlobalParameter("rmin12", np.sqrt(6.0 / 7.0))
 
     force.addPerParticleParameter("Sticky")
     force.addPerParticleParameter("ExtraHard")
@@ -406,24 +406,25 @@ def selective_SSW(sim_object,
     counts = np.bincount(stickyParticlesIdxs, minlength=sim_object.N)
 
     for i in range(sim_object.N):
-        force.addParticle(
-            (float(counts[i]),
-             float(i in extraHardParticlesIdxs)))
+        force.addParticle((float(counts[i]), float(i in extraHardParticlesIdxs)))
 
     return force
 
-def heteropolymer_SSW(sim_object,
+
+def heteropolymer_SSW(
+    sim_object,
     interactionMatrix,
     monomerTypes,
     extraHardParticlesIdxs,
     repulsionEnergy=3.0,
-    repulsionRadius=1.,
+    repulsionRadius=1.0,
     attractionEnergy=3.0,
     attractionRadius=1.5,
     selectiveRepulsionEnergy=20.0,
     selectiveAttractionEnergy=1.0,
     keepVanishingInteractions=False,
-    name='heteropolymer_SSW'):
+    name="heteropolymer_SSW",
+):
     """
     A version of smooth square well potential that enables the simulation of
     heteropolymers. Every monomer is assigned a number determining its type,
@@ -482,7 +483,7 @@ def heteropolymer_SSW(sim_object,
     """
 
     # Check type info for consistency
-    Ntypes = max(monomerTypes) + 1 # IDs should be zero based
+    Ntypes = max(monomerTypes) + 1  # IDs should be zero based
     if any(np.less(interactionMatrix.shape, [Ntypes, Ntypes])):
         raise ValueError("Need interactions for {0:d} types!".format(Ntypes))
 
@@ -504,12 +505,15 @@ def heteropolymer_SSW(sim_object,
         ""
         "Eattr = - rshft12 * (rshft2 - 1.0) * ATTReTot / emin12 - ATTReTot;"
         "ATTReTot = ATTRe"
-        )
+    )
     if len(indexpairs) > 0:
-        energy += (" + ATTReAdd*(delta(type1-{0:d})*delta(type2-{1:d})"
-                   "*INT_{0:d}_{1:d}").format(indexpairs[0][0], indexpairs[0][1])
+        energy += (
+            " + ATTReAdd*(delta(type1-{0:d})*delta(type2-{1:d})" "*INT_{0:d}_{1:d}"
+        ).format(indexpairs[0][0], indexpairs[0][1])
         for i, j in indexpairs[1:]:
-            energy += "+delta(type1-{0:d})*delta(type2-{1:d})*INT_{0:d}_{1:d}".format(i, j)
+            energy += "+delta(type1-{0:d})*delta(type2-{1:d})*INT_{0:d}_{1:d}".format(
+                i, j
+            )
         energy += ")"
     energy += (
         ";"
@@ -518,46 +522,48 @@ def heteropolymer_SSW(sim_object,
         "rshft2 = rshft * rshft;"
         "rshft = (r - REPsigma - ATTRdelta) / ATTRdelta * rmin12;"
         ""
-        )
+    )
 
-    if selectiveRepulsionEnergy == float('inf'):
-        energy += (
-        "REPeAdd = 4 * ((REPsigma / (2.0^(1.0/6.0)) / r)^12 - (REPsigma / (2.0^(1.0/6.0)) / r)^6) + 1;"
-        )
+    if selectiveRepulsionEnergy == float("inf"):
+        energy += "REPeAdd = 4 * ((REPsigma / (2.0^(1.0/6.0)) / r)^12 - (REPsigma / (2.0^(1.0/6.0)) / r)^6) + 1;"
 
     force = openmm.CustomNonbondedForce(energy)
     force.name = name
 
     force.setCutoffDistance(attractionRadius * sim_object.conlen)
 
-    force.addGlobalParameter('REPe', repulsionEnergy * sim_object.kT)
-    if selectiveRepulsionEnergy != float('inf'):
-        force.addGlobalParameter('REPeAdd', selectiveRepulsionEnergy * sim_object.kT)
-    force.addGlobalParameter('REPsigma', repulsionRadius * sim_object.conlen)
+    force.addGlobalParameter("REPe", repulsionEnergy * sim_object.kT)
+    if selectiveRepulsionEnergy != float("inf"):
+        force.addGlobalParameter("REPeAdd", selectiveRepulsionEnergy * sim_object.kT)
+    force.addGlobalParameter("REPsigma", repulsionRadius * sim_object.conlen)
 
-    force.addGlobalParameter('ATTRe', attractionEnergy * sim_object.kT)
-    force.addGlobalParameter('ATTReAdd', selectiveAttractionEnergy * sim_object.kT)
-    force.addGlobalParameter('ATTRdelta',
-        sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0)
+    force.addGlobalParameter("ATTRe", attractionEnergy * sim_object.kT)
+    force.addGlobalParameter("ATTReAdd", selectiveAttractionEnergy * sim_object.kT)
+    force.addGlobalParameter(
+        "ATTRdelta", sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0
+    )
 
     # Coefficients for x^12*(x*x-1)
-    force.addGlobalParameter('emin12', 46656.0 / 823543.0)
-    force.addGlobalParameter('rmin12', np.sqrt(6.0 / 7.0))
+    force.addGlobalParameter("emin12", 46656.0 / 823543.0)
+    force.addGlobalParameter("rmin12", np.sqrt(6.0 / 7.0))
 
     for i, j in indexpairs:
-        force.addGlobalParameter("INT_{0:d}_{1:d}".format(i, j), interactionMatrix[i, j])
+        force.addGlobalParameter(
+            "INT_{0:d}_{1:d}".format(i, j), interactionMatrix[i, j]
+        )
 
     force.addPerParticleParameter("type")
     force.addPerParticleParameter("ExtraHard")
 
     for i in range(sim_object.N):
-        force.addParticle(
-            (float(monomerTypes[i]),
-             float(i in extraHardParticlesIdxs)))
+        force.addParticle((float(monomerTypes[i]), float(i in extraHardParticlesIdxs)))
 
     return force
 
-def spherical_well(sim_object, particles, r, center=[0, 0, 0], width=1, depth=1, name="spherical_well"):
+
+def spherical_well(
+    sim_object, particles, r, center=[0, 0, 0], width=1, depth=1, name="spherical_well"
+):
     """
     A spherical potential well, suited for example to simulate attraction to a lamina.
 
@@ -581,9 +587,9 @@ def spherical_well(sim_object, particles, r, center=[0, 0, 0], width=1, depth=1,
     """
 
     force = openmm.CustomExternalForce(
-            "-step(1+d)*step(1-d)*SPHWELLdepth*cos(3.1415926536*d)/2 + 0.5;"
-            "d = (sqrt((x-SPHWELLx)^2 + (y-SPHWELLy)^2 + (z-SPHWELLz)^2) - SPHWELLradius) / SPHWELLwidth"
-            )
+        "-step(1+d)*step(1-d)*SPHWELLdepth*cos(3.1415926536*d)/2 + 0.5;"
+        "d = (sqrt((x-SPHWELLx)^2 + (y-SPHWELLy)^2 + (z-SPHWELLz)^2) - SPHWELLradius) / SPHWELLwidth"
+    )
     force.name = name
 
     force.addGlobalParameter("SPHWELLradius", r * sim_object.conlen)
@@ -600,18 +606,14 @@ def spherical_well(sim_object, particles, r, center=[0, 0, 0], width=1, depth=1,
 
     return force
 
+
 def cylindrical_confinement(
-    sim_object, 
-    r, 
-    bottom=None, 
-    k=0.1, 
-    top=9999,
-    name="cylindrical_confinement"):
+    sim_object, r, bottom=None, k=0.1, top=9999, name="cylindrical_confinement"
+):
     """As it says."""
 
     if bottom == True:
-        warnings.warn(DeprecationWarning(
-            "Use bottom=0 instead of bottom = True! "))
+        warnings.warn(DeprecationWarning("Use bottom=0 instead of bottom = True! "))
         bottom = 0
 
     if bottom is not None:
@@ -636,22 +638,23 @@ def cylindrical_confinement(
     force.addGlobalParameter("k", k / nm)
     force.addGlobalParameter("r", r * sim_object.conlen)
     force.addGlobalParameter("kt", sim_object.kT)
-    force.addGlobalParameter("t",  0.1 / k * nm)
+    force.addGlobalParameter("t", 0.1 / k * nm)
     force.addGlobalParameter("tt", 0.01 * nm)
     force.addGlobalParameter("top", top * sim_object.conlen)
     if bottom is not None:
         force.addGlobalParameter("bottom", bottom * sim_object.conlen)
-    
+
     return force
 
-    
-def spherical_confinement(sim_object,
-            r="density",  # radius... by default uses certain density
-            k=5.,  # How steep the walls are
-            density=.3,    # target density, measured in particles
-                           # per cubic nanometer (bond size is 1 nm)
-            name='spherical_confinement'
-            ):
+
+def spherical_confinement(
+    sim_object,
+    r="density",  # radius... by default uses certain density
+    k=5.0,  # How steep the walls are
+    density=0.3,  # target density, measured in particles
+    # per cubic nanometer (bond size is 1 nm)
+    name="spherical_confinement",
+):
     """Constrain particles to be within a sphere.
     With no parameters creates sphere with density .3
 
@@ -670,20 +673,21 @@ def spherical_confinement(sim_object,
 
     force = openmm.CustomExternalForce(
         "step(r-aa) * kb * (sqrt((r-aa)*(r-aa) + t*t) - t); "
-        "r = sqrt(x^2 + y^2 + z^2 + tt^2)")
+        "r = sqrt(x^2 + y^2 + z^2 + tt^2)"
+    )
     force.name = name
 
     for i in range(sim_object.N):
         force.addParticle(i, [])
     if r == "density":
-        r = (3 * sim_object.N / (4 * 3.141592 * density)) ** (1 / 3.)
+        r = (3 * sim_object.N / (4 * 3.141592 * density)) ** (1 / 3.0)
 
     if sim_object.verbose == True:
         print("Spherical confinement with radius = %lf" % r)
     # assigning parameters of the force
     force.addGlobalParameter("kb", k * sim_object.kT / nm)
-    force.addGlobalParameter("aa", (r - 1. / k) * nm)
-    force.addGlobalParameter("t", (1. / k) * nm / 10.)
+    force.addGlobalParameter("aa", (r - 1.0 / k) * nm)
+    force.addGlobalParameter("t", (1.0 / k) * nm / 10.0)
     force.addGlobalParameter("tt", 0.01 * nm)
 
     ## TODO: move 'r' elsewhere?..
@@ -692,13 +696,7 @@ def spherical_confinement(sim_object,
     return force
 
 
-def tether_particles(
-        sim_object, 
-        particles, 
-        k=30, 
-        positions="current",
-        name="Tethers"
-        ):
+def tether_particles(sim_object, particles, k=30, positions="current", name="Tethers"):
     """tethers particles in the 'particles' array.
     Increase k to tether them stronger, but watch the system!
 
@@ -714,7 +712,7 @@ def tether_particles(
         rock solid.
         Can be provided as a vector [kx, ky, kz].
     """
-    
+
     energy = "kx * (x - x0)^2 + ky * (y - y0)^2 + kz * (z - z0)^2"
     force = openmm.CustomExternalForce(energy)
     force.name = name
@@ -724,7 +722,7 @@ def tether_particles(
     if isinstance(k, Iterable):
         k = list(k)
         if len(k) != 3:
-            raise ValueError('k must either be a scalar or a 3D vector!')
+            raise ValueError("k must either be a scalar or a 3D vector!")
         kx, ky, kz = k
     else:
         kx, ky, kz = k, k, k
@@ -736,50 +734,47 @@ def tether_particles(
     force.addPerParticleParameter("y0")
     force.addPerParticleParameter("z0")
 
-    particles = [sim_object.N+i if i<0 else i for i in particles]
+    particles = [sim_object.N + i if i < 0 else i for i in particles]
 
     if positions == "current":
         positions = [sim_object.data[i] for i in particles]
     else:
         positions = units.Quantity(positions, nm)
 
-    for i, pos in zip(particles, positions):  # adding all the particles on which force acts
+    # adding all the particles on which force acts
+    for i, pos in zip(particles, positions):
         i = int(i)
         force.addParticle(i, list(pos))
         if sim_object.verbose == True:
             print("particle %d tethered! " % i)
-    
+
     return force
-            
-def pull_force(
-        sim_object, 
-        particles, 
-        force_vecs,
-        name="Pull"):
+
+
+def pull_force(sim_object, particles, force_vecs, name="Pull"):
     """
     adds force pulling on each particle
     particles: list of particle indices
     force_vecs: list of forces [[f0x,f0y,f0z],[f1x,f1y,f1z], ...]
     if there are fewer forces than particles forces are padded with forces[-1]
     """
-    force = openmm.CustomExternalForce(
-        "- x * fx - y * fy - z * fz")
+    force = openmm.CustomExternalForce("- x * fx - y * fy - z * fz")
     force.name = name
 
     force.addPerParticleParameter("fx")
     force.addPerParticleParameter("fy")
     force.addPerParticleParameter("fz")
 
-    for num, force_vec in itertools.zip_longest(particles, force_vecs, fillvalue=force_vecs[-1]):
+    for num, force_vec in itertools.zip_longest(
+        particles, force_vecs, fillvalue=force_vecs[-1]
+    ):
         force_vec = [float(f) * (sim_object.kT / sim_object.conlen) for f in force_vec]
         force.addParticle(int(num), force_vec)
-    
+
     return force
 
-def grosberg_polymer_bonds(sim_object, 
-                           bonds,
-                           k=30,
-                          name = "grosberg_polymer"):
+
+def grosberg_polymer_bonds(sim_object, bonds, k=30, name="grosberg_polymer"):
     """Adds FENE bonds according to Halverson-Grosberg paper.
     (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
      nonconcatenated ring polymers in a melt. I. Statics."
@@ -795,31 +790,29 @@ def grosberg_polymer_bonds(sim_object,
         Arbitrary parameter; default value as in Grosberg paper.
 
      """
-    
-    equation = ("- 0.5 * k * r0 * r0 * log(1-(r/r0)* (r / r0))")
-    force = openmm.CustomBondForce(equation)
-    force.name = name 
 
-    force.addGlobalParameter("k", k *
-        sim_object.kT / (sim_object.conlen * sim_object.conlen))
+    equation = "- 0.5 * k * r0 * r0 * log(1-(r/r0)* (r / r0))"
+    force = openmm.CustomBondForce(equation)
+    force.name = name
+
+    force.addGlobalParameter(
+        "k", k * sim_object.kT / (sim_object.conlen * sim_object.conlen)
+    )
     force.addGlobalParameter("r0", sim_object.conlen * 1.5)
-       
 
     for bond_idx, (i, j) in enumerate(bonds):
         if (i >= sim_object.N) or (j >= sim_object.N):
-            raise ValueError("\nCannot add bond with monomers %d,%d that"\
-            "are beyound the polymer length %d" % (i, j, sim_object.N))
-        
+            raise ValueError(
+                "\nCannot add bond with monomers %d,%d that"
+                "are beyound the polymer length %d" % (i, j, sim_object.N)
+            )
+
         force.addBond(int(i), int(j))
-    
-    return force 
-                
+
+    return force
 
 
-def grosberg_angle(sim_object, 
-                   triplets,
-                       k=1.5, 
-                      name="grosberg_angle"):
+def grosberg_angle(sim_object, triplets, k=1.5, name="grosberg_angle"):
     """Adds stiffness according to the Grosberg paper.
     (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
      nonconcatenated ring polymers in a melt. I. Statics."
@@ -841,26 +834,23 @@ def grosberg_angle(sim_object,
         Default value maximizes entanglement length.
 
     """
-    k = _to_array_1d(k, len(triplets)) 
-        
-    force = openmm.CustomAngleForce(
-        "GRk * kT * (1 - cos(theta - 3.141592))")
-    
-    force.name = name 
+    k = _to_array_1d(k, len(triplets))
+
+    force = openmm.CustomAngleForce("GRk * kT * (1 - cos(theta - 3.141592))")
+
+    force.name = name
     force.addGlobalParameter("kT", sim_object.kT)
     force.addPerAngleParameter("GRk")
-    
+
     for triplet_idx, (p1, p2, p3) in enumerate(triplets):
         force.addAngle(p1, p2, p3, [k[triplet_idx]])
-        
-    return force 
 
-    
-    
-def grosberg_repulsive_force(sim_object,
-                             trunc=None,
-                             radiusMult=1.,
-                            name="grosberg_repulsive"):
+    return force
+
+
+def grosberg_repulsive_force(
+    sim_object, trunc=None, radiusMult=1.0, name="grosberg_repulsive"
+):
     """This is the fastest non-transparent repulsive force.
     (that preserves topology, doesn't allow chain passing)
     Done according to the paper:
@@ -877,7 +867,7 @@ def grosberg_repulsive_force(sim_object,
 
     """
     radius = sim_object.conlen * radiusMult
-    nbCutOffDist = radius * 2. ** (1. / 6.)
+    nbCutOffDist = radius * 2.0 ** (1.0 / 6.0)
     if trunc is None:
         repul_energy = "4 * e * ((sigma/r)^12 - (sigma/r)^6) + e"
     else:
@@ -885,20 +875,20 @@ def grosberg_repulsive_force(sim_object,
             "step(cut2 - U) * U"
             " + step(U - cut2) * cut2 * (1 + tanh(U/cut2 - 1));"
             "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
-            "r2 = (r^10. + (sigma03)^10.)^0.1")
+            "r2 = (r^10. + (sigma03)^10.)^0.1"
+        )
     force = openmm.CustomNonbondedForce(repul_energy)
     force.name = name
 
-    force.addGlobalParameter('e', sim_object.kT)
-    force.addGlobalParameter('sigma', radius)
-    force.addGlobalParameter('sigma03', 0.3 * radius)
+    force.addGlobalParameter("e", sim_object.kT)
+    force.addGlobalParameter("sigma", radius)
+    force.addGlobalParameter("sigma03", 0.3 * radius)
     if trunc is not None:
-        force.addGlobalParameter('cut', sim_object.kT * trunc)
-        force.addGlobalParameter('cut2', 0.5 * trunc * sim_object.kT)
+        force.addGlobalParameter("cut", sim_object.kT * trunc)
+        force.addGlobalParameter("cut2", 0.5 * trunc * sim_object.kT)
     for _ in range(sim_object.N):
         force.addParticle(())
 
     force.setCutoffDistance(nbCutOffDist)
-    
-    return force 
-    
+
+    return force
