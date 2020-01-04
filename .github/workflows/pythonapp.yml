@@ -18,9 +18,10 @@ jobs:
         conda install --file requirements.txt
         conda install -c omnia openmm 
         conda init 
-        echo $PATH
-        ls -la ~ 
-        pip install -e .
+    - name: activate conda 
+      run: |
+        export PATH="/usr/share/miniconda/bin:$PATH"
+        source activate base 
     - name: Test with pytest
       run: |
         pip install pytest
