@@ -85,6 +85,7 @@ napoleon_use_rtype = False
 project = 'polychrom'
 copyright = '2020, Mirny lab'
 author = 'Mirny lab'
+master_doc = 'index'
 
 # The full version, including alpha/beta/rc tags
 release = '0.1.0'
