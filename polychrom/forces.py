@@ -5,11 +5,7 @@ from collections.abc import Iterable
 import numpy as np
 
 import simtk.openmm as openmm
-import simtk.unit as units
-
-nm = units.meter * 1e-9
-fs = units.second * 1e-15
-ps = units.second * 1e-12
+import simtk.unit 
 
 
 def _prepend_force_name_to_params(force):
@@ -635,11 +631,11 @@ def cylindrical_confinement(
     for i in range(sim_object.N):
         force.addParticle(i, [])
 
-    force.addGlobalParameter("k", k / nm)
+    force.addGlobalParameter("k", k / simtk.unit.nanometer)
     force.addGlobalParameter("r", r * sim_object.conlen)
     force.addGlobalParameter("kt", sim_object.kT)
-    force.addGlobalParameter("t", 0.1 / k * nm)
-    force.addGlobalParameter("tt", 0.01 * nm)
+    force.addGlobalParameter("t", 0.1 / k * simtk.unit.nanometer)
+    force.addGlobalParameter("tt", 0.01 * simtk.unit.nanometer)
     force.addGlobalParameter("top", top * sim_object.conlen)
     if bottom is not None:
         force.addGlobalParameter("bottom", bottom * sim_object.conlen)
@@ -685,10 +681,10 @@ def spherical_confinement(
     if sim_object.verbose == True:
         print("Spherical confinement with radius = %lf" % r)
     # assigning parameters of the force
-    force.addGlobalParameter("kb", k * sim_object.kT / nm)
-    force.addGlobalParameter("aa", (r - 1.0 / k) * nm)
-    force.addGlobalParameter("t", (1.0 / k) * nm / 10.0)
-    force.addGlobalParameter("tt", 0.01 * nm)
+    force.addGlobalParameter("kb", k * sim_object.kT / simtk.unit.nanometer)
+    force.addGlobalParameter("aa", (r - 1.0 / k) * simtk.unit.nanometer)
+    force.addGlobalParameter("t", (1.0 / k) * simtk.unit.nanometer / 10.0)
+    force.addGlobalParameter("tt", 0.01 * simtk.unit.nanometer)
 
     ## TODO: move 'r' elsewhere?..
     sim_object.sphericalConfinementRadius = r
@@ -727,9 +723,10 @@ def tether_particles(sim_object, particles, k=30, positions="current", name="Tet
     else:
         kx, ky, kz = k, k, k
 
-    force.addGlobalParameter("kx", kx * sim_object.kT / nm / nm)
-    force.addGlobalParameter("ky", ky * sim_object.kT / nm / nm)
-    force.addGlobalParameter("kz", kz * sim_object.kT / nm / nm)
+    nm2 = simtk.unit.nanometer * simtk.unit.nanometer
+    force.addGlobalParameter("kx", kx * sim_object.kT / nm2 )
+    force.addGlobalParameter("ky", ky * sim_object.kT / nm2)
+    force.addGlobalParameter("kz", kz * sim_object.kT / nm2)
     force.addPerParticleParameter("x0")
     force.addPerParticleParameter("y0")
     force.addPerParticleParameter("z0")
@@ -739,7 +736,7 @@ def tether_particles(sim_object, particles, k=30, positions="current", name="Tet
     if positions == "current":
         positions = [sim_object.data[i] for i in particles]
     else:
-        positions = units.Quantity(positions, nm)
+        positions = simtk.unit.Quantity(positions, simtk.unit.nanometer)
 
     # adding all the particles on which force acts
     for i, pos in zip(particles, positions):

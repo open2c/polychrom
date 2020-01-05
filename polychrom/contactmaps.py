@@ -1,14 +1,9 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-import numpy as np
-import random
-import ctypes
-import multiprocessing as mp
-from contextlib import closing
-from . import polymerutils
-import warnings
-from . import polymer_analyses
+"""
+Using contactmaps module
+------------------------
 
-"""This module is the main workhorse of tools to calculate contactmaps, both from 
+
+This module is the main workhorse of tools to calculate contactmaps, both from 
 polymer simulations and from other simulations (e.g. 1D simulations of loop 
 extrusion). All of the functions here are designed to be parallelized, and lots of 
 efforts were put into making this possible. 
@@ -23,9 +18,13 @@ The reasons we need parallel contactmap code is the following:
 
 The structure of this class is as follows. 
 
-On the outer level, it  provides three methods to average contactmaps: 
-monomerResolutionContactMap, binnedContactMap, 
-and monomerResolutionContactMapSubchains.  The first two create contact map from an 
+On the outer level, it  provides three methods to average contactmaps:
+
+* :func:`monomerResolutionContactMap`
+* :func:`binnedContactMap`,
+* :func:`monomerResolutionContactMapSubchains`.
+
+The first two create contact map from an
 entire file: either monomer-resolution or binned. The last one creates contact maps 
 from sub-chains in a file, starting at a given set of starting points. It is useful 
 when doing contact maps from several copies of a system in one simulation. 
@@ -42,12 +41,21 @@ monomerResolutionContactMap for example) are implemented using this method.
 On the lower level, there are internals of the "averageContacts" method and an 
 associated "worker" function. There is generally no need to understand the code of 
 those functions. There exists a reference implementation of both the worker and the 
-averageContacts function, named "simpleWorker" and "averageContactsSimple". They do 
+:func:`averageContacts` function,  :class:`simpleWorker` and :func:`averageContactsSimple`. They do
 all the things that "averageContacts" do, but on only one core. In fact, 
 "averageContacts" defaults to "averageContactsSimple" if requested to run on one core 
 because it is a little bit faster. 
 
 """
+
+import numpy as np
+import random
+import ctypes
+import multiprocessing as mp
+from contextlib import closing
+from . import polymerutils
+import warnings
+from . import polymer_analyses
 
 
 def indexing(smaller, larger, M):

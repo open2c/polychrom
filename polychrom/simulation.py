@@ -14,13 +14,9 @@ from six import string_types
 from collections.abc import Iterable
 
 import simtk.openmm as openmm
-import simtk.unit as units
+import simtk.unit
 
 from . import forces
-
-nm = units.meter * 1e-9
-fs = units.second * 1e-15
-ps = units.second * 1e-12
 
 logging.basicConfig(level=logging.INFO)
 
@@ -52,24 +48,22 @@ class Simulation(object):
             Simulations with strong forces may need 0.001 or less
             OpenMM manual recommends 0.001, but our forces tend to be "softer" than theirs
 
-
         timestep : number
             timestep in femtoseconds. Mandatory for non-variable integrators.
             Ignored for variableLangevin integrator. Value of 70-80 are appropriate
 
         collision_rate : number
             collision rate in inverse picoseconds. values of 0.01 or 0.05 are often used. 
-            Consult with lab members on values. 
-            
+            Consult with lab members on values.
+
             In brief, equilibrium simulations likely do not care about the exact dynamics 
             you're using, and therefore can be simulated in a "ballistic" dynamics with 
-            col_rate of around 0.001-0.01. 
-            
-            Dynamical simulations and active simulations may be more sensitive to col_rate,
-            though this is still under discussion/investigation. 
-            
-            Johannes converged on using 0.1 for loop extrusion simulations, just to be safe. 
+            col_rate of around 0.001-0.01.
 
+            Dynamical simulations and active simulations may be more sensitive to col_rate,
+            though this is still under discussion/investigation.
+
+            Johannes converged on using 0.1 for loop extrusion simulations, just to be safe.
 
         PBCbox : (float,float,float) or False; default:False
             Controls periodic boundary conditions
@@ -86,7 +80,6 @@ class Simulation(object):
                      
         mass : number or np.array
             Particle mass (default 100 amu)
-            
 
         temperature : simtk.units.quantity(units.kelvin), optional
             Temperature of the simulation. Devault value is 300 K.
@@ -111,7 +104,6 @@ class Simulation(object):
 
         verbose : bool, optional
             Shout out loud about every change.
-
         
         precision: str, optional (not recommended to change)
             mixed is optimal for most situations. 
@@ -181,7 +173,7 @@ class Simulation(object):
 
         self.temperature = kwargs["temperature"]
 
-        self.collisionRate = kwargs["collision_rate"] * (1 / ps)
+        self.collisionRate = kwargs["collision_rate"] * (1 / simtk.unit.picosecond)
 
         self.integrator_type = kwargs["integrator"]
         if isinstance(self.integrator_type, string_types):
@@ -189,18 +181,18 @@ class Simulation(object):
             if self.integrator_type.lower() == "langevin":
                 self.integrator = openmm.LangevinIntegrator(
                     self.temperature,
-                    kwargs["collision_rate"] * (1 / ps),
-                    kwargs["timestep"] * fs,
+                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
+                    kwargs["timestep"] * simtk.unit.femtosecond,
                 )
             elif self.integrator_type.lower() == "variablelangevin":
                 self.integrator = openmm.VariableLangevinIntegrator(
                     self.temperature,
-                    kwargs["collision_rate"] * (1 / ps),
+                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
                     kwargs["error_tol"],
                 )
             elif self.integrator_type.lower() == "verlet":
                 self.integrator = openmm.VariableVerletIntegrator(
-                    kwargs["timestep"] * fs
+                    kwargs["timestep"] * simtk.unit.femtosecond
                 )
             elif self.integrator_type.lower() == "variableverlet":
                 self.integrator = openmm.VariableVerletIntegrator(kwargs["error_tol"])
@@ -208,8 +200,8 @@ class Simulation(object):
             elif self.integrator_type.lower() == "brownian":
                 self.integrator = openmm.BrownianIntegrator(
                     self.temperature,
-                    kwargs["collision_rate"] * (1 / ps),
-                    kwargs["timestep"] * fs,
+                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
+                    kwargs["timestep"] * simtk.unit.femtosecond,
                 )
         else:
             logging.info("Using the provided integrator object")
@@ -229,17 +221,17 @@ class Simulation(object):
         self.block = 0
         self.time = 0
 
-        self.nm = nm
+        self.nm = simtk.unit.nanometer
 
-        self.kB = units.BOLTZMANN_CONSTANT_kB * units.AVOGADRO_CONSTANT_NA
-        self.kT = self.kB * self.temperature * units.kelvin  # thermal energy
+        self.kB = simtk.unit.BOLTZMANN_CONSTANT_kB * simtk.unit.AVOGADRO_CONSTANT_NA
+        self.kT = self.kB * self.temperature * simtk.unit.kelvin  # thermal energy
 
         # All masses are the same,
         # unless individual mass multipliers are specified in self.load()
-        self.conlen = 1.0 * nm * self.length_scale
+        self.conlen = 1.0 * simtk.unit.nanometer * self.length_scale
 
         self.kbondScalingFactor = float(
-            (2 * self.kT / self.conlen ** 2) / (units.kilojoule_per_mole / nm ** 2)
+            (2 * self.kT / self.conlen ** 2) / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer ** 2)
         )
 
         self.system = openmm.System()
@@ -264,7 +256,7 @@ class Simulation(object):
 
     def get_data(self):
         "Returns an Nx3 array of positions"
-        return np.asarray(self.data / nm, dtype=np.float32)
+        return np.asarray(self.data / simtk.unit.nanometer, dtype=np.float32)
 
     def get_scaled_data(self):
         """Returns data, scaled back to PBC box """
@@ -322,7 +314,7 @@ class Simulation(object):
             minvalue = np.min(data, axis=0)
             data -= minvalue
 
-        self.data = units.Quantity(data, nm)
+        self.data = simtk.unit.Quantity(data, simtk.unit.nanometer)
         if report:
             for reporter in self.reporters:
                 reporter.report(
@@ -575,17 +567,17 @@ class Simulation(object):
 
         b = time.time()
         coords = self.state.getPositions(asNumpy=True)
-        newcoords = coords / nm
+        newcoords = coords / simtk.unit.nanometer
         newcoords = np.array(newcoords, dtype=np.float32)
         if self.kwargs["save_decimals"] is not None:
             newcoords = np.round(newcoords, self.kwargs["save_decimals"])
 
-        self.time = self.state.getTime() / ps
+        self.time = self.state.getTime() / simtk.unit.picosecond
 
         # calculate energies in KT/particle
         eK = self.state.getKineticEnergy() / self.N / self.kT
         eP = self.state.getPotentialEnergy() / self.N / self.kT
-        curtime = self.state.getTime() / units.picosecond
+        curtime = self.state.getTime() / simtk.unit.picosecond
 
         msg = "block %4s " % int(self.block)
         msg += "pos[1]=[%.1lf %.1lf %.1lf] " % tuple(newcoords[0])
@@ -607,7 +599,7 @@ class Simulation(object):
         dif = np.sqrt(np.mean(np.sum((newcoords - self.get_data()) ** 2, axis=1)))
         msg += "dr=%.2lf " % (dif,)
         self.data = coords
-        msg += "t=%2.1lfps " % (self.state.getTime() / ps)
+        msg += "t=%2.1lfps " % (self.state.getTime() / simtk.unit.picosecond)
         msg += "kin=%.2lf pot=%.2lf " % (eK, eP)
         msg += "Rg=%.3lf " % self.RG()
         msg += "SPS=%.0lf " % (steps / (float(b - a)))
@@ -617,10 +609,10 @@ class Simulation(object):
             or self.integrator_type.lower() == "variableverlet"
         ):
             dt = self.integrator.getStepSize()
-            msg += "dt=%.1lffs " % (dt / fs)
+            msg += "dt=%.1lffs " % (dt / simtk.unit.femtosecond)
             mass = self.system.getParticleMass(1)
-            dx = units.sqrt(2.0 * eK * self.kT / mass) * dt
-            msg += "dx=%.2lfpm " % (dx / nm * 1000.0)
+            dx = simtk.unit.sqrt(2.0 * eK * self.kT / mass) * dt
+            msg += "dx=%.2lfpm " % (dx / simtk.unit.nanometer * 1000.0)
 
         logging.info(msg)
 
@@ -633,7 +625,7 @@ class Simulation(object):
         }
         if get_velocities:
             result["vel"] = self.state.getVelocities() / (
-                units.nanometer / units.picosecond
+                    simtk.unit.nanometer / simtk.unit.picosecond
             )
         result.update(save_extras)
         if save:
@@ -654,12 +646,12 @@ class Simulation(object):
         )
 
         eP = state.getPotentialEnergy()
-        pos = np.array(state.getPositions() / nm)
+        pos = np.array(state.getPositions() / simtk.unit.nanometer)
         bonds = np.sqrt(np.sum(np.diff(pos, axis=0) ** 2, axis=1))
         sbonds = np.sort(bonds)
         vel = state.getVelocities()
         mass = self.system.getParticleMass(1)
-        vkT = np.array(vel / units.sqrt(self.kT / mass), dtype=float)
+        vkT = np.array(vel / simtk.unit.sqrt(self.kT / mass), dtype=float)
         self.velocs = vkT
         EkPerParticle = 0.5 * np.sum(vkT ** 2, axis=1)
 
