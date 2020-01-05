@@ -25,7 +25,7 @@ def setup(app):
     app.connect("autodoc-skip-member", skip)
 
 
-sys.path.insert(0, os.path.abspath('../..'))
+sys.path.insert(0, os.path.abspath('..'))
 
 # autodoc_mock_imports = [
 #     'numpy',
@@ -54,8 +54,10 @@ MOCK_MODULES = [
     'dask.dataframe.core',
     'dask.dataframe.utils',
     'simtk',
-    'simkt.openmm',
+    'simtk.unit'
+    'simtk.openmm',
     'joblib',
+    'scipy.interpolate.fitpack2',
 ]
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
