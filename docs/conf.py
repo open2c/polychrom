@@ -54,7 +54,7 @@ MOCK_MODULES = [
     'dask.dataframe.core',
     'dask.dataframe.utils',
     'simtk',
-    'simtk.unit'
+    'simtk.unit',
     'simtk.openmm',
     'joblib',
     'scipy.interpolate.fitpack2',
