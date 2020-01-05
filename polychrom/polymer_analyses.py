@@ -4,8 +4,6 @@ This module presents a collection of utils to work with polymer conformations.
 
 """
 
-
-from . import _polymer_math
 from math import sqrt
 
 import numpy as np
@@ -13,6 +11,10 @@ import pandas as pd
 
 from scipy.spatial import ckdtree
 
+try:
+    from . import _polymer_math
+except:
+    pass
 
 def calculate_contacts(data, cutoff=1.7):
     """Calculates contacts between points give the contact radius (cutoff)
