@@ -52,24 +52,22 @@ class Simulation(object):
             Simulations with strong forces may need 0.001 or less
             OpenMM manual recommends 0.001, but our forces tend to be "softer" than theirs
 
-
         timestep : number
             timestep in femtoseconds. Mandatory for non-variable integrators.
             Ignored for variableLangevin integrator. Value of 70-80 are appropriate
 
         collision_rate : number
             collision rate in inverse picoseconds. values of 0.01 or 0.05 are often used. 
-            Consult with lab members on values. 
-            
+            Consult with lab members on values.
+
             In brief, equilibrium simulations likely do not care about the exact dynamics 
             you're using, and therefore can be simulated in a "ballistic" dynamics with 
-            col_rate of around 0.001-0.01. 
-            
-            Dynamical simulations and active simulations may be more sensitive to col_rate,
-            though this is still under discussion/investigation. 
-            
-            Johannes converged on using 0.1 for loop extrusion simulations, just to be safe. 
+            col_rate of around 0.001-0.01.
 
+            Dynamical simulations and active simulations may be more sensitive to col_rate,
+            though this is still under discussion/investigation.
+
+            Johannes converged on using 0.1 for loop extrusion simulations, just to be safe.
 
         PBCbox : (float,float,float) or False; default:False
             Controls periodic boundary conditions
@@ -86,7 +84,6 @@ class Simulation(object):
                      
         mass : number or np.array
             Particle mass (default 100 amu)
-            
 
         temperature : simtk.units.quantity(units.kelvin), optional
             Temperature of the simulation. Devault value is 300 K.
@@ -111,7 +108,6 @@ class Simulation(object):
 
         verbose : bool, optional
             Shout out loud about every change.
-
         
         precision: str, optional (not recommended to change)
             mixed is optimal for most situations. 

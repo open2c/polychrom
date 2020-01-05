@@ -1,4 +1,9 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
+"""
+This module presents a collection of utils to work with polymer conformations.
+
+"""
+
 
 from . import _polymer_math
 from math import sqrt

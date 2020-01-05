@@ -3,19 +3,6 @@
 This file contains a bunch of method to work on contact maps of a Hi-C data.
 
 
-
-
-
-
-Find contacts of a conformation
--------------------------------
-
-To be filled in later
-
-
-Find average contact maps
--------------------------
-
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
