@@ -30,7 +30,6 @@ Polychrom is an API, and each simulation has to be set up as a Python script. Si
 .. toctree::
    :maxdepth: 2   
    
-   quickstart 
    polychrom.simulation
    polychrom.contactmaps
 

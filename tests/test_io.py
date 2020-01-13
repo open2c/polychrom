@@ -6,7 +6,7 @@ import numpy as np
 
 
 def test_basic_simulation_and_hdf5(tmp_path):
-    data = polychrom.starting_conformations.grow_cubic(40, 10)
+    data = polychrom.starting_conformations.create_random_walk(1,100)
 
     """
     Here we created a hdf5Reporter attached to a foler test, and we are saving 5 blocks per file 
@@ -18,9 +18,9 @@ def test_basic_simulation_and_hdf5(tmp_path):
     Passing a reporter to the simulation object - many reporters are possible, and more will be added in a future
     """
     sim = Simulation(
-        N=40,
+        N=100,
         error_tol=0.001,
-        collision_rate=0.2,
+        collision_rate=0.1,
         integrator="variableLangevin",
         platform="reference",
         max_Ek=40,
@@ -28,8 +28,8 @@ def test_basic_simulation_and_hdf5(tmp_path):
     )
     sim.set_data(data)
     sim.add_force(polychrom.forcekits.polymer_chains(sim))
+    sim.add_force(polychrom.forces.spherical_confinement(sim, r=4, k=3))
     sim._apply_forces()
-    sim.add_force(polychrom.forces.spherical_confinement(sim, r=4, k=1))
     datas = []
     for i in range(19):
         """
@@ -37,7 +37,7 @@ def test_basic_simulation_and_hdf5(tmp_path):
         First becomes an attr, and second becomes an HDF5 dataset
         """
         sim.do_block(
-            10,
+            20,
             save_extras={
                 "eggs": "I don't eat green eggs and ham!!!",
                 "spam": [1, 2, 3],

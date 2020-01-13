@@ -2,8 +2,9 @@
 Creating a simulation: Simulation class
 =======================================
 
-This module contains a main class that is used to create and control simulation. 
 
+Both initialization and running the simulation is done by interacting with an instance 
+of :class:polychrom.simulation.Simulation: class.  
 
 """
 
