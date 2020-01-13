@@ -3,12 +3,18 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to polychrom's documentation!
-=====================================
+Welcome to the documentation for the polychrom package
+======================================================
+
+Polychrom is a package for setting up, performing and analyzing polymer simulations of chromosomes. 
+The simulation part is based around VJ Pande's OpenMM library - a GPU-assisted framework for general molecular dynamics simulations. 
+The analysis part is written by the mirnylab. 
+
 
 .. toctree::
    :maxdepth: 2   
-
+   
+   quickstart 
    polychrom
 
 
