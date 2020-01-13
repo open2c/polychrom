@@ -38,3 +38,10 @@ Module contents
    :members:
    :undoc-members:
    :show-inheritance:
+
+
+
+Structure
+---------
+
+Polychrom is an API, and each simulation has to be set up as a Python script. Simulations are done using a :ref:`polychrom-simulation` submodule (:class:`polychrom.simulation.simulation`)
