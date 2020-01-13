@@ -31,7 +31,8 @@ Polychrom is an API, and each simulation has to be set up as a Python script. Si
    :maxdepth: 2   
    
    quickstart 
-   polychrom
+   polychrom.simulation
+   polychrom.contactmaps
 
 
 Indices and tables
