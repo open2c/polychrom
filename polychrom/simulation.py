@@ -1,5 +1,12 @@
-# Licensed under the MIT license:
-# http://www.opensource.org/licenses/mit-license.php
+"""
+Creating a simulation: Simulation class
+=======================================
+
+This module contains a main class that is used to create and control simulation. 
+
+
+"""
+
 
 from __future__ import absolute_import, division, print_function
 import numpy as np
@@ -338,13 +345,18 @@ class Simulation(object):
 
     def dist(self, i, j):
         """
-        Calculates distance between particles i and j
+        Calculates distance between particles i and j. 
+        
+        Added for convenience, and not for production code. Not for use in large for-loops. 
         """
         data = self.get_data()
         dif = data[i] - data[j]
         return np.sqrt(sum(dif ** 2))
 
     def add_force(self, force):
+        """
+        Adds a force or a forcekit to the system. 
+        """
         if isinstance(force, Iterable):
             for f in force:
                 self.add_force(f)
@@ -355,12 +367,27 @@ class Simulation(object):
                 )
             forces._prepend_force_name_to_params(force)
             self.force_dict[force.name] = force
+        
+        if self.forces_applied:
+            raise RuntimeError("Cannot add force after the context has been created")
 
     def _apply_forces(self):
-        """Adds all particles to the system.
+        """
+        Adds all particles and forces to the system.
         Then applies all the forces in the forcedict.
         Forces should not be modified after that, unless you do it carefully
-        (see openmm reference)."""
+        (see openmm reference).
+        
+        This method is called automatically when you run energy minimization, 
+        or run your first block. On rare occasions, you would need to run it manually, 
+        but then you probably know what you're doing. 
+        
+        One example when this method is used is a loop extrusion code (extrusion_3d.ipynb).
+        In that case, you restart a simulation, but don't do energy minimization. 
+        However, before doing the first block, you just need to advance the integrator. 
+        This requires manually creating context/etc which would be normally done by 
+        the do_block method.  
+        """
 
         if self.forces_applied:
             return
@@ -438,7 +465,8 @@ class Simulation(object):
     def reinitialize(self):
         """Reinitializes the OpenMM context object.
         This should be called if low-level parameters,
-        such as forces, have changed"""
+        such as parameters of forces, have changed        
+        """
 
         self.context.reinitialize()
         self.init_positions()

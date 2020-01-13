@@ -58,7 +58,7 @@ def test_basic_simulation_and_hdf5(tmp_path):
     d1 = load_URI(files[1])
     d1_direct = datas[1]
 
-    assert np.abs(d1["pos"] - d1_direct).max() <= 0.005
+    assert np.abs(d1["pos"] - d1_direct).max() <= 0.0051
 
     d1_fetch = polychrom.polymerutils.fetch_block(tmp_path, 1)
     assert np.allclose(d1["pos"], d1_fetch)
