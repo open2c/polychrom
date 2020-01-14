@@ -4,7 +4,43 @@ Creating a simulation: Simulation class
 
 
 Both initialization and running the simulation is done by interacting with an instance 
-of :class:polychrom.simulation.Simulation: class.  
+of :py:class:`polychrom.simulation.Simulation` class.  
+
+Overall parameters
+------------------
+
+Overall technical parameters of a simulation are generally initialized in the constructor of the 
+Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This includes 
+
+Techcnical parameters not affecting the output of simulations: 
+* Platform (cuda (usually), opencl, or CPU (slow)) 
+* GPU index
+
+Parameters affecting the simulation
+* number of particles
+* integrator (we usually use variable Langevin) + error tolerance of integrator
+* collision rate 
+* Whether to use periodic boundary conditions (PBC)
+* timestep (if using non-variable integrator)
+
+Parameters that are changed rarely, but may be useful
+* particle mass, temperature and length scale 
+* kinetic energy at which to raise an error 
+* OpenMM precision
+* Rounding before saving (default is to 0.01) 
+
+Starting conformation is loaded using :meth:`polychrom.simulation.Simulation.set_data` method. 
+Many tools for creating starting conformations are in :mod:`polychrom.starting_conformations`
+
+Adding forces 
+-------------
+
+Forces define the main aspects of a given simulation. Polymer connectivity, confinement, crosslinks, tethering monomers, etc. 
+are all defined as different forces acting on the particles. 
+
+Typicall used forces are listed in :py:mod:`polychrom.forces` module. Forces out of there can be added using :py:meth:`polychrom.simulation.Simulation.add_force` method. 
+
+
 
 """
 
@@ -39,9 +75,8 @@ class EKExceedsError(Exception):
 
 class Simulation(object):
     def __init__(self, **kwargs):
-        """Base class for openmm simulations
-
-        All parameters here are floats. Units specified in a parameter. 
+        """
+        All numbers here are floats. Units specified in a parameter. 
 
         Parameters
         ----------
