@@ -2,7 +2,6 @@
 Creating a simulation: Simulation class
 =======================================
 
-
 Both initialization and running the simulation is done by interacting with an instance 
 of :py:class:`polychrom.simulation.Simulation` class.  
 
@@ -12,18 +11,22 @@ Overall parameters
 Overall technical parameters of a simulation are generally initialized in the constructor of the 
 Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This includes 
 
-Techcnical parameters not affecting the output of simulations: 
+**Techcnical parameters not affecting the output of simulations**
+
 * Platform (cuda (usually), opencl, or CPU (slow)) 
 * GPU index
+* reporter (where to save results): see :py:mod`polychrom.hdf5_reporter`
 
-Parameters affecting the simulation
+**Parameters affecting the simulation**
+
 * number of particles
 * integrator (we usually use variable Langevin) + error tolerance of integrator
 * collision rate 
 * Whether to use periodic boundary conditions (PBC)
 * timestep (if using non-variable integrator)
 
-Parameters that are changed rarely, but may be useful
+**Parameters that are changed rarely, but may be useful**
+
 * particle mass, temperature and length scale 
 * kinetic energy at which to raise an error 
 * OpenMM precision
@@ -35,12 +38,39 @@ Many tools for creating starting conformations are in :mod:`polychrom.starting_c
 Adding forces 
 -------------
 
-Forces define the main aspects of a given simulation. Polymer connectivity, confinement, crosslinks, tethering monomers, etc. 
+**Forces** define the main aspects of a given simulation. Polymer connectivity, confinement, crosslinks, tethering monomers, etc. 
 are all defined as different forces acting on the particles. 
 
 Typicall used forces are listed in :py:mod:`polychrom.forces` module. Forces out of there can be added using :py:meth:`polychrom.simulation.Simulation.add_force` method. 
 
+Some forces need to be added together. Those include forces defining polymer connectivity. Those forces are combined 
+into **forcekits**. Forcekits are defined in :py:mod:`polychrom.forcekits` module. The only example 
+of a forcekit for now is defining polymer connectivity using bonds, polymer stiffness, and inter-monomer interaction 
+("nonbonded force"). 
 
+Some forces were written for openmm-polymer library and were not fully ported/tested into the polychrom library. 
+Those forces reside in :py:mod:`polychrom.legacy.forces` module. Some of them can be used as is, and some of them 
+would need to be copied to your code and potentially conformed to the new style of defining forces. This includes 
+accepting simulation object as a parameter, and having a ``.name`` attribute. 
+
+
+Defining your own forces
+------------------------
+
+Each force in :py:mod:`polychrom.forces` is a simple function that wraps creation of an openmm force object. 
+Users can create new forces in the script defining their simulation and add them using add_force method. 
+Good examples of forces are in :py:mod:`polychrom.forces` - all but harmonic bond force use custom forces, 
+and provide explanations of why particular energy function was chosen. 
+
+
+
+Running a simulation 
+--------------------
+
+To run a simulation, you call :py:meth:`polychrom.simulation.Simulation.doBlock` method in a loop. 
+Unless specified otherwise, this would save a conformation into a defined reporter. Terminating a 
+simulation is not necessary; however, terminating a reporter using reporter.dump_data() is needed for 
+the hdf5 reporter. This all can be viewed in the example script. 
 
 """
 
@@ -74,6 +104,12 @@ class EKExceedsError(Exception):
 
 
 class Simulation(object):
+    """
+    This is a base class for creating a Simulation and interacting with it. All 
+    general simulation parameters are defined in the constructor. 
+    Forces are defined in :py:mod:`polychrom.forces` module, and are added
+    using :py:meth:`polychrom.simulation.Simulation.add_force` method. 
+    """
     def __init__(self, **kwargs):
         """
         All numbers here are floats. Units specified in a parameter. 
