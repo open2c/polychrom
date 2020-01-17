@@ -94,9 +94,9 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
 
 def generate_bins(N, start=4, bins_per_order_magn=10):
     lstart = np.log10(start)
-    lend = np.log10(N - 1) + 1e-6
+    lend = np.log10(N - 1) 
     num = np.ceil((lend - lstart) * bins_per_order_magn)
-    bins = np.unique(np.logspace(lstart, lend, dtype=int, num=num))
+    bins = np.unique(np.round(10**np.linspace(lstart, lend, num=num)).astype(int))
     assert bins[-1] == N - 1
     return bins
 
