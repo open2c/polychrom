@@ -4,7 +4,7 @@ New-style HDF5 trajectories
 
 
 The purpose of the HDF5 reporter 
---------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 There are several reasons for migrating to the new HDF5 storage format: 
 

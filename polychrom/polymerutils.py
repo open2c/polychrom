@@ -1,10 +1,10 @@
 """
-Loading polychrom trajectories
-==============================
+Loading and saving individual conformations
+===========================================
 
 
 The module :py:mod:`polychrom.polymerutils` provides tools for saving and loading individual 
-conformations. Note that saving trajectories should be done using :py:mod:`polychrom.hdf5_format` module. 
+conformations. Note that saving and loading trajectories should generally be done using :py:mod:`polychrom.hdf5_format` module. 
 This module provides tools for loading/saving invividual conformations, or for working with 
 projects that have both  old-style and new-style trajectories. 
 
@@ -15,11 +15,11 @@ old-style and new-style trajectory. Note however that it is not the fastest way 
 in the new-style trajectory, and the :py:func:`polychrom.hdf5_format.list_URIs` is faster. 
 
 A typical workflow with the new-style trajectories should be: 
-``URIs = polychrom.hdf5_format.list_URIs(folder)
-for URI in URIs:
-    data = polychrom.hdf5_format.load_URI(URI)
-    xyz = data["pos"] 
-``
+.. code-block:: python
+    URIs = polychrom.hdf5_format.list_URIs(folder)
+    for URI in URIs:
+        data = polychrom.hdf5_format.load_URI(URI)
+        xyz = data["pos"] 
 """
 
 
