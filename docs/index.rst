@@ -31,7 +31,11 @@ Polychrom is an API, and each simulation has to be set up as a Python script. Si
    :maxdepth: 2   
    
    polychrom.simulation
+   polychrom.polymerutils
+   polychrom.hdf5_format
+   polychrom.polymer_analyses
    polychrom.contactmaps
+   
 
 
 Indices and tables
