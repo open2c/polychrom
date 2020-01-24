@@ -1,6 +1,38 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 """
+Analyses of polymer conformations
+=================================
+
+
 This module presents a collection of utils to work with polymer conformations.
+
+
+Tools for calculating contacts
+------------------------------
+
+The main function calculating contacts is: :py:func:`polychrom.polymer_analyses.calculate_contacts`
+Right now it is a simple wrapper around scipy.cKDTree. 
+
+Another function :py:func:`polychrom.polymer_analyses.smart_contacts` was added recently
+to help build contact maps with a large contact radius. 
+It randomly sub-samples the monomers; by default selecting N/cutoff monomers. It then 
+calculates contacts from sub-sampled monomers only. It is especially helpful when the same code 
+needs to calculate contacts at large and small contact radii.Because of sub-sampling at large
+contact radius, it avoids the problem of having way-too-many-contacts at a large contact radius. 
+For ordinary contacts, the number of contacts scales as contact_radius^3; however, with smart_contacts 
+it would only scale linearly with contact radius, which leads to significant speedsups. 
+
+
+Tools to calculate P(s) and R(s) 
+----------------------------------
+
+We provide functions to calculate P(s), Rg^2(s) and R^2(s) for polymers. 
+By default, they use  log-spaced bins on the X axis, with about 10 bins per order of magnitude, 
+but aligned such that the last bins ends exactly at (N-1). They output (bin, scaling) 
+for Rg^2 and R^2, and (bin_mid, scaling) for contacts. In either case, the 
+returned values are ready to plot. The difference is that Rg and R^2 are evaluated
+at a given value of s, while contacts are aggregated for (bins[0].. bins[1]), (bins[1]..bins[2]). 
+Therefore, we have to return bin mids for contacts. 
 
 """
 
@@ -41,7 +73,7 @@ def calculate_contacts(data, cutoff=1.7):
     return pairs
 
 
-def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
+def smart_contacts(data, cutoff=1.7, min_cutoff=2.1, percent_func=lambda x:1/x):
     """Calculates contacts for a polymer, give the contact radius (cutoff)
     This method takes a random fraction of the monomers that is equal to (
     1/cutoff).
@@ -53,7 +85,7 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
 
     This method will have # of contacts grow approximately linearly with
     contact radius, not cubically, which should drastically speed up
-    computations of contacts for large (10+) contact radii. This should allow
+    computations of contacts for large (5+) contact radii. This should allow
     using the same code both for small and large contact radius, without the
     need to reduce the # of conformations, subsample the data, or both at
     very large contact radii.
@@ -68,6 +100,9 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
     min_cutoff : float, optional
         Apply the "smart" reduction of contacts only when cutoff
         is less than this value
+    percent_func : callable, optional 
+        Function that calculates fraction of monomers to use, as a function of cutoff
+        Default is 1/cutoff 
 
     Returns
     -------
@@ -80,7 +115,7 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
         raise RuntimeError("Data contains NANs")
 
     if cutoff > min_cutoff:
-        frac = 1 / cutoff
+        frac = percent_func(cutoff)
         inds = np.nonzero(np.random.random(len(data)) < frac)[0]
 
         conts = calculate_contacts(data[inds], cutoff)
@@ -89,21 +124,21 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1):
         return conts
 
     else:
-        return calculate_contacts((data, cutoff))
+        return calculate_contacts(data, cutoff)
 
 
 def generate_bins(N, start=4, bins_per_order_magn=10):
     lstart = np.log10(start)
     lend = np.log10(N - 1) + 1e-6
     num = np.ceil((lend - lstart) * bins_per_order_magn)
-    bins = np.unique(np.logspace(lstart, lend, dtype=int, num=num))
-    assert bins[-1] == N - 1
+    bins = np.unique(np.logspace(lstart, lend, dtype=int, num=max(num,0)))
+    if len(bins) > 0:
+        assert bins[-1] == N - 1
     return bins
 
 
 def contact_scaling(
-    data, bins0=None, cutoff=1.1, integrate=False, ring=False, bins_per_order_magn=10
-):
+    data, bins0=None, cutoff=1.1, integrate=False, ring=False):
     """
     Returns contact probability scaling for a given polymer conformation
     Contact between monomers X and X+1 is counted as s=1 
@@ -141,7 +176,7 @@ def contact_scaling(
     assert data.shape[1] == 3
 
     if bins0 is None:
-        bins0 = generate_bins(N, bins_per_order_magn=bins_per_order_magn)
+        bins0 = generate_bins(N)
 
     bins0 = np.array(bins0)
     bins = [(bins0[i], bins0[i + 1]) for i in range(len(bins0) - 1)]
@@ -166,76 +201,6 @@ def contact_scaling(
 
     a = [sqrt(i[0] * (i[1] - 1)) for i in bins]
     return a, connumbers
-
-
-def R2_scaling(data, bins=None, ring=False):
-    """
-    Returns end-to-end distance scaling of a given polymer conformation.
-    ..warning:: This method averages end-to-end scaling over all possible
-     subchains of given length
-
-    Parameters
-    ----------
-
-    data: Nx3 array
-    bins: the same as in giveCpScaling
-
-    """
-    data = np.asarray(data, float)
-    N = data.shape[0]
-    assert data.shape[1] == 3
-    data = data.T
-
-    if bins is None:
-        bins = generate_bins(N)
-    if ring:
-        data = np.concatenate([data, data], axis=1)
-
-    rads = [0.0 for i in range(len(bins))]
-    for i in range(len(bins)):
-        length = bins[i]
-        if ring:
-            rads[i] = np.mean(
-                (np.sum((data[:, :N] - data[:, length : length + N]) ** 2, 0))
-            )
-        else:
-            rads[i] = np.mean((np.sum((data[:, :-length] - data[:, length:]) ** 2, 0)))
-    return np.array(bins), rads
-
-
-def Rg2(data):
-    """
-    Simply calculates gyration radius of a polymer chain.
-    """
-    data = np.asarray(data)
-    assert data.shape[1] == 3
-    return np.mean((data - np.mean(data, axis=0)) ** 2) * 3
-
-
-def Rg2_matrix(data):
-    """
-    Uses dynamic programming and vectorizing to calculate Rg for each subchain of the
-    matrix element [i,j] in resulting matrix is Rg of a subchain from i to j
-    including  i and j
-    """
-
-    data = np.asarray(data, float)
-    assert data.shape[1] == 3
-    N = data.shape[0]
-    data = np.concatenate([[[0, 0, 0]], data])
-
-    coms = np.cumsum(data, 0)  # cumulative sum of locations to calculate COM
-    coms2 = np.cumsum(data ** 2, 0)  # cumulative sum of locations^2 to calculate RG
-
-    dists = np.abs(np.arange(N)[:, None] - np.arange(N)[None, :]) + 1
-    coms2d = (-coms2[:-1, None, :] + coms2[None, 1::, :]) / dists[:, :, None]
-    comsd = ((coms[:-1, None, :] - coms[None, 1:, :]) / dists[:, :, None]) ** 2
-    sums = np.sum(coms2d - comsd, 2)
-    np.fill_diagonal(sums, 0)
-    mask = np.arange(N)[:, None] > np.arange(N)[None, :]
-    sums[mask] = sums.T[mask]
-    return sums
-
 
 def Rg2_scaling(data, bins=None, ring=False):
     """Calculates average gyration radius of subchains a function of s
@@ -283,6 +248,73 @@ def Rg2_scaling(data, bins=None, ring=False):
     for i in range(len(bins)):
         rads[i] = radius_gyration(int(bins[i]))
     return np.array(bins), rads
+
+def R2_scaling(data, bins=None, ring=False):
+    """
+    Returns end-to-end distance scaling of a given polymer conformation.
+    ..warning:: This method averages end-to-end scaling over all possible
+     subchains of given length
+
+    Parameters
+    ----------
+
+    data: Nx3 array
+    bins: the same as in giveCpScaling
+
+    """
+    data = np.asarray(data, float)
+    N = data.shape[0]
+    assert data.shape[1] == 3
+    data = data.T
+
+    if bins is None:
+        bins = generate_bins(N)
+    if ring:
+        data = np.concatenate([data, data], axis=1)
+
+    rads = [0.0 for i in range(len(bins))]
+    for i in range(len(bins)):
+        length = bins[i]
+        if ring:
+            rads[i] = np.mean(
+                (np.sum((data[:, :N] - data[:, length : length + N]) ** 2, 0))
+            )
+        else:
+            rads[i] = np.mean((np.sum((data[:, :-length] - data[:, length:]) ** 2, 0)))
+    return np.array(bins), rads
+
+
+def Rg2(data):
+    """
+    Simply calculates gyration radius of a polymer chain.
+    """
+    data = np.asarray(data)
+    assert data.shape[1] == 3
+    return np.mean((data - np.mean(data, axis=0)) ** 2) * 3
+
+
+def Rg2_matrix(data):
+    """
+    Uses dynamic programming and vectorizing to calculate Rg for each subchain of the polymer. 
+    Returns a matrix for which an element [i,j] is Rg of a subchain from i to j including  i and j
+    """
+
+    data = np.asarray(data, float)
+    assert data.shape[1] == 3
+    N = data.shape[0]
+    data = np.concatenate([[[0, 0, 0]], data])
+
+    coms = np.cumsum(data, 0)  # cumulative sum of locations to calculate COM
+    coms2 = np.cumsum(data ** 2, 0)  # cumulative sum of locations^2 to calculate RG
+
+    dists = np.abs(np.arange(N)[:, None] - np.arange(N)[None, :]) + 1
+    coms2d = (-coms2[:-1, None, :] + coms2[None, 1::, :]) / dists[:, :, None]
+    comsd = ((coms[:-1, None, :] - coms[None, 1:, :]) / dists[:, :, None]) ** 2
+    sums = np.sum(coms2d - comsd, 2)
+    np.fill_diagonal(sums, 0)
+    mask = np.arange(N)[:, None] > np.arange(N)[None, :]
+    sums[mask] = sums.T[mask]
+    return sums
 
 
 def ndarray_groupby_aggregate(
@@ -358,6 +390,12 @@ def streaming_ndarray_agg(
 
     if divide_by_counts is True, divides result by column "count". 
     If it's a string, divides by divide_by_count column
+    
+    This function can be used for automatically aggregating P(s), R(s) etc. 
+    for a set of conformations that is so large that all P(s) won't fit in RAM,
+    and when averaging needs to be done over so many parameters 
+    that for-loops are not an issue. Examples may include simulations in which sweep
+    over many parameters has been performed. 
     
     """
     value_cols_orig = [i for i in value_cols]

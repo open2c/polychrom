@@ -1,6 +1,6 @@
 """
-Using contactmaps module
-------------------------
+Building contact maps
+=====================
 
 
 This module is the main workhorse of tools to calculate contactmaps, both from 
