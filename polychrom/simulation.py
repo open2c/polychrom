@@ -188,8 +188,8 @@ class Simulation(object):
             mixed is optimal for most situations. 
             If you are using double precision, it will be slower by a factor of 10 or so. 
             
-        save_decimals: int, optional 
-            Round to this number of decimals before saving. 8+ is full precision. 
+        save_decimals: int or False, optional 
+            Round to this number of decimals before saving. ``False`` is no rounding.  
             Default is 2. It gives maximum error of 0.005, which is nearly always harmless
             but saves up to 40% of storage space (0.6 of the original)
             Using one decimal is safe most of the time, and reduces storage to 40% of int32. 
@@ -224,6 +224,9 @@ class Simulation(object):
                         i, valid_names
                     )
                 )
+                
+        if None in kwargs.values():
+            raise ValueError("None is not allowed in arguments due to HDF5 incompatiliblity. Use False instead.")
         default_args.update(kwargs)
         kwargs = default_args
         self.kwargs = kwargs
@@ -669,7 +672,7 @@ class Simulation(object):
         coords = self.state.getPositions(asNumpy=True)
         newcoords = coords / simtk.unit.nanometer
         newcoords = np.array(newcoords, dtype=np.float32)
-        if self.kwargs["save_decimals"] is not None:
+        if self.kwargs["save_decimals"] is not False:
             newcoords = np.round(newcoords, self.kwargs["save_decimals"])
 
         self.time = self.state.getTime() / simtk.unit.picosecond

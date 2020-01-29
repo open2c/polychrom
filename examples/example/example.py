@@ -23,8 +23,8 @@ sim = simulation.Simulation(
     GPU="0",
     collision_rate=0.03,
     N=N,
-    save_decimals=None,
-    PBCbox=None,
+    save_decimals=2,
+    PBCbox=False,
     reporters=[reporter],
 )
 
