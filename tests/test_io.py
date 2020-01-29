@@ -73,7 +73,7 @@ def test_basic_simulation_and_hdf5(tmp_path):
     ind, data = rep.continue_trajectory()
 
     # continuing from the last trajectory
-    assert np.abs(data["pos"] - datas[-1]).max() <= 0.005
+    assert np.abs(data["pos"] - datas[-1]).max() <= 0.0054
 
 
 def run():
