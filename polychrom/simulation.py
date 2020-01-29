@@ -1,5 +1,79 @@
-# Licensed under the MIT license:
-# http://www.opensource.org/licenses/mit-license.php
+"""
+Creating a simulation: Simulation class
+=======================================
+
+Both initialization and running the simulation is done by interacting with an instance 
+of :py:class:`polychrom.simulation.Simulation` class.  
+
+Overall parameters
+------------------
+
+Overall technical parameters of a simulation are generally initialized in the constructor of the 
+Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This includes 
+
+**Techcnical parameters not affecting the output of simulations**
+
+* Platform (cuda (usually), opencl, or CPU (slow)) 
+* GPU index
+* reporter (where to save results): see :py:mod`polychrom.hdf5_reporter`
+
+**Parameters affecting the simulation**
+
+* number of particles
+* integrator (we usually use variable Langevin) + error tolerance of integrator
+* collision rate 
+* Whether to use periodic boundary conditions (PBC)
+* timestep (if using non-variable integrator)
+
+**Parameters that are changed rarely, but may be useful**
+
+* particle mass, temperature and length scale 
+* kinetic energy at which to raise an error 
+* OpenMM precision
+* Rounding before saving (default is to 0.01) 
+
+Starting conformation is loaded using :meth:`polychrom.simulation.Simulation.set_data` method. 
+Many tools for creating starting conformations are in :mod:`polychrom.starting_conformations`
+
+Adding forces 
+-------------
+
+**Forces** define the main aspects of a given simulation. Polymer connectivity, confinement, crosslinks, tethering monomers, etc. 
+are all defined as different forces acting on the particles. 
+
+Typicall used forces are listed in :py:mod:`polychrom.forces` module. Forces out of there can be added using :py:meth:`polychrom.simulation.Simulation.add_force` method. 
+
+Some forces need to be added together. Those include forces defining polymer connectivity. Those forces are combined 
+into **forcekits**. Forcekits are defined in :py:mod:`polychrom.forcekits` module. The only example 
+of a forcekit for now is defining polymer connectivity using bonds, polymer stiffness, and inter-monomer interaction 
+("nonbonded force"). 
+
+Some forces were written for openmm-polymer library and were not fully ported/tested into the polychrom library. 
+Those forces reside in :py:mod:`polychrom.legacy.forces` module. Some of them can be used as is, and some of them 
+would need to be copied to your code and potentially conformed to the new style of defining forces. This includes 
+accepting simulation object as a parameter, and having a ``.name`` attribute. 
+
+
+Defining your own forces
+------------------------
+
+Each force in :py:mod:`polychrom.forces` is a simple function that wraps creation of an openmm force object. 
+Users can create new forces in the script defining their simulation and add them using add_force method. 
+Good examples of forces are in :py:mod:`polychrom.forces` - all but harmonic bond force use custom forces, 
+and provide explanations of why particular energy function was chosen. 
+
+
+
+Running a simulation 
+--------------------
+
+To run a simulation, you call :py:meth:`polychrom.simulation.Simulation.doBlock` method in a loop. 
+Unless specified otherwise, this would save a conformation into a defined reporter. Terminating a 
+simulation is not necessary; however, terminating a reporter using reporter.dump_data() is needed for 
+the hdf5 reporter. This all can be viewed in the example script. 
+
+"""
+
 
 from __future__ import absolute_import, division, print_function
 import numpy as np
@@ -30,10 +104,15 @@ class EKExceedsError(Exception):
 
 
 class Simulation(object):
+    """
+    This is a base class for creating a Simulation and interacting with it. All 
+    general simulation parameters are defined in the constructor. 
+    Forces are defined in :py:mod:`polychrom.forces` module, and are added
+    using :py:meth:`polychrom.simulation.Simulation.add_force` method. 
+    """
     def __init__(self, **kwargs):
-        """Base class for openmm simulations
-
-        All parameters here are floats. Units specified in a parameter. 
+        """
+        All numbers here are floats. Units specified in a parameter. 
 
         Parameters
         ----------
@@ -338,13 +417,18 @@ class Simulation(object):
 
     def dist(self, i, j):
         """
-        Calculates distance between particles i and j
+        Calculates distance between particles i and j. 
+        
+        Added for convenience, and not for production code. Not for use in large for-loops. 
         """
         data = self.get_data()
         dif = data[i] - data[j]
         return np.sqrt(sum(dif ** 2))
 
     def add_force(self, force):
+        """
+        Adds a force or a forcekit to the system. 
+        """
         if isinstance(force, Iterable):
             for f in force:
                 self.add_force(f)
@@ -355,12 +439,27 @@ class Simulation(object):
                 )
             forces._prepend_force_name_to_params(force)
             self.force_dict[force.name] = force
+        
+        if self.forces_applied:
+            raise RuntimeError("Cannot add force after the context has been created")
 
     def _apply_forces(self):
-        """Adds all particles to the system.
+        """
+        Adds all particles and forces to the system.
         Then applies all the forces in the forcedict.
         Forces should not be modified after that, unless you do it carefully
-        (see openmm reference)."""
+        (see openmm reference).
+        
+        This method is called automatically when you run energy minimization, 
+        or run your first block. On rare occasions, you would need to run it manually, 
+        but then you probably know what you're doing. 
+        
+        One example when this method is used is a loop extrusion code (extrusion_3d.ipynb).
+        In that case, you restart a simulation, but don't do energy minimization. 
+        However, before doing the first block, you just need to advance the integrator. 
+        This requires manually creating context/etc which would be normally done by 
+        the do_block method.  
+        """
 
         if self.forces_applied:
             return
@@ -438,7 +537,8 @@ class Simulation(object):
     def reinitialize(self):
         """Reinitializes the OpenMM context object.
         This should be called if low-level parameters,
-        such as forces, have changed"""
+        such as parameters of forces, have changed        
+        """
 
         self.context.reinitialize()
         self.init_positions()

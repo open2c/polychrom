@@ -1,3 +1,66 @@
+"""
+New-style HDF5 trajectories 
+===========================
+
+
+The purpose of the HDF5 reporter 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+There are several reasons for migrating to the new HDF5 storage format: 
+
+* Saving each conformation as individual file is producing too many files
+* Using pickle-based approaches (joblib) makes format python-specific and not backwards compatible; text is clumsy
+* Would be nice to save metadata, such as starting conformation, forces, or initial parameters. 
+* Compression can be benefitial for rounded conformations: can reduce file size by up to 40% 
+
+one file vs  many files  vs  several files 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Saving each conformation as an individual file is undesirable because it will produce too many files: filesystem check or backup on 30,000,000 files takes hours/days. 
+
+Saving all trajectory as a single files is undesirable because 1. backup software will back up a new copy of the file every day as it grows; and 2. if the last write fails, the file will end up in the corrupted state and would need to be recovered. 
+
+Solution is: save groups of conformations as individual files. E.g. save conformations 1-50 as one file, conformations 51-100 as a second file etc. 
+
+This way, we are not risking to lose anything if the power goes out at the end. This way, we are not screwing with backup solutions, And we also have partial trajectories that can be analyzed. 
+
+
+Polychrom storage format 
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+We chose the HDF5-based storage that roughly mimics the MDTraj HDF5 format. It does not have MDTraj topology because it seemed a little too complicated. However, full MDTraj compatibility may be added in the future 
+
+
+Separation of simulation and repoter 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Polychrom separates two entitys: a simulation object and a reporter. When a simulation object is initialized, a reporter (actually, a list of reporters in case you want to use several) is passed to the simulation object. Simulation object would attempt to save several things: __init__ arguments, starting conformation, energy minimization results, serialized forces, and blocks of conformations together with time, Ek, Ep. 
+
+Each time a simulation object wants to save something, it calls reporter.report(...) for each of the reporters. It passes a string indicating what is being reported, and a dictionary to save. Reporter will have to interpret this and save the data. Reporter is also keeping appropriate counts. NOTE: generic Python objects are not supported. It has to be HDF5-compatible, meaning an array of numbers/strings, or a number/string. 
+
+The HDF5 reporter used here saves everything into an HDF5 file. For anything except for a conformation, it would immmediately save the data into a single HDF5 file: numpy array compatible structures would be saved as datasets, and regular types (strings, numbers) would be saved as attributes. For conformations, it would wait until a certain number of conformations is received. It will then save them all at once into an HDF5 file under groups /1, /2, /3... /50 for blocks 1,2,3...50 respectively, and save them to `blocks_1-50.h5` file
+
+
+Multi-stage simulations or loop extrusion
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+We frequently have simulations in which a simulation object changes. One example would be changing forces or parameters throughout the simulation. Another example would be loop extrusion simulations. 
+
+In this design, a reporter object can be reused and passed to a new simulation. This would keep counter of conformations, and also save applied forces etc. again. The reporter would create a file "applied_forces_0.h5" the first time it receives forces, and "applied_forces_1.h5" the second time it receives forces from a simulation. Setting `reporter.blocks_only=True` would stop the reporter from saving anything but blocks, which may be helpful for making loop extrusion conformations. This is currently implemented in the examples
+
+
+URIs to identify individual conformations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Because we're saving several conformations into one file, we designed an URI format to quickly fetch a conformation by a unique identifyer. 
+
+URIs are like that: `/path/to/the/trajectory/blocks_1-50.h5::42` 
+
+This URI will fetch block #42 from a file blocks_1-50.h5, which contains blocks 1 through 50 including 1 and 50
+:py:func:`polychrom.polymerutils.load` function is compatible with URIs 
+Also, to make it easy to load both old-style filenames and new-style URIs, there is a function :py:func:`polychrom.polymerutils.fetch_block`. fetch_block will autodetermine the type of a trajectory folder. So it will fetch both `/path/to/the/trajectory/block42.dat` and  `/path/to/the/trajectory/blocks_x-y.h5::42` automatically 
+
+"""
 import numpy as np
 import warnings
 import h5py

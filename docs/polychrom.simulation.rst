@@ -1,3 +1,5 @@
+.. _polychrom-simulation:
+
 polychrom.simulation module
 ===========================
 

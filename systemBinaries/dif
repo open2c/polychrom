@@ -1,49 +1,40 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function
 import sys
-import numpy
-from numpy import sqrt
+import numpy as np 
 import scipy.optimize
+from polychrom.polymerutils import load, fetch_block
+from polychrom.polymer_analyses import kabsch_msd
+import os 
 
-np = numpy
-from numpy import sin, cos
-import joblib
-from openmmlib import polymerutils
-import os
-import pyximport
+filename = sys.argv[1]
+try:
+    fol, fname = os.path.split(filename)
+    data1 = fetch_block(fol, fname)
+except:
+    data1 = load(filename)
 
-pyximport.install()
-from openmmlib import polymerCython
+filename = sys.argv[2]
+try:
+    fol, fname = os.path.split(filename)
+    data2 = fetch_block(fol, fname)
+except:
+    data2 = load(filename)
 
-
-if os.path.exists(sys.argv[1]):
-    data = polymerutils.load(sys.argv[1])
-elif os.path.exists("block%s.dat" % sys.argv[1]):
-    data = polymerutils.load("block%s.dat" % sys.argv[1])
-else:
-    raise IOError("File not found: {0}").format(sys.argv[1])
-dataa = data - numpy.sum(data, 0) / float(len(data))
-
-if os.path.exists(sys.argv[2]):
-    data = polymerutils.load(sys.argv[2])
-elif os.path.exists("block{0}.dat".format(sys.argv[2])):
-    data = polymerutils.load("block%s.dat" % sys.argv[2])
-else:
-    raise IOError("File not found: {0}")
-
-datab = data - numpy.sum(data, 0) / float(len(data))
+dataa = data1 - np.sum(data1, 0) / float(len(data1))
+datab = data2 - np.sum(data2, 0) / float(len(data2))
 
 
 print(
     "Shuffled distance",
     np.mean(
         [
-            polymerCython.fastMSD(
+            np.sqrt(kabsch_msd(
                 dataa, datab[np.argsort(np.random.random(len(datab)))]
-            )
+            ))
             for _ in range(10)
         ]
     ),
 )
 
-print("actual distance", polymerCython.fastMSD(dataa, datab))
+print("actual distance", np.sqrt(kabsch_msd(dataa, datab)))

@@ -1,3 +1,7 @@
+"""
+This module defines forces commonly used in polychrom. 
+"""
+
 import re
 import itertools
 from collections.abc import Iterable
@@ -9,6 +13,12 @@ import simtk.unit
 
 
 def _prepend_force_name_to_params(force):
+    """
+    This function is called by :py:mod:`polychrom.simulation.Simulation.add_force` method. 
+    It's goal is to avoid using the same names of global parameters defined in different forces. 
+    To this end, it modifies names of parameters of each force to start with the force name, 
+    which should be unique.     
+    """
     if not hasattr(force, "getEnergyFunction"):
         return
 
@@ -24,6 +34,13 @@ def _prepend_force_name_to_params(force):
 
 
 def _to_array_1d(scalar_or_array, arrlen, dtype=float):
+    """
+    A helper function for writing forces that can accept either a single parameter, 
+    or an array of per-particle parameters. 
+    If passed a scalar, it converts it to an array of the length arrlen. 
+    If passed an iterable, it verifies that its length equals to arrlen, and 
+    returns a numpy array. 
+    """
     if not hasattr(scalar_or_array, "__iter__"):
         outarr = np.full(arrlen, scalar_or_array, dtype)
     else:
