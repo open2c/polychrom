@@ -1,3 +1,11 @@
+"""
+This is a sample simulation that does not represent any particular biological system. It is just a showcase 
+of how create a Simulation object, add forces, and initialize the reporter. 
+
+In this simulation, a simple polymer chain of 10,000 monomers is 
+"""
+
+
 import os, sys
 import polychrom
 from polychrom import simulation, starting_conformations, forces, forcekits
@@ -6,18 +14,17 @@ import os
 from polychrom.hdf5_format import HDF5Reporter
 
 N=10000
-ATTR = 0.3
 
 reporter = HDF5Reporter(folder="trajectory", max_data_length=5, overwrite=True)
 sim = simulation.Simulation(
-    platform="CUDA",  # <--------- change this to CUDA for simulations on a GPU
+    platform="CUDA", 
     integrator="variableLangevin",
-    error_tol=0.005,
+    error_tol=0.003,
     GPU="0",
     collision_rate=0.03,
     N=N,
     save_decimals=None,
-    PBCbox=[(10*N)**(1/3)]*3,
+    PBCbox=None,
     reporters=[reporter],
 )
 
@@ -31,6 +38,9 @@ sim.add_force(
     forcekits.polymer_chains(
         sim,
         chains=[(0, None, False)],
+        # By default the library assumes you have one polymer chain
+        # If you want to make it a ring, or more than one chain, use self.setChains
+        # self.setChains([(0,50,True),(50,None,False)]) will set a 50-monomer ring and a chain from monomer 50 to the end
         bond_force_func=forces.harmonic_bonds,
         bond_force_kwargs={
             "bondLength": 1.0,
@@ -42,30 +52,18 @@ sim.add_force(
             # K is more or less arbitrary, k=4 corresponds to presistence length of 4,
             # k=1.5 is recommended to make polymer realistically flexible; k=8 is very stiff
         },
-        nonbonded_force_func=forces.addSelectiveSSWForce,
+        nonbonded_force_func=forces.polynomial_repulsive,
         nonbonded_force_kwargs={
-         "stickyParticlesIdxs":list(np.nonzero(comp)[0])
-        "repulsionEnergy":5.0,
-        "repulsionRadius":1.0,
-        "attractionEnergy":0.1,
-        "attractionRadius":1.6,
-         "selectiveRepulsionEnergy":5,
-          "selectiveAttractionEnergy":ATTR,  
+            "trunc": 3.0,  # this will let chains cross sometimes
+            #'trunc':10.0, # this will resolve chain crossings and will not let chain cross anymore
         },
         except_bonds=True,
     )
 )
- a.addSelectiveSSWForce(=list(np.nonzero(comp)[0]), extraHardParticlesIdxs=[], repulsionEnergy=5, repulsionRadius=1, attractionEnergy=0.1, attractionRadius=1.5, selectiveRepulsionEnergy=5, selectiveAttractionEnergy=attr)
 
-# -----------Running a simulation ---------
-
-
-# sim.save()  # save original conformationz
 
 for _ in range(10):  # Do 10 blocks
-    sim.do_block(100)  # Of 2000 timesteps each
-    # sim.save()  # and save data every block
-sim.print_stats()  # In the end, print statistics
-# sim.show()  # and show the polymer if you want to see it.
+    sim.do_block(100)  # Of 100 timesteps each. Data is saved automatically. 
+sim.print_stats()  # In the end, print very simple statistics
 
-reporter.dump_data()
+reporter.dump_data()  # always need to run in the end to dump the block cache to the disk
