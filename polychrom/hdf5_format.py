@@ -22,7 +22,7 @@ Saving all trajectory as a single files is undesirable because 1. backup softwar
 
 Solution is: save groups of conformations as individual files. E.g. save conformations 1-50 as one file, conformations 51-100 as a second file etc. 
 
-This way, we are not risking to lose anything if the power goes out at the end. This way, we are not screwing with backup solutions, And we also have partial trajectories that can be analyzed. 
+This way, we are not risking to lose anything if the power goes out at the end. This way, we are not screwing with backup solutions. This way, we have partial trajectories that can be analyzed. Although partial trajectories are not realtime, @golobor was proposing a solution to it for debug/development. 
 
 
 Polychrom storage format 
@@ -34,11 +34,14 @@ We chose the HDF5-based storage that roughly mimics the MDTraj HDF5 format. It d
 Separation of simulation and repoter 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Polychrom separates two entitys: a simulation object and a reporter. When a simulation object is initialized, a reporter (actually, a list of reporters in case you want to use several) is passed to the simulation object. Simulation object would attempt to save several things: __init__ arguments, starting conformation, energy minimization results, serialized forces, and blocks of conformations together with time, Ek, Ep. 
+Polychrom separates two entities: a simulation object and a reporter. When a simulation object is initialized, a reporter (actually, a list of reporters in case you want to use several) is passed to the simulation object. Simulation object would attempt to save several things: __init__ arguments, starting conformation, energy minimization results, serialized forces, and blocks of conformations together with time, Ek, Ep. 
 
-Each time a simulation object wants to save something, it calls reporter.report(...) for each of the reporters. It passes a string indicating what is being reported, and a dictionary to save. Reporter will have to interpret this and save the data. Reporter is also keeping appropriate counts. NOTE: generic Python objects are not supported. It has to be HDF5-compatible, meaning an array of numbers/strings, or a number/string. 
+Each time a simulation object wants to save something, it calls reporter.report(...) for each of the reporters. It passes a string indicating what is being reported, and a dictionary to save. Reporter will have to interpret this and save the data. Reporter is also keeping appropriate counts. Users can pass a dict with extra variables to :py:func:`polychrom.simulation.Simulation.do_block` as ``save_extras`` paramater. This dict will be saved by the reporter. 
 
-The HDF5 reporter used here saves everything into an HDF5 file. For anything except for a conformation, it would immmediately save the data into a single HDF5 file: numpy array compatible structures would be saved as datasets, and regular types (strings, numbers) would be saved as attributes. For conformations, it would wait until a certain number of conformations is received. It will then save them all at once into an HDF5 file under groups /1, /2, /3... /50 for blocks 1,2,3...50 respectively, and save them to `blocks_1-50.h5` file
+.. note:: 
+    Generic Python objects are not supported by HDF5 reporter. Data has to be HDF5-compatible, meaning an array of numbers/strings, or a number/string. 
+
+The HDF5 reporter used here saves everything into an HDF5 file. For anything except the conformations, it would immmediately save the data into a single HDF5 file: numpy array compatible structures would be saved as datasets, and regular types (strings, numbers) would be saved as attributes. For conformations, it would wait until a certain number of conformations is received. It will then save them all at once into an HDF5 file under groups /1, /2, /3... /50 for blocks 1,2,3...50 respectively, and save them to `blocks_1-50.h5` file
 
 
 Multi-stage simulations or loop extrusion

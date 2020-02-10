@@ -1,3 +1,22 @@
+"""
+Forcekits (new in polychrom)
+----------------------------
+
+The goal of the forcekits is two-fold. First, sometimes communication between forces is required. 
+Since explicit is better than implicit, according to The Zen of Python, we are trying to 
+avoid communication between forces using hidden variables (as done in openmm-polymer), and make it explicit. 
+Forcekits are the tool to implement groups of forces that go together, as to avoid hidden communication between forces. 
+Second, some structures can be realized using many different forces: e.g. polymer chain connectivity
+can be done using harmonic bond force, FENE bonds, etc. Forcekits help avoid duplicating code, and allow swapping 
+one force for another and keeping the topology/geometry of the system the same
+
+The only forcekit that we have now implements polymer chain connectivity. It then explicitly adds exclusions 
+for all the polymer bonds into the nonbonded force, without using hidden variables for communication between forces. 
+It also allows using any bond force, any angle force, and any nonbonded force, allowing for easy swapping of 
+one force for another without duplicating code. 
+
+"""
+
 import numpy as np
 from . import forces
 

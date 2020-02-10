@@ -15,11 +15,14 @@ old-style and new-style trajectory. Note however that it is not the fastest way 
 in the new-style trajectory, and the :py:func:`polychrom.hdf5_format.list_URIs` is faster. 
 
 A typical workflow with the new-style trajectories should be: 
+
 .. code-block:: python
+
     URIs = polychrom.hdf5_format.list_URIs(folder)
     for URI in URIs:
         data = polychrom.hdf5_format.load_URI(URI)
         xyz = data["pos"] 
+        
 """
 
 

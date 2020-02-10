@@ -23,7 +23,7 @@ Other dependencies are simple, and are listed in requirements.txt. All but jobli
 Structure
 ---------
 
-Polychrom is an API, and each simulation has to be set up as a Python script. Simulations are done using a :ref:`polychrom-simulation` submodule (:class:`polychrom.simulation.simulation`)
+Polychrom is an API, and each simulation has to be set up as a Python script. Simulations are done using a "simulation" module :py:mod:`polychrom.simulation`. Forces that define the simulation are found in :py:mod:`polychrom.forces` and :py:mod:`polychrom.forcekits` modules. Contactmaps from simulated conformations can be generated using :py:mod:`polychrom.contactmaps` module. Loading and saving individual conformations can be done using :py:mod:`polychrom.polymerutils`, while loading/saving whole trajetories is done using :py:mod:`polychrom.hdf5_format`. P(s), R(s), Rg(s) curves and other analyses can be done using :py:mod:`polychrom.polymer_analyses`. 
 
 
 
