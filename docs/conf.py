@@ -127,6 +127,11 @@ exclude_patterns = []
 # a list of builtin themes.
 #
 html_theme = 'sphinx_rtd_theme'
+
+html_theme_options = {
+    'collapse_navigation': False,
+    'navigation_depth': 4,
+}
 #html_theme = 'alabaster'
 
 # Add any paths that contain custom static files (such as style sheets) here,
