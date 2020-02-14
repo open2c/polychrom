@@ -43,6 +43,8 @@ are all defined as different forces acting on the particles.
 
 Typicall used forces are listed in :py:mod:`polychrom.forces` module. Forces out of there can be added using :py:meth:`polychrom.simulation.Simulation.add_force` method. 
 
+Forces and their parameters are an essential part of nearly any polymer simulations. Some forces have just a few paramters (e.g. spherical confinement just needs a radius), while other forces may have lots of parameters and can define complex structures. For example, harmonidBondForce with a specially-created bond list was used to create a backbone-plectoneme conformation in Caulobacter simulations (Le et al, Science 2013). Same harmonic bonds that change over time are used to simulate loop extrusion as in (Fudenberg, 2016). 
+
 Some forces need to be added together. Those include forces defining polymer connectivity. Those forces are combined 
 into **forcekits**. Forcekits are defined in :py:mod:`polychrom.forcekits` module. The only example 
 of a forcekit for now is defining polymer connectivity using bonds, polymer stiffness, and inter-monomer interaction 
