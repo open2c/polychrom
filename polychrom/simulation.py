@@ -62,7 +62,8 @@ Defining your own forces
 Each force in :py:mod:`polychrom.forces` is a simple function that wraps creation of an openmm force object. 
 Users can create new forces in the script defining their simulation and add them using add_force method. 
 Good examples of forces are in :py:mod:`polychrom.forces` - all but harmonic bond force use custom forces, 
-and provide explanations of why particular energy function was chosen. 
+and provide explanations of why particular energy function was chosen. Description of the module :py:mod:`polychrom.forces` 
+has some important information about adding new forces. 
 
 
 

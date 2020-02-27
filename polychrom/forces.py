@@ -1,5 +1,42 @@
 """
-This module defines forces commonly used in polychrom. 
+
+Detailed description of forces in polychrom 
+-------------------------------------------
+
+This module defines forces commonly used in polychrom. Most forces are implemented using 
+custom forces in openmm. The force equations were generally derived such that the force and the 
+first derivative both go to zero at the cutoff radius. 
+
+Note on energy equations
+************************
+
+Energy  equations are passed as strings to one of the OpenMM customXXXForce class (e.g. customNonbondedForce). 
+Note two things. First, sub-equations are separated by semicolon, and are evaluated "bottom up", last equation first. 
+Second, equations seem much more scary than they actually are (see below). 
+
+All energy equations have to be continuous, and we strongly believe that the first derivative has to be continuous as well. 
+As a result, all equations were carefully crafted to be smooth functions. This makes things more complicated. For example, 
+a simple "k * abs(x-x0)" becomes "k * (sqrt((x-x0)^2 + a^2) - a)" where a is a small number (defined to be 0.01 for example). 
+
+All energy equations have to be calculatable in single precision. Any rounding error will throw you off. For example, you 
+should never have sqrt(A - B) where A and B are expressions, and A >= B. Because by chance, due to rounding, you may and up
+with A slightly less than B, and you will receive NaN, and the whole simulation will blow up. Similarly, atan(very_large_number),
+while defined mathematically, could easily become NaN, because very_large_number may be larger than the largest allowable float. 
+
+Note that basically all nonbonded forces were written before OpenMM introduced a switching function 
+http://docs.openmm.org/latest/api-python/generated/simtk.openmm.openmm.CustomNonbondedForce.html#simtk.openmm.openmm.CustomNonbondedForce
+Therefore, we always manually sticth the value and the first derivative of the force to be 0 at the cutoff distance. 
+For custom user-defined forces forces, it may be better to use switching function instead. 
+This does not apply to custom external forces, there stitching is still necessary. 
+
+Force equations don't have "if" statements, but it is possible to avoid them where they would be normally used. 
+For example,  "if a: b= b0 + c" can be replaced with  "b = b0 + c * delta(a)". 
+Similarly "f(r) if r < r0; 0 otherwise" is just "f(r) * step(r0 - r)". 
+These examples appear frequently in the forces that we have. One of the finest examples of crafting 
+complex forces with on-the-fly generation of force equation is in :py:fun:`polychrom.forces.heteropolymer_SSW`. 
+One of the best examples of optimizing complex forces using polynomials is in 
+:py:func:`polychrom.forces.polynomial_reuplsive`.
+
 """
 
 import re
@@ -264,9 +301,10 @@ def smooth_square_well(
     attractionEnergy: float
         the depth of the attractive part of the potential.
         E(`repulsionRadius`/2 + `attractionRadius`/2) = `attractionEnergy`
-    attractionEnergy: float
-        the maximal range of the attractive part of the potential.
-
+    attractionRadius: float
+        the radius of the attractive part of the potential.
+        E(`attractionRadius`) = 0,
+        E'(`attractionRadius`) = 0
     """
     nbCutOffDist = sim_object.conlen * attractionRadius
     energy = (
@@ -311,12 +349,12 @@ def selective_SSW(
     sim_object,
     stickyParticlesIdxs,
     extraHardParticlesIdxs,
-    repulsionEnergy=3.0,
+    repulsionEnergy=3.0,   # base repulsion energy for **all** particles 
     repulsionRadius=1.0,
-    attractionEnergy=3.0,
+    attractionEnergy=3.0,  # base attraction energy for **all** particles 
     attractionRadius=1.5,
-    selectiveRepulsionEnergy=20.0,
-    selectiveAttractionEnergy=1.0,
+    selectiveRepulsionEnergy=20.0,  # **extra** repulsive energy for **extraHard** particles
+    selectiveAttractionEnergy=1.0,   # **extra** attractive energy for **sticky** particles
     name="selective_SSW",
 ):
     """
@@ -333,15 +371,15 @@ def selective_SSW(
     This is a tunable version of SSW:
     a) You can specify the set of "sticky" particles. The sticky particles
     are attracted only to other sticky particles.
-    b) You can select a subset of particles and make them "extra hard".
+    b) You can **smultaneously** select a subset of particles and make them "extra hard".
+    
 
     This force was used two-ways. First was to make a small subset of particles very sticky. 
     In that case, it is advantageous to make the sticky particles and their neighbours
     "extra hard" and thus prevent the system from collapsing.
 
     Another useage is to induce phase separation by making all B monomers sticky. In that case, 
-    extraHard particles may not be needed at all, because the system would not collapse on itsim_object. 
-
+    extraHard particles may not be needed at all, because the system would not collapse on iteslf. 
 
     Parameters
     ----------
@@ -366,9 +404,9 @@ def selective_SSW(
     attractionRadius: float
         the maximal range of the attractive part of the potential.
     selectiveRepulsionEnergy: float
-        the EXTRA repulsion energy applied to the "extra hard" particles
+        the **EXTRA** repulsion energy applied to the **extra hard** particles
     selectiveAttractionEnergy: float
-        the EXTRA attraction energy applied to the "sticky" particles
+        the **EXTRA** attraction energy applied to the **sticky** particles
     """
 
     energy = (
@@ -429,12 +467,12 @@ def heteropolymer_SSW(
     interactionMatrix,
     monomerTypes,
     extraHardParticlesIdxs,
-    repulsionEnergy=3.0,
+    repulsionEnergy=3.0, # base repulsion energy for **all** particles 
     repulsionRadius=1.0,
-    attractionEnergy=3.0,
+    attractionEnergy=3.0, # base attraction energy for **all** particles 
     attractionRadius=1.5,
-    selectiveRepulsionEnergy=20.0,
-    selectiveAttractionEnergy=1.0,
+    selectiveRepulsionEnergy=20.0, # **extra** repulsive energy for **extraHard** particles
+    selectiveAttractionEnergy=1.0, # **extra** attraction energy that is multiplied by interactionMatrix
     keepVanishingInteractions=False,
     name="heteropolymer_SSW",
 ):
@@ -442,31 +480,37 @@ def heteropolymer_SSW(
     A version of smooth square well potential that enables the simulation of
     heteropolymers. Every monomer is assigned a number determining its type,
     then one can specify additional attraction between the types with the
-    interactionMatrix.
+    interactionMatrix. Repulsion between all monomers is the same, except for 
+    extraHardParticles, which, if specified, have higher repulsion energy. 
+    
+    The overall potential is the same as in :py:func:`polychrom.forces.smooth_square_well`
+    
+    Treatment of extraHard particles is the same as in :py:func:`polychrom.forces.selective_SSW`
 
-    This is a simple and fast polynomial force that looks like a smoothed
-    version of the square-well potential. The energy equals `repulsionEnergy`
-    around r=0, stays flat until 0.6-0.7, then drops to zero together
-    with its first derivative at r=1.0. After that it drop down to
-    `attractionEnergy` and gets back to zero at r=`attractionRadius`.
-
-    The energy function is based on polynomials of 12th power. Both the
-    function and its first derivative is continuous everywhere within its
-    domain and they both get to zero at the boundary.
-
-    This is a tunable version of SSW:
+    This is an extension of SSW (smooth square well) force in which:
+    
     a) You can give monomerTypes (e.g. 0, 1, 2 for A, B, C)
        and interaction strengths between these types. The corresponding entry in
        interactionMatrix is multiplied by selectiveAttractionEnergy to give the actual
-       (additional) depth of the potential well. 
-    b) You can select a subset of particles and make them "extra hard".
+       **additional** depth of the potential well.        
+    b) You can select a subset of particles and make them "extra hard". See selective_SSW force for descrition. 
+    
+    Force summary
+    *************
+    
+    Potential is the same as smooth square well, with the following parameters for particles i and j: 
+    
+    * Attraction energy (i,j) = attractionEnergy + selectiveAttractionEnergy * interactionMatrix[i,j] 
+
+    * Repulsion Energy (i,j) = repulsionEnergy + selectiveRepulsionEnergy;  if (i) or (j) are extraHard
+    * Repulsion Energy (i,j) = repulsionEnergy;  otherwise 
 
     Parameters
     ----------
 
     interactionMatrix: np.array
-        the interaction strenghts between the different types.
-        Only upper triangular values are used.
+        the **EXTRA** interaction strenghts between the different types.
+        Only upper triangular values are used. See "Force summary" above 
     monomerTypes: list of int or np.array
         the type of each monomer, starting at 0
     extraHardParticlesIdxs : list of int
@@ -486,9 +530,9 @@ def heteropolymer_SSW(
     attractionRadius: float
         the maximal range of the attractive part of the potential.
     selectiveRepulsionEnergy: float
-        the EXTRA repulsion energy applied to the "extra hard" particles
+        the **EXTRA** repulsion energy applied to the "extra hard" particles
     selectiveAttractionEnergy: float
-        prefactor for the heteropolymer interactions
+        the **EXTRA** attraction energy (prefactor for the interactionMatrix interactions)
     keepVanishingInteractions : bool
         a flag that determines whether the terms that have zero interaction are
         still added to the force. This can be useful when changing the force
