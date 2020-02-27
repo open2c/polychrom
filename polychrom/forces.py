@@ -264,9 +264,10 @@ def smooth_square_well(
     attractionEnergy: float
         the depth of the attractive part of the potential.
         E(`repulsionRadius`/2 + `attractionRadius`/2) = `attractionEnergy`
-    attractionEnergy: float
-        the maximal range of the attractive part of the potential.
-
+    attractionRadius: float
+        the radius of the attractive part of the potential.
+        E(`attractionRadius`) = 0,
+        E'(`attractionRadius`) = 0
     """
     nbCutOffDist = sim_object.conlen * attractionRadius
     energy = (
@@ -311,12 +312,12 @@ def selective_SSW(
     sim_object,
     stickyParticlesIdxs,
     extraHardParticlesIdxs,
-    repulsionEnergy=3.0,
+    repulsionEnergy=3.0,   # base repulsion energy for **all** particles 
     repulsionRadius=1.0,
-    attractionEnergy=3.0,
+    attractionEnergy=3.0,  # base attraction energy for **all** particles 
     attractionRadius=1.5,
-    selectiveRepulsionEnergy=20.0,
-    selectiveAttractionEnergy=1.0,
+    selectiveRepulsionEnergy=20.0,  # **extra** repulsive energy for **extraHard** particles
+    selectiveAttractionEnergy=1.0,   # **extra** attractive energy for **sticky** particles
     name="selective_SSW",
 ):
     """
@@ -333,15 +334,15 @@ def selective_SSW(
     This is a tunable version of SSW:
     a) You can specify the set of "sticky" particles. The sticky particles
     are attracted only to other sticky particles.
-    b) You can select a subset of particles and make them "extra hard".
+    b) You can **smultaneously** select a subset of particles and make them "extra hard".
+    
 
     This force was used two-ways. First was to make a small subset of particles very sticky. 
     In that case, it is advantageous to make the sticky particles and their neighbours
     "extra hard" and thus prevent the system from collapsing.
 
     Another useage is to induce phase separation by making all B monomers sticky. In that case, 
-    extraHard particles may not be needed at all, because the system would not collapse on itsim_object. 
-
+    extraHard particles may not be needed at all, because the system would not collapse on iteslf. 
 
     Parameters
     ----------
@@ -366,9 +367,9 @@ def selective_SSW(
     attractionRadius: float
         the maximal range of the attractive part of the potential.
     selectiveRepulsionEnergy: float
-        the EXTRA repulsion energy applied to the "extra hard" particles
+        the **EXTRA** repulsion energy applied to the **extra hard** particles
     selectiveAttractionEnergy: float
-        the EXTRA attraction energy applied to the "sticky" particles
+        the **EXTRA** attraction energy applied to the **sticky** particles
     """
 
     energy = (
@@ -429,12 +430,12 @@ def heteropolymer_SSW(
     interactionMatrix,
     monomerTypes,
     extraHardParticlesIdxs,
-    repulsionEnergy=3.0,
+    repulsionEnergy=3.0, # base repulsion energy for **all** particles 
     repulsionRadius=1.0,
-    attractionEnergy=3.0,
+    attractionEnergy=3.0, # base attraction energy for **all** particles 
     attractionRadius=1.5,
-    selectiveRepulsionEnergy=20.0,
-    selectiveAttractionEnergy=1.0,
+    selectiveRepulsionEnergy=20.0, # **extra** repulsive energy for **extraHard** particles
+    selectiveAttractionEnergy=1.0, # **extra** attraction energy that is multiplied by interactionMatrix
     keepVanishingInteractions=False,
     name="heteropolymer_SSW",
 ):
@@ -442,31 +443,36 @@ def heteropolymer_SSW(
     A version of smooth square well potential that enables the simulation of
     heteropolymers. Every monomer is assigned a number determining its type,
     then one can specify additional attraction between the types with the
-    interactionMatrix.
+    interactionMatrix. Repulsion between all monomers is the same, except for 
+    extraHardParticles, which, if specified, have higher repulsion energy. 
+    
+    The overall potential is the same as in :py:func:`polychrom.forces.smooth_square_well`
+    
+    Treatment of extraHard particles is the same as in :py:func:`polychrom.forces.selective_SSW`
 
-    This is a simple and fast polynomial force that looks like a smoothed
-    version of the square-well potential. The energy equals `repulsionEnergy`
-    around r=0, stays flat until 0.6-0.7, then drops to zero together
-    with its first derivative at r=1.0. After that it drop down to
-    `attractionEnergy` and gets back to zero at r=`attractionRadius`.
-
-    The energy function is based on polynomials of 12th power. Both the
-    function and its first derivative is continuous everywhere within its
-    domain and they both get to zero at the boundary.
-
-    This is a tunable version of SSW:
+    This is a tunable version of SSW (smooth square well):
     a) You can give monomerTypes (e.g. 0, 1, 2 for A, B, C)
        and interaction strengths between these types. The corresponding entry in
        interactionMatrix is multiplied by selectiveAttractionEnergy to give the actual
-       (additional) depth of the potential well. 
-    b) You can select a subset of particles and make them "extra hard".
+       **additional** depth of the potential well. 
+    b) You can select a subset of particles and make them "extra hard". See selective_SSW force for descrition. 
+    
+    Force summary
+    -------------
+    
+    Potential is the same as smooth square well, with the following parameters for particles i and j: 
+    
+    * Attraction energy (i,j) = attractionEnergy + selectiveAttractionEnergy * interactionMatrix[i,j] 
+
+    * Repulsion Energy (i,j) = repulsionEnergy + selectiveRepulsionEnergy;  if (i) or (j) are extraHard
+    * Repulsion Energy (i,j) = repulsionEnergy;  otherwise 
 
     Parameters
     ----------
 
     interactionMatrix: np.array
-        the interaction strenghts between the different types.
-        Only upper triangular values are used.
+        the *extra* interaction strenghts between the different types.
+        Only upper triangular values are used. See "Force summary" above 
     monomerTypes: list of int or np.array
         the type of each monomer, starting at 0
     extraHardParticlesIdxs : list of int
