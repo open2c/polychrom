@@ -450,15 +450,16 @@ def heteropolymer_SSW(
     
     Treatment of extraHard particles is the same as in :py:func:`polychrom.forces.selective_SSW`
 
-    This is a tunable version of SSW (smooth square well):
+    This is an extension of SSW (smooth square well) force in which:
+    
     a) You can give monomerTypes (e.g. 0, 1, 2 for A, B, C)
        and interaction strengths between these types. The corresponding entry in
        interactionMatrix is multiplied by selectiveAttractionEnergy to give the actual
-       **additional** depth of the potential well. 
+       **additional** depth of the potential well.        
     b) You can select a subset of particles and make them "extra hard". See selective_SSW force for descrition. 
     
     Force summary
-    -------------
+    *************
     
     Potential is the same as smooth square well, with the following parameters for particles i and j: 
     
@@ -471,7 +472,7 @@ def heteropolymer_SSW(
     ----------
 
     interactionMatrix: np.array
-        the *extra* interaction strenghts between the different types.
+        the **EXTRA** interaction strenghts between the different types.
         Only upper triangular values are used. See "Force summary" above 
     monomerTypes: list of int or np.array
         the type of each monomer, starting at 0
@@ -492,9 +493,9 @@ def heteropolymer_SSW(
     attractionRadius: float
         the maximal range of the attractive part of the potential.
     selectiveRepulsionEnergy: float
-        the EXTRA repulsion energy applied to the "extra hard" particles
+        the **EXTRA** repulsion energy applied to the "extra hard" particles
     selectiveAttractionEnergy: float
-        prefactor for the heteropolymer interactions
+        the **EXTRA** attraction energy (prefactor for the interactionMatrix interactions)
     keepVanishingInteractions : bool
         a flag that determines whether the terms that have zero interaction are
         still added to the force. This can be useful when changing the force
