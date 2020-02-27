@@ -35,6 +35,7 @@ Polychrom is an API, and each simulation has to be set up as a Python script. Si
    polychrom.hdf5_format
    polychrom.polymer_analyses
    polychrom.contactmaps
+   polychrom.forces
    
 
 

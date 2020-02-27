@@ -1,5 +1,42 @@
 """
-This module defines forces commonly used in polychrom. 
+
+Detailed description of forces in polychrom 
+-------------------------------------------
+
+This module defines forces commonly used in polychrom. Most forces are implemented using 
+custom forces in openmm. The force equations were generally derived such that the force and the 
+first derivative both go to zero at the cutoff radius. 
+
+Note on energy equations
+************************
+
+Energy  equations are passed as strings to one of the OpenMM customXXXForce class (e.g. customNonbondedForce). 
+Note two things. First, sub-equations are separated by semicolon, and are evaluated "bottom up", last equation first. 
+Second, equations seem much more scary than they actually are (see below). 
+
+All energy equations have to be continuous, and we strongly believe that the first derivative has to be continuous as well. 
+As a result, all equations were carefully crafted to be smooth functions. This makes things more complicated. For example, 
+a simple "k * abs(x-x0)" becomes "k * (sqrt((x-x0)^2 + a^2) - a)" where a is a small number (defined to be 0.01 for example). 
+
+All energy equations have to be calculatable in single precision. Any rounding error will throw you off. For example, you 
+should never have sqrt(A - B) where A and B are expressions, and A >= B. Because by chance, due to rounding, you may and up
+with A slightly less than B, and you will receive NaN, and the whole simulation will blow up. Similarly, atan(very_large_number),
+while defined mathematically, could easily become NaN, because very_large_number may be larger than the largest allowable float. 
+
+Note that basically all nonbonded forces were written before OpenMM introduced a switching function 
+http://docs.openmm.org/latest/api-python/generated/simtk.openmm.openmm.CustomNonbondedForce.html#simtk.openmm.openmm.CustomNonbondedForce
+Therefore, we always manually sticth the value and the first derivative of the force to be 0 at the cutoff distance. 
+For custom user-defined forces forces, it may be better to use switching function instead. 
+This does not apply to custom external forces, there stitching is still necessary. 
+
+Force equations don't have "if" statements, but it is possible to avoid them where they would be normally used. 
+For example,  "if a: b= b0 + c" can be replaced with  "b = b0 + c * delta(a)". 
+Similarly "f(r) if r < r0; 0 otherwise" is just "f(r) * step(r0 - r)". 
+These examples appear frequently in the forces that we have. One of the finest examples of crafting 
+complex forces with on-the-fly generation of force equation is in :py:fun:`polychrom.forces.heteropolymer_SSW`. 
+One of the best examples of optimizing complex forces using polynomials is in 
+:py:func:`polychrom.forces.polynomial_reuplsive`.
+
 """
 
 import re
