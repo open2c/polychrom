@@ -33,9 +33,9 @@ Force equations don't have "if" statements, but it is possible to avoid them whe
 For example,  "if a: b= b0 + c" can be replaced with  "b = b0 + c * delta(a)". 
 Similarly "f(r) if r < r0; 0 otherwise" is just "f(r) * step(r0 - r)". 
 These examples appear frequently in the forces that we have. One of the finest examples of crafting 
-complex forces with on-the-fly generation of force equation is in :py:fun:`polychrom.forces.heteropolymer_SSW`. 
+complex forces with on-the-fly generation of force equation is in :py:func:`polychrom.forces.heteropolymer_SSW`. 
 One of the best examples of optimizing complex forces using polynomials is in 
-:py:func:`polychrom.forces.polynomial_reuplsive`.
+:py:func:`polychrom.forces.polynomial_repulsive`.
 
 """
 
@@ -871,10 +871,11 @@ def grosberg_polymer_bonds(sim_object, bonds, k=30, name="grosberg_polymer"):
 
 
 def grosberg_angle(sim_object, triplets, k=1.5, name="grosberg_angle"):
-    """Adds stiffness according to the Grosberg paper.
+    """
+    Adds stiffness according to the Grosberg paper.
     (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
-     nonconcatenated ring polymers in a melt. I. Statics."
-     The Journal of chemical physics 134 (2011): 204904.)
+    nonconcatenated ring polymers in a melt. I. Statics."
+    The Journal of chemical physics 134 (2011): 204904.)
 
     Parameters are synchronized with normal stiffness
 

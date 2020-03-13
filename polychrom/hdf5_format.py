@@ -410,7 +410,7 @@ class HDF5Reporter(object):
         if name not in ["data"]:
             if not self.blocks_only:
                 filename = f"{name}_{count}.h5"
-                with h5py.File(os.path.join(self.folder, filename)) as file:
+                with h5py.File(os.path.join(self.folder, filename),mode='w') as file:
                     _write_group(values, file, dset_opts=self.h5py_dset_opts)
 
         else:
@@ -424,7 +424,7 @@ class HDF5Reporter(object):
             cmin = min(self.datas.keys())
             cmax = max(self.datas.keys())
             filename = f"blocks_{cmin}-{cmax}.h5"
-            with h5py.File(os.path.join(self.folder, filename)) as file:
+            with h5py.File(os.path.join(self.folder, filename),mode='w') as file:
                 for count, values in self.datas.items():
                     gr = file.create_group(str(count))
                     _write_group(values, gr, dset_opts=self.h5py_dset_opts)
