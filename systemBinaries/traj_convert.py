@@ -141,15 +141,18 @@ def trajcopy(
     If you have several files like that, you can repeat "--extra-pattern" and other 3 arguments
     several times.     
     """
+
+    # managing input/output directories
     in_dir = os.path.abspath(in_dir)
     if not os.path.exists(in_dir):
         raise IOError("input directory doesn't exist")
-    
     out_dir = os.path.abspath(out_dir)
     if out_dir == in_dir:
         raise ValueError("Copying to same directory not supported - use replace=True")
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
+
+    # getting files/URIs corresponding to blocks
     all_files = glob.glob(os.path.join(in_dir, "*"))
     if kwargs["input_style"] == "old":
         blocks = _find_matches(block_pattern, all_files)
@@ -157,28 +160,33 @@ def trajcopy(
         blocks = {i: j for j, i in list_URIs(in_dir, return_dict=True).items()}
     else:
         raise ValueError("input-style should be 'old' or 'new'")
-    
+
+    # managing cases when the folder is empty
     policy = kwargs["empty_policy"]
     if len(blocks) == 0:
         if policy == "copy":
-            kwargs["max_unmatched_files"] = 1e9 
+            kwargs["max_unmatched_files"] = 1e9
         elif policy == "raise":
             print(in_dir)
             raise IOError("Emtpy directory encountered")
-        elif policy in ["ignore", "copy-limit"]:
+        elif policy == "ignore":
+            exit()
+        elif policy == "copy-limit":
             pass
         else:
             raise ValueError(f"wrong empty policy: {policy}")
-        
-    
+
+    # coverting blocks to pd.Series
     blocks = pd.Series(data=list(blocks.keys()), index=list(blocks.values()))
     blocks.name = "blocks"
     all_series = [blocks]
 
+    # making sure the 4 arguments for extra files are repeated the same number of time
     assert len(extra_pattern) == len(extra_pattern_name)
     assert len(extra_loader) == len(extra_pattern_name)
     assert len(extra_loader) == len(extra_require)
 
+    # matching patterns for extra files, populating the dataframe
     for val_pat, val_name, require in zip(
         extra_pattern, extra_pattern_name, extra_require
     ):
@@ -192,12 +200,13 @@ def trajcopy(
             datas = pd.Series(data=list(datas.keys()), index=list(datas.values()))
             datas.name = val_name
             all_series.append(datas)
-
     df = pd.DataFrame(all_series).T
 
-    if (not kwargs["allow_nonconsecutive"]) and (kwargs["skip_files"] == 1):
+    # verifying that index is consecutive
+    if not kwargs["allow_nonconsecutive"]:
         assert (np.diff(df.index.values) == 1).all()
 
+    # managing files that are not blocks; raising an error if there are too many of them
     vals = set(df.values.reshape((-1,)))
     other = [i for i in all_files if i not in vals]
     if len(other) > kwargs["max_unmatched_files"]:
@@ -205,15 +214,19 @@ def trajcopy(
         print(other[:: len(other) // 20 + 1])
         print("Verify that none of these should be converted using extra_pattern")
         print("If not, increase max_unmatched_files")
-        raise ValueError("Limit exceeded: {0} files did not match anything".format(len(other)))
-        
+        raise ValueError(
+            "Limit exceeded: {0} files did not match anything".format(len(other))
+        )
+
+    # copying the "other" files
     for i in other:
         dest = os.path.join(out_dir, os.path.split(i)[-1])
         if not kwargs["overwrite"]:
             if os.path.exists(dest):
                 raise IOError(f"File exists: {dest}")
         shutil.copy(i, dest)
-    
+
+    # creating the reporter and populating the output
     if len(blocks) > 0:
         rep = HDF5Reporter(
             folder=out_dir,
@@ -222,6 +235,7 @@ def trajcopy(
             overwrite=kwargs["overwrite"],
         )
 
+        # main loop - skip_files is aplied here
         for i, subdf in df.iloc[:: kwargs["skip_files"]].iterrows():
             cur = {}
             data = subdf["blocks"]
@@ -236,6 +250,7 @@ def trajcopy(
                     np.asarray(cur["pos"], dtype=np.float32), kwargs["round_to"]
                 )
 
+            # adding "extra" data in the dict to save
             for name, ldr in zip(extra_pattern_name, extra_loader):
                 if name not in subdf:
                     continue
@@ -244,6 +259,8 @@ def trajcopy(
                     cur[name] = eval(ldr)
             rep.report("data", cur)
         rep.dump_data()
+
+    # replacing the original trajectory if requested
     if kwargs["replace"]:
         files = [os.path.join(in_dir, i) for i in os.listdir(in_dir)]
         if not kwargs["force_delete"]:
