@@ -39,6 +39,12 @@ def _find_matches(pat, filenames):
     help="old (block*.dat) or new (HDF5) style for input files",
 )
 @click.option(
+    "--empty-policy",
+    default="copy-limit",
+    show_default=True,
+    help="empty trajectories: 'copy', 'copy-limit' (enforce file limit), 'raise', 'ignore'",
+)
+@click.option(
     "--block-pattern",
     default="block([0-9]+).dat",
     show_default=True,
@@ -70,7 +76,7 @@ def _find_matches(pat, filenames):
     multiple=True,
     default=[False],
     show_default=True,
-    help="Require or not the current extra to be present (can be repeated)",
+    help="Require or not that extra files are present (can be repeated)",
 )
 @click.option(
     "--overwrite/--not-overwrite",
@@ -138,7 +144,7 @@ def trajcopy(
     in_dir = os.path.abspath(in_dir)
     if not os.path.exists(in_dir):
         raise IOError("input directory doesn't exist")
-
+    
     out_dir = os.path.abspath(out_dir)
     if out_dir == in_dir:
         raise ValueError("Copying to same directory not supported - use replace=True")
@@ -151,7 +157,20 @@ def trajcopy(
         blocks = {i: j for j, i in list_URIs(in_dir, return_dict=True).items()}
     else:
         raise ValueError("input-style should be 'old' or 'new'")
-
+    
+    policy = kwargs["empty_policy"]
+    if len(blocks) == 0:
+        if policy == "copy":
+            kwargs["max_unmatched_files"] = 1e9 
+        elif policy == "raise":
+            print(in_dir)
+            raise IOError("Emtpy directory encountered")
+        elif policy in ["ignore", "copy-limit"]:
+            pass
+        else:
+            raise ValueError(f"wrong empty policy: {policy}")
+        
+    
     blocks = pd.Series(data=list(blocks.keys()), index=list(blocks.values()))
     blocks.name = "blocks"
     all_series = [blocks]
@@ -186,40 +205,45 @@ def trajcopy(
         print(other[:: len(other) // 20 + 1])
         print("Verify that none of these should be converted using extra_pattern")
         print("If not, increase max_unmatched_files")
-        raise ValueError("{0} files did not match anything".format(len(other)))
-
-    rep = HDF5Reporter(
-        folder=out_dir,
-        max_data_length=kwargs["hdf5_blocks_per_file"],
-        h5py_dset_opts=None,
-        overwrite=kwargs["overwrite"],
-    )
-
-    for i, subdf in df.iloc[:: kwargs["skip_files"]].iterrows():
-        cur = {}
-        data = subdf["blocks"]
-        if kwargs["input_style"] == "old":
-            data = load(data)
-            data = np.round(np.asarray(data, dtype=np.float32), kwargs["round_to"])
-            cur["pos"] = data
-            cur["block"] = i
-        elif kwargs["input_style"] == "new":
-            cur = load_URI(data)
-            cur["pos"] = np.round(
-                np.asarray(cur["pos"], dtype=np.float32), kwargs["round_to"]
-            )
-
-        for name, ldr in zip(extra_pattern_name, extra_loader):
-            if name not in subdf:
-                continue
-            filename = subdf[name]
-            if filename is not None:
-                cur[name] = eval(ldr)
-        rep.report("data", cur)
-    rep.dump_data()
+        raise ValueError("Limit exceeded: {0} files did not match anything".format(len(other)))
+        
     for i in other:
-        shutil.copy(i, os.path.join(out_dir, os.path.split(i)[-1]))
-        print("copied", i)
+        dest = os.path.join(out_dir, os.path.split(i)[-1])
+        if not kwargs["overwrite"]:
+            if os.path.exists(dest):
+                raise IOError(f"File exists: {dest}")
+        shutil.copy(i, dest)
+    
+    if len(blocks) > 0:
+        rep = HDF5Reporter(
+            folder=out_dir,
+            max_data_length=kwargs["hdf5_blocks_per_file"],
+            h5py_dset_opts=None,
+            overwrite=kwargs["overwrite"],
+        )
+
+        for i, subdf in df.iloc[:: kwargs["skip_files"]].iterrows():
+            cur = {}
+            data = subdf["blocks"]
+            if kwargs["input_style"] == "old":
+                data = load(data)
+                data = np.round(np.asarray(data, dtype=np.float32), kwargs["round_to"])
+                cur["pos"] = data
+                cur["block"] = i
+            elif kwargs["input_style"] == "new":
+                cur = load_URI(data)
+                cur["pos"] = np.round(
+                    np.asarray(cur["pos"], dtype=np.float32), kwargs["round_to"]
+                )
+
+            for name, ldr in zip(extra_pattern_name, extra_loader):
+                if name not in subdf:
+                    continue
+                filename = subdf[name]
+                if filename is not None:
+                    cur[name] = eval(ldr)
+            rep.report("data", cur)
+        rep.dump_data()
     if kwargs["replace"]:
         files = [os.path.join(in_dir, i) for i in os.listdir(in_dir)]
         if not kwargs["force_delete"]:
