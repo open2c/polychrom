@@ -1,4 +1,27 @@
 #!/usr/bin/env python
+"""
+This is an executable file that accepts two conformations (old-style or URI), 
+or a number of a block, or /path/to/the/trajectory/number   ( "mytraj/5" for example). 
+
+Called in a folder with trajectory, "$dif 5 10" will calculate the rMSD between blocks 5 and 10. 
+
+Three examples below would work for old style trajectory (1), both (2) and new style trajectory (3) 
+
+$dif mytraj/block5.dat mytraj/block10.dat
+$dif mytraj/5 mytraj/6 
+$dif mytraj/blocks_5-10.h5::5 blocks_5010.h5::10 
+
+It calculates sqrt(mean square displacement) after accounting for shifts and rotations of the 
+conformation as a whole. 
+
+It then prints a "shuffled distance", which is rMSD between the first conformation and the second conformation 
+in which the monomer indices were shuffled. It is a measure of how much displacement is "possible" 
+between the first and the second conformation. Specifically useful if you have 
+spherical confinement - then shuffled distance becomes a proxy of how much would an MSD be 
+between two random conformations inside a sphere. In that case, when rMSD approaches shuffled distance, 
+you likely have mixed enough to reach some kind of equilibrium (and if you haven't you definitely haven't
+reached equilibrium). 
+"""
 from __future__ import absolute_import, division, print_function
 import sys
 import numpy as np 
