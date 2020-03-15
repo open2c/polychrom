@@ -1,4 +1,17 @@
 #!/usr/bin/env python
+"""
+General description is in the dosctring of a function below, and in click decorators. 
+Motivation, FAQ, and  detailed description of _some_ features is here. 
+
+
+FAQ
+---
+
+Q: What happens to block numbers from old style trajectories?
+A: they are put in the data dict under "block" key, the same way HDF5 trajectories in polychrom do it
+
+"""
+
 import os
 import sys
 import shutil
@@ -45,6 +58,9 @@ def _find_matches(pat, filenames):
     help="empty trajectories: 'copy', 'copy-limit' (enforce file limit), 'raise', 'ignore'",
 )
 @click.option(
+    "--dry-run", is_flag=True, help="do not perform any file operations",
+)
+@click.option(
     "--block-pattern",
     default="block([0-9]+).dat",
     show_default=True,
@@ -89,6 +105,7 @@ def _find_matches(pat, filenames):
     is_flag=True,
     help="allow blocks to be non-consecutive (1,2,3...)",
 )
+@click.option("--verbose", is_flag=True)
 @click.option(
     "--round-to", default=2, show_default=True, help="round to this number of digits"
 )
@@ -97,7 +114,7 @@ def _find_matches(pat, filenames):
 )
 @click.option(
     "--HDF5-blocks-per-file",
-    default=50,
+    default=100,
     show_default=True,
     help="blocks per file for HDF5 reporter",
 )
@@ -140,6 +157,10 @@ def trajcopy(
 
     If you have several files like that, you can repeat "--extra-pattern" and other 3 arguments
     several times.     
+    
+    An example command to replace each subfolder in a folder, and take every second file (4x space saving): 
+    
+    for i in *; do traj_convert.py --round-to 1 --skip-files 2 --allow-nonconsecutive --replace  $i `mktemp -d` ; done
     """
 
     # managing input/output directories
@@ -149,27 +170,44 @@ def trajcopy(
     out_dir = os.path.abspath(out_dir)
     if out_dir == in_dir:
         raise ValueError("Copying to same directory not supported - use replace=True")
-    if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
+    if not kwargs["dry_run"]:
+        if not os.path.exists(out_dir):
+            os.mkdir(out_dir)
 
     # getting files/URIs corresponding to blocks
     all_files = glob.glob(os.path.join(in_dir, "*"))
     if kwargs["input_style"] == "old":
         blocks = _find_matches(block_pattern, all_files)
     elif kwargs["input_style"] == "new":
-        blocks = {i: j for j, i in list_URIs(in_dir, return_dict=True).items()}
+        blocks = {
+            i: j
+            for j, i in list_URIs(in_dir, empty_error=True, return_dict=True).items()
+        }
     else:
         raise ValueError("input-style should be 'old' or 'new'")
 
     # managing cases when the folder is empty
     policy = kwargs["empty_policy"]
     if len(blocks) == 0:
+        if (policy in ["copy", "copy-limit"]) and kwargs["verbose"]:
+            if kwargs["replace"]:
+                if kwargs["verbose"]:
+                    print("no files found; not moving", in_dir)
+            else:
+                if not kwargs["dry_run"]:
+                    shutil.move(in_dir, out_dir)
+                if kwargs["verbose"]:
+                    print("no files found; simply moving", in_dir)
+            exit()
+
         if policy == "copy":
             kwargs["max_unmatched_files"] = 1e9
         elif policy == "raise":
             print(in_dir)
             raise IOError("Emtpy directory encountered")
         elif policy == "ignore":
+            if kwargs["verbose"]:
+                print("skipping", in_dir)
             exit()
         elif policy == "copy-limit":
             pass
@@ -177,34 +215,37 @@ def trajcopy(
             raise ValueError(f"wrong empty policy: {policy}")
 
     # coverting blocks to pd.Series
-    blocks = pd.Series(data=list(blocks.keys()), index=list(blocks.values()))
-    blocks.name = "blocks"
-    all_series = [blocks]
+    if len(blocks) > 0:
+        if kwargs["verbose"]:
+            print(f"moving {len(blocks)} blocks in {in_dir}")
+        blocks = pd.Series(data=list(blocks.keys()), index=list(blocks.values()))
+        blocks.name = "blocks"
+        all_series = [blocks]
 
-    # making sure the 4 arguments for extra files are repeated the same number of time
-    assert len(extra_pattern) == len(extra_pattern_name)
-    assert len(extra_loader) == len(extra_pattern_name)
-    assert len(extra_loader) == len(extra_require)
+        # making sure the 4 arguments for extra files are repeated the same number of time
+        assert len(extra_pattern) == len(extra_pattern_name)
+        assert len(extra_loader) == len(extra_pattern_name)
+        assert len(extra_loader) == len(extra_require)
 
-    # matching patterns for extra files, populating the dataframe
-    for val_pat, val_name, require in zip(
-        extra_pattern, extra_pattern_name, extra_require
-    ):
-        datas = _find_matches(val_pat, all_files)
-        if require:
-            if len(datas) != len(blocks):
-                raise ValueError(
-                    f"files missing for {val_name}: need {len(blocks)} found {len(datas)}"
-                )
-        if len(datas) > 0:
-            datas = pd.Series(data=list(datas.keys()), index=list(datas.values()))
-            datas.name = val_name
-            all_series.append(datas)
-    df = pd.DataFrame(all_series).T
+        # matching patterns for extra files, populating the dataframe
+        for val_pat, val_name, require in zip(
+            extra_pattern, extra_pattern_name, extra_require
+        ):
+            datas = _find_matches(val_pat, all_files)
+            if require:
+                if len(datas) != len(blocks):
+                    raise ValueError(
+                        f"files missing for {val_name}: need {len(blocks)} found {len(datas)}"
+                    )
+            if len(datas) > 0:
+                datas = pd.Series(data=list(datas.keys()), index=list(datas.values()))
+                datas.name = val_name
+                all_series.append(datas)
+        df = pd.DataFrame(all_series).T
 
-    # verifying that index is consecutive
-    if not kwargs["allow_nonconsecutive"]:
-        assert (np.diff(df.index.values) == 1).all()
+        # verifying that index is consecutive
+        if not kwargs["allow_nonconsecutive"]:
+            assert (np.diff(df.index.values) == 1).all()
 
     # managing files that are not blocks; raising an error if there are too many of them
     vals = set(df.values.reshape((-1,)))
@@ -218,16 +259,8 @@ def trajcopy(
             "Limit exceeded: {0} files did not match anything".format(len(other))
         )
 
-    # copying the "other" files
-    for i in other:
-        dest = os.path.join(out_dir, os.path.split(i)[-1])
-        if not kwargs["overwrite"]:
-            if os.path.exists(dest):
-                raise IOError(f"File exists: {dest}")
-        shutil.copy(i, dest)
-
-    # creating the reporter and populating the output
-    if len(blocks) > 0:
+    # creating the reporter
+    if (len(blocks) > 0) and (not kwargs["dry_run"]):
         rep = HDF5Reporter(
             folder=out_dir,
             max_data_length=kwargs["hdf5_blocks_per_file"],
@@ -235,6 +268,16 @@ def trajcopy(
             overwrite=kwargs["overwrite"],
         )
 
+    # copying the "other" files
+    if not kwargs["dry_run"]:
+        for i in other:
+            dest = os.path.join(out_dir, os.path.split(i)[-1])
+            if not kwargs["overwrite"]:
+                if os.path.exists(dest):
+                    raise IOError(f"File exists: {dest}")
+            shutil.copy(i, dest)
+
+    if (len(blocks) > 0) and (not kwargs["dry_run"]):
         # main loop - skip_files is aplied here
         for i, subdf in df.iloc[:: kwargs["skip_files"]].iterrows():
             cur = {}
@@ -261,7 +304,7 @@ def trajcopy(
         rep.dump_data()
 
     # replacing the original trajectory if requested
-    if kwargs["replace"]:
+    if kwargs["replace"] and (not kwargs["dry_run"]):
         files = [os.path.join(in_dir, i) for i in os.listdir(in_dir)]
         if not kwargs["force_delete"]:
             for f in files:
