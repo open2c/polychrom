@@ -10,6 +10,42 @@ FAQ
 Q: What happens to block numbers from old style trajectories?
 A: they are put in the data dict under "block" key, the same way HDF5 trajectories in polychrom do it
 
+
+Default Behavior
+----------------
+
+Defaults are fairly conservative, and would use little rounding (to 2 digits, 0.005 maximum error), 
+would demand the trajectory to be consecutive, and would not do in-place conversions. 
+
+All examples below convert each sub-folder in a given folder, which is probably the most common usecase. 
+
+For very critical data, it is recommended to not convert in place. Script below does this, 
+and converts each trajectory to a new-style, placed in a "../converted" folder with the same
+name. It rounds to 2 digits (max error 0.005) by default, which is very conservative. 
+It is recommended to round to 1 digit unless you specifically need bond lengths or angles
+to a high precision. Contactmaps are not affected by 1-digit rounding. 
+
+set - e 
+for i in *; do traj_convert.py --empty-policy raise --verbose  "$i" "../converted/$i" ; done
+
+
+For less critical data, in-place conversion is acceptable. Example below converts every trajectory in-place, 
+and rounds to 1 digit, and also skips every second file. This gives ~4x space savings. 
+It sets empty-policy to "ignore" because conversion is in place. You will be notified of all the cases 
+of empty folders because of the --verbose flag. It will use a temporary folder to copy files to, and then would
+replace the original with the temporary folder. It also allows for missing blocks (e.g. block1.dat block2.dat block4.dat). 
+
+for i in *; do traj_convert.py --empty-policy ignore --verbose --round-to 1 --skip-files 2 --allow-nonconsecutive --replace  "$i" `mktemp -d` ; done
+
+
+Input can be new-style trajectory as well. You would use that for thinning or rounding the data. For example, 
+the script below would round data to 0.05, and take every 5th file (10x space reduction). It also shows an example of iterating 
+through all sub-subdirectories, (not sub-directories), which is also a common data layout. 
+
+for i in */*; do traj_convert.py --empty-policy ignore --verbose --input-style new --round-to 1 --skip-files 5 --allow-nonconsecutive --replace "$i" `mktemp -d` ; done
+
+
+
 """
 
 import os
@@ -165,6 +201,8 @@ def trajcopy(
 
     # managing input/output directories
     in_dir = os.path.abspath(in_dir)
+    if os.path.isfile(in_dir):
+        raise IOError("input directory is a file")
     if not os.path.exists(in_dir):
         raise IOError("input directory doesn't exist")
     out_dir = os.path.abspath(out_dir)
