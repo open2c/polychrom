@@ -90,7 +90,7 @@ def _to_array_1d(scalar_or_array, arrlen, dtype=float):
 
 
 def harmonic_bonds(
-    sim_object, bonds, bondWiggleDistance=0.05, bondLength=1.0, name="harmonic_bonds",
+    sim_object, bonds, bondWiggleDistance=0.05, bondLength=1.0, name="harmonic_bonds", override_checks=False
 ):
     """Adds harmonic bonds
 
@@ -106,11 +106,22 @@ def harmonic_bonds(
     bondLength : float or iterable of float
         The length of the bond.
         Can be provided per-particle.
+    override_checks: bool
+        If True then do not check that no bonds are repeated.
+        False by default.
     """
 
     force = openmm.HarmonicBondForce()
     force.name = name
+    
+    # check for repeating bond
+    if not override_checks:
+        if len(set(bonds)) != len(bonds):
+            for bond in set(bonds):
+                bonds.remove(bond)
 
+            raise Exception(f'Bond {bonds[0]} is repeated. Set override_checks=True to override this check.')
+    
     bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
     bondWiggleDistance = (
         _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
