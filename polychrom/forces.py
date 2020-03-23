@@ -502,20 +502,11 @@ def spherical_confinement(sim_object,
 
     return force
 
-
-def tether_particles(
-        sim_object, 
-        particles, 
-        k=30, 
-        positions="current",
-        name="Tethers"
-        ):
+def tether_particles(sim_object, particles, k=30, positions="current", name="Tethers"):
     """tethers particles in the 'particles' array.
     Increase k to tether them stronger, but watch the system!
-
     Parameters
     ----------
-
     particles : list of ints
         List of particles to be tethered (fixed in space).
         Negative values are allowed.
@@ -525,7 +516,7 @@ def tether_particles(
         rock solid.
         Can be provided as a vector [kx, ky, kz].
     """
-    
+
     energy = "kx * (x - x0)^2 + ky * (y - y0)^2 + kz * (z - z0)^2"
     force = openmm.CustomExternalForce(energy)
     force.name = name
@@ -535,33 +526,33 @@ def tether_particles(
     if isinstance(k, Iterable):
         k = list(k)
         if len(k) != 3:
-            raise ValueError('k must either be a scalar or a 3D vector!')
+            raise ValueError("k must either be a scalar or a 3D vector!")
         kx, ky, kz = k
     else:
         kx, ky, kz = k, k, k
 
-    force.addGlobalParameter("kx", kx * sim_object.kT / nm)
-    force.addGlobalParameter("ky", ky * sim_object.kT / nm)
-    force.addGlobalParameter("kz", kz * sim_object.kT / nm)
+    nm2 = simtk.unit.nanometer * simtk.unit.nanometer
+    force.addGlobalParameter("kx", kx * sim_object.kT / nm2 )
+    force.addGlobalParameter("ky", ky * sim_object.kT / nm2)
+    force.addGlobalParameter("kz", kz * sim_object.kT / nm2)
     force.addPerParticleParameter("x0")
     force.addPerParticleParameter("y0")
     force.addPerParticleParameter("z0")
 
-    _prepend_force_name_to_params(force)
-
-    particles = [sim_object.N+i if i<0 else i for i in particles]
+    particles = [sim_object.N + i if i < 0 else i for i in particles]
 
     if positions == "current":
         positions = [sim_object.data[i] for i in particles]
     else:
-        positions = sim_object.addUnits(positions)
+        positions = simtk.unit.Quantity(positions, simtk.unit.nanometer)
 
-    for i, pos in zip(particles, positions):  # adding all the particles on which force acts
+    # adding all the particles on which force acts
+    for i, pos in zip(particles, positions):
         i = int(i)
         force.addParticle(i, list(pos))
         if sim_object.verbose == True:
             print("particle %d tethered! " % i)
-    
+
     return force
             
     
