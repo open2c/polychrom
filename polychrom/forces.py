@@ -6,6 +6,8 @@ import numpy as np
 
 import simtk.openmm as openmm
 import simtk.unit as units
+import simtk.openmm as openmm
+import simtk.unit 
 
 nm = units.meter * 1e-9
 fs = units.second * 1e-15
