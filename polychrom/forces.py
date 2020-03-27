@@ -79,9 +79,15 @@ def _check_bonds(bonds, N):
 
     # check that all monomers make at least one bond
     monomer_not_in_bond = ~np.zeros(N).astype(bool)
-    monomer_not_in_bond[np.array(bonds).reshape(-1)] = False
+    bonds_arr = np.array(bonds)
+    monomer_not_in_bond[bonds_arr.reshape(-1)] = False
     if monomer_not_in_bond.any():
         raise ValueError(f'Monomers {np.where(monomer_not_in_bond)[0]} are not in any bonds. Set override_checks=True to override this check.')
+        
+    # check that no bonds of the form (i, i) exist
+    if (bonds_arr[:, 0] == bonds_arr[:, 1]).any():
+        index = np.where(bonds_arr[:, 0] == bonds_arr[:, 1])[0]
+        raise ValueError(f'Bonds {bonds_arr[index].tolist()} are self-bonds. Set override_checks=True to override this check.')
 
 def _check_angle_bonds(triplets):
     # check that triplets are unique
@@ -90,6 +96,16 @@ def _check_angle_bonds(triplets):
             triplets.remove(triplet)
 
         raise ValueError(f'Triplets {triplets} are repeated. Set override_checks=True to override this check.')
+    
+    # check that no triplet of the form (i, i, j) exists
+    # check that no bonds of the form (i, i) exist
+    triplet_arr = np.array(triplets)
+    err_condition = (triplet_arr[:, 0] == triplet_arr[:, 1]) | (triplet_arr[:, 0] == triplet_arr[:, 2]) | \
+        (triplet_arr[:, 1] == triplet_arr[:, 2])
+    if err_condition.any():
+        index = np.where(err_condition)[0]
+        raise ValueError(f'Triplets {triplet_arr[index].tolist()} contain monomers with the same index. Set override_checks=True to override this check.')
+
         
 def _to_array_1d(scalar_or_array, arrlen, dtype=float):
     """
