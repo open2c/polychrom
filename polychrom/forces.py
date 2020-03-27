@@ -69,7 +69,31 @@ def _prepend_force_name_to_params(force):
 
     force.setEnergyFunction(energy)
 
+def _check_bonds(bonds, N):
+    # check for repeating bond
+    if len(set(bonds)) != len(bonds):
+        for bond in set(bonds):
+            bonds.remove(bond)
 
+        raise ValueError(f'Bonds {bonds} are repeated. Set override_checks=True to override this check.')
+
+    # check that all monomers make at least one bond
+    monomer_not_in_bond = ~np.zeros(N).astype(bool)
+    for bond in bonds:
+        monomer_not_in_bond[bond[0]] = False
+        monomer_not_in_bond[bond[1]] = False
+
+    if monomer_not_in_bond.any():
+        raise ValueError(f'Monomers {np.where(monomer_not_in_bond)} are not in any bonds. Set override_checks=True to override this check.')
+
+def _check_angle_bonds(triplets):
+    # check that triplets are unique
+    if len(set(triplets)) != len(triplets):
+        for triplet in set(triplets):
+            triplets.remove(triplet)
+
+        raise ValueError(f'Triplets {triplets} are repeated. Set override_checks=True to override this check.')
+        
 def _to_array_1d(scalar_or_array, arrlen, dtype=float):
     """
     A helper function for writing forces that can accept either a single parameter, 
@@ -110,17 +134,13 @@ def harmonic_bonds(
         If True then do not check that no bonds are repeated.
         False by default.
     """
-
+    
+    # check for repeated bonds
+    if not override_checks:
+        _check_bonds(bonds, sim_object.N)
+        
     force = openmm.HarmonicBondForce()
     force.name = name
-    
-    # check for repeating bond
-    if not override_checks:
-        if len(set(bonds)) != len(bonds):
-            for bond in set(bonds):
-                bonds.remove(bond)
-
-            raise Exception(f'Bond {bonds[0]} is repeated. Set override_checks=True to override this check.')
     
     bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
     bondWiggleDistance = (
@@ -146,7 +166,7 @@ def harmonic_bonds(
 
 
 def FENE_bonds(
-    sim_object, bonds, bondWiggleDistance=0.05, bondLength=1.0, name="FENE_bonds",
+    sim_object, bonds, bondWiggleDistance=0.05, bondLength=1.0, name="FENE_bonds", override_checks=False
 ):
     """Adds harmonic bonds
 
@@ -161,8 +181,15 @@ def FENE_bonds(
     bondLength : float
         The length of the bond.
         Can be provided per-particle.
+    override_checks: bool
+        If True then do not check that no bonds are repeated.
+        False by default.
     """
-
+    
+    # check for repeated bonds
+    if not override_checks:
+        _check_bonds(bonds, sim_object.N)
+        
     energy = (
         f"(1. / wiggle) * univK * "
         f"(sqrt((r-r0 * conlen)* "
@@ -198,7 +225,7 @@ def FENE_bonds(
     return force
 
 
-def angle_force(sim_object, triplets, k=1.5, theta_0=np.pi, name="angle"):
+def angle_force(sim_object, triplets, k=1.5, theta_0=np.pi, name="angle", override_checks=False):
     """Adds harmonic angle bonds. k specifies energy in kT at one radian
     If k is an array, it has to be of the length N.
     Xth value then specifies stiffness of the angle centered at
@@ -215,9 +242,15 @@ def angle_force(sim_object, triplets, k=1.5, theta_0=np.pi, name="angle"):
     
     theta_0 : float or list of length N 
               Equilibrium angle of the bond. By default it is np.pi. 
-              
-        
+
+    override_checks: bool
+        If True then do not check that no bonds are repeated.
+        False by default.
     """
+    
+    # check for repeated triplets
+    if not override_checks:
+        _check_angle_bonds(triplets)
 
     k = _to_array_1d(k, len(triplets))
     theta_0 = _to_array_1d(theta_0, len(triplets))
@@ -843,7 +876,7 @@ def pull_force(sim_object, particles, force_vecs, name="Pull"):
     return force
 
 
-def grosberg_polymer_bonds(sim_object, bonds, k=30, name="grosberg_polymer"):
+def grosberg_polymer_bonds(sim_object, bonds, k=30, name="grosberg_polymer", override_checks=False):
     """Adds FENE bonds according to Halverson-Grosberg paper.
     (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
      nonconcatenated ring polymers in a melt. I. Statics."
@@ -858,8 +891,15 @@ def grosberg_polymer_bonds(sim_object, bonds, k=30, name="grosberg_polymer"):
     k : float, optional
         Arbitrary parameter; default value as in Grosberg paper.
 
+    override_checks: bool
+        If True then do not check that no bonds are repeated.
+        False by default.
      """
 
+    # check for repeated bonds
+    if not override_checks:
+        _check_bonds(bonds, sim_object.N)
+    
     equation = "- 0.5 * k * r0 * r0 * log(1-(r/r0)* (r / r0))"
     force = openmm.CustomBondForce(equation)
     force.name = name
@@ -881,7 +921,7 @@ def grosberg_polymer_bonds(sim_object, bonds, k=30, name="grosberg_polymer"):
     return force
 
 
-def grosberg_angle(sim_object, triplets, k=1.5, name="grosberg_angle"):
+def grosberg_angle(sim_object, triplets, k=1.5, name="grosberg_angle", override_checks=False):
     """
     Adds stiffness according to the Grosberg paper.
     (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
@@ -903,7 +943,15 @@ def grosberg_angle(sim_object, triplets, k=1.5, name="grosberg_angle"):
         Default value is very flexible, as in Grosberg paper.
         Default value maximizes entanglement length.
 
+    override_checks: bool
+        If True then do not check that no bonds are repeated.
+        False by default.
     """
+    
+    # check for repeated triplets
+    if not override_checks:
+        _check_angle_bonds(triplets)
+    
     k = _to_array_1d(k, len(triplets))
 
     force = openmm.CustomAngleForce("GRk * kT * (1 - cos(theta - 3.141592))")

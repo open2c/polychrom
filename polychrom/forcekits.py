@@ -50,7 +50,10 @@ def polymer_chains(
     
     override_checks: bool
         If True then do not check that all monomers are a member of exactly
-        one chain. False by default.
+        one chain. False by default. Note that overriding checks does not
+        get automatically "passed on" to bond/angle force functions so you
+        may need to specify override_checks=True in the respective kwargs
+        as well.
     """
 
     force_list = []
@@ -81,7 +84,7 @@ def polymer_chains(
         
         for i in range(sim_object.N):
             if num_chains_for_monomer[i] != 1:
-                raise Exception(f'Monomer {i} is a member of {num_chains_for_monomer[i]} chains. Set override_checks=True to override this check.')
+                raise ValueError(f'Monomer {i} is a member of {num_chains_for_monomer[i]} chains. Set override_checks=True to override this check.')
 
     report_dict = {
         "chains": np.array(newchains, dtype=int),
