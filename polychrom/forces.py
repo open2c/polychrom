@@ -79,12 +79,9 @@ def _check_bonds(bonds, N):
 
     # check that all monomers make at least one bond
     monomer_not_in_bond = ~np.zeros(N).astype(bool)
-    for bond in bonds:
-        monomer_not_in_bond[bond[0]] = False
-        monomer_not_in_bond[bond[1]] = False
-
+    monomer_not_in_bond[np.array(bonds).reshape(-1)] = False
     if monomer_not_in_bond.any():
-        raise ValueError(f'Monomers {np.where(monomer_not_in_bond)} are not in any bonds. Set override_checks=True to override this check.')
+        raise ValueError(f'Monomers {np.where(monomer_not_in_bond)[0]} are not in any bonds. Set override_checks=True to override this check.')
 
 def _check_angle_bonds(triplets):
     # check that triplets are unique

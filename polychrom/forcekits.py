@@ -76,15 +76,14 @@ def polymer_chains(
     
     # check that all monomers are a member of exactly one chain
     if not override_checks:
-        num_chains_for_monomer = [0] * sim_object.N
+        num_chains_for_monomer = np.zeros(sim_object.N, dtype=int)
         for chain in newchains:
             start, end, _ = chain
-            for i in range(start, end):
-                num_chains_for_monomer[i] += 1
+            num_chains_for_monomer[start:end] += 1
         
-        for i in range(sim_object.N):
-            if num_chains_for_monomer[i] != 1:
-                raise ValueError(f'Monomer {i} is a member of {num_chains_for_monomer[i]} chains. Set override_checks=True to override this check.')
+        errs = np.where(num_chains_for_monomer != 1)[0]
+        if len(errs) != 0:
+            raise ValueError(f'Monomer {errs[0]} is a member of {num_chains_for_monomer[errs[0]]} chains. Set override_checks=True to override this check.')
 
     report_dict = {
         "chains": np.array(newchains, dtype=int),
