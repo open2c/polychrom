@@ -31,6 +31,7 @@ def polymer_chains(
     nonbonded_force_func=forces.polynomial_repulsive,
     nonbonded_force_kwargs={"trunc": 3.0, "radiusMult": 1.0},
     except_bonds=True,
+    override_checks=False
 ):
     """Adds harmonic bonds connecting polymer chains
 
@@ -43,9 +44,16 @@ def polymer_chains(
         and the last particles of the chain are linked into a ring.
         The default value links all particles of the system into one chain.
 
-    exceptBonds : bool
+    except_bonds : bool
         If True then do not calculate non-bonded forces between the
         particles connected by a bond. True by default.
+    
+    override_checks: bool
+        If True then do not check that all monomers are a member of exactly
+        one chain. False by default. Note that overriding checks does not
+        get automatically "passed on" to bond/angle force functions so you
+        may need to specify override_checks=True in the respective kwargs
+        as well.
     """
 
     force_list = []
@@ -65,6 +73,17 @@ def polymer_chains(
             bonds.append((start, end - 1))
             triplets.append((int(end - 2), int(end - 1), int(start)))
             triplets.append((int(end - 1), int(start), int(start + 1)))
+    
+    # check that all monomers are a member of exactly one chain
+    if not override_checks:
+        num_chains_for_monomer = np.zeros(sim_object.N, dtype=int)
+        for chain in newchains:
+            start, end, _ = chain
+            num_chains_for_monomer[start:end] += 1
+        
+        errs = np.where(num_chains_for_monomer != 1)[0]
+        if len(errs) != 0:
+            raise ValueError(f'Monomer {errs[0]} is a member of {num_chains_for_monomer[errs[0]]} chains. Set override_checks=True to override this check.')
 
     report_dict = {
         "chains": np.array(newchains, dtype=int),
