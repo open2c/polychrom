@@ -31,6 +31,8 @@ def polymer_chains(
     nonbonded_force_func=forces.polynomial_repulsive,
     nonbonded_force_kwargs={"trunc": 3.0, "radiusMult": 1.0},
     except_bonds=True,
+    extra_bonds = None,
+    extra_triplets = None,
 ):
     """Adds harmonic bonds connecting polymer chains
 
@@ -46,13 +48,17 @@ def polymer_chains(
     exceptBonds : bool
         If True then do not calculate non-bonded forces between the
         particles connected by a bond. True by default.
+        
+    extra_bonds : None or list
+        [(i,j)] list of extra bonds. Same for extra_triplets. 
     """
 
     force_list = []
 
-    bonds = []
-    triplets = []
+    bonds = extra_bonds if extra_bonds else []
+    triplets = extra_triplets if extra_triplets else []
     newchains = []
+    
 
     for start, end, is_ring in chains:
         end = sim_object.N if (end is None) else end

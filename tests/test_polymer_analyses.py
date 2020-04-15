@@ -66,7 +66,7 @@ def test_scalings():
 
     scals = [polychrom.polymer_analyses.R2_scaling(i) for i in datas]
     scals = np.mean(scals, axis=0)
-    assert np.max(np.abs((scals[1]-scals[0])/scals[0])) < 0.15
+    assert np.max(np.abs((scals[1]-scals[0])/scals[0])) < 0.2
 
     scals = [polychrom.polymer_analyses.Rg2_scaling(i) for i in datas]
     scals = np.mean(scals, axis=0)
