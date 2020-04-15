@@ -46,7 +46,7 @@ from collections.abc import Iterable
 import numpy as np
 
 import simtk.openmm as openmm
-import simtk.unit 
+import simtk.unit
 
 
 def _prepend_force_name_to_params(force):
@@ -65,9 +65,10 @@ def _prepend_force_name_to_params(force):
             old_name = force.getGlobalParameterName(i)
             new_name = force.name + "_" + old_name
             force.setGlobalParameterName(i, new_name)
-            energy = re.sub(f"(?<!\w){old_name}(?!\w)", new_name, energy)
+            energy = re.sub(r"(?<!\w)" + f"{old_name}" + r"(?!\w)", new_name, energy)
 
     force.setEnergyFunction(energy)
+
 
 def _check_bonds(bonds, N):
     # check for repeating bond
@@ -75,19 +76,26 @@ def _check_bonds(bonds, N):
         for bond in set(bonds):
             bonds.remove(bond)
 
-        raise ValueError(f'Bonds {bonds} are repeated. Set override_checks=True to override this check.')
+        raise ValueError(
+            f"Bonds {bonds} are repeated. Set override_checks=True to override this check."
+        )
 
     # check that all monomers make at least one bond
     monomer_not_in_bond = ~np.zeros(N).astype(bool)
     bonds_arr = np.array(bonds)
     monomer_not_in_bond[bonds_arr.reshape(-1)] = False
     if monomer_not_in_bond.any():
-        raise ValueError(f'Monomers {np.where(monomer_not_in_bond)[0]} are not in any bonds. Set override_checks=True to override this check.')
-        
+        raise ValueError(
+            f"Monomers {np.where(monomer_not_in_bond)[0]} are not in any bonds. Set override_checks=True to override this check."
+        )
+
     # check that no bonds of the form (i, i) exist
     if (bonds_arr[:, 0] == bonds_arr[:, 1]).any():
         index = np.where(bonds_arr[:, 0] == bonds_arr[:, 1])[0]
-        raise ValueError(f'Bonds {bonds_arr[index].tolist()} are self-bonds. Set override_checks=True to override this check.')
+        raise ValueError(
+            f"Bonds {bonds_arr[index].tolist()} are self-bonds. Set override_checks=True to override this check."
+        )
+
 
 def _check_angle_bonds(triplets):
     # check that triplets are unique
@@ -95,18 +103,25 @@ def _check_angle_bonds(triplets):
         for triplet in set(triplets):
             triplets.remove(triplet)
 
-        raise ValueError(f'Triplets {triplets} are repeated. Set override_checks=True to override this check.')
-    
+        raise ValueError(
+            f"Triplets {triplets} are repeated. Set override_checks=True to override this check."
+        )
+
     # check that no triplet of the form (i, i, j) exists
     # check that no bonds of the form (i, i) exist
     triplet_arr = np.array(triplets)
-    err_condition = (triplet_arr[:, 0] == triplet_arr[:, 1]) | (triplet_arr[:, 0] == triplet_arr[:, 2]) | \
-        (triplet_arr[:, 1] == triplet_arr[:, 2])
+    err_condition = (
+        (triplet_arr[:, 0] == triplet_arr[:, 1])
+        | (triplet_arr[:, 0] == triplet_arr[:, 2])
+        | (triplet_arr[:, 1] == triplet_arr[:, 2])
+    )
     if err_condition.any():
         index = np.where(err_condition)[0]
-        raise ValueError(f'Triplets {triplet_arr[index].tolist()} contain monomers with the same index. Set override_checks=True to override this check.')
+        raise ValueError(
+            f"Triplets {triplet_arr[index].tolist()} contain monomers with the same index. Set override_checks=True to override this check."
+        )
 
-        
+
 def _to_array_1d(scalar_or_array, arrlen, dtype=float):
     """
     A helper function for writing forces that can accept either a single parameter, 
@@ -127,7 +142,12 @@ def _to_array_1d(scalar_or_array, arrlen, dtype=float):
 
 
 def harmonic_bonds(
-    sim_object, bonds, bondWiggleDistance=0.05, bondLength=1.0, name="harmonic_bonds", override_checks=False
+    sim_object,
+    bonds,
+    bondWiggleDistance=0.05,
+    bondLength=1.0,
+    name="harmonic_bonds",
+    override_checks=False,
 ):
     """Adds harmonic bonds
 
@@ -147,14 +167,14 @@ def harmonic_bonds(
         If True then do not check that no bonds are repeated.
         False by default.
     """
-    
+
     # check for repeated bonds
     if not override_checks:
         _check_bonds(bonds, sim_object.N)
-        
+
     force = openmm.HarmonicBondForce()
     force.name = name
-    
+
     bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
     bondWiggleDistance = (
         _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
@@ -179,7 +199,12 @@ def harmonic_bonds(
 
 
 def FENE_bonds(
-    sim_object, bonds, bondWiggleDistance=0.05, bondLength=1.0, name="FENE_bonds", override_checks=False
+    sim_object,
+    bonds,
+    bondWiggleDistance=0.05,
+    bondLength=1.0,
+    name="FENE_bonds",
+    override_checks=False,
 ):
     """Adds harmonic bonds
 
@@ -198,11 +223,11 @@ def FENE_bonds(
         If True then do not check that no bonds are repeated.
         False by default.
     """
-    
+
     # check for repeated bonds
     if not override_checks:
         _check_bonds(bonds, sim_object.N)
-        
+
     energy = (
         f"(1. / wiggle) * univK * "
         f"(sqrt((r-r0 * conlen)* "
@@ -238,7 +263,9 @@ def FENE_bonds(
     return force
 
 
-def angle_force(sim_object, triplets, k=1.5, theta_0=np.pi, name="angle", override_checks=False):
+def angle_force(
+    sim_object, triplets, k=1.5, theta_0=np.pi, name="angle", override_checks=False
+):
     """Adds harmonic angle bonds. k specifies energy in kT at one radian
     If k is an array, it has to be of the length N.
     Xth value then specifies stiffness of the angle centered at
@@ -260,7 +287,7 @@ def angle_force(sim_object, triplets, k=1.5, theta_0=np.pi, name="angle", overri
         If True then do not check that no bonds are repeated.
         False by default.
     """
-    
+
     # check for repeated triplets
     if not override_checks:
         _check_angle_bonds(triplets)
@@ -406,12 +433,12 @@ def selective_SSW(
     sim_object,
     stickyParticlesIdxs,
     extraHardParticlesIdxs,
-    repulsionEnergy=3.0,   # base repulsion energy for **all** particles 
+    repulsionEnergy=3.0,  # base repulsion energy for **all** particles
     repulsionRadius=1.0,
-    attractionEnergy=3.0,  # base attraction energy for **all** particles 
+    attractionEnergy=3.0,  # base attraction energy for **all** particles
     attractionRadius=1.5,
     selectiveRepulsionEnergy=20.0,  # **extra** repulsive energy for **extraHard** particles
-    selectiveAttractionEnergy=1.0,   # **extra** attractive energy for **sticky** particles
+    selectiveAttractionEnergy=1.0,  # **extra** attractive energy for **sticky** particles
     name="selective_SSW",
 ):
     """
@@ -524,12 +551,12 @@ def heteropolymer_SSW(
     interactionMatrix,
     monomerTypes,
     extraHardParticlesIdxs,
-    repulsionEnergy=3.0, # base repulsion energy for **all** particles 
+    repulsionEnergy=3.0,  # base repulsion energy for **all** particles
     repulsionRadius=1.0,
-    attractionEnergy=3.0, # base attraction energy for **all** particles 
+    attractionEnergy=3.0,  # base attraction energy for **all** particles
     attractionRadius=1.5,
-    selectiveRepulsionEnergy=20.0, # **extra** repulsive energy for **extraHard** particles
-    selectiveAttractionEnergy=1.0, # **extra** attraction energy that is multiplied by interactionMatrix
+    selectiveRepulsionEnergy=20.0,  # **extra** repulsive energy for **extraHard** particles
+    selectiveAttractionEnergy=1.0,  # **extra** attraction energy that is multiplied by interactionMatrix
     keepVanishingInteractions=False,
     name="heteropolymer_SSW",
 ):
@@ -842,7 +869,7 @@ def tether_particles(sim_object, particles, k=30, positions="current", name="Tet
         kx, ky, kz = k, k, k
 
     nm2 = simtk.unit.nanometer * simtk.unit.nanometer
-    force.addGlobalParameter("kx", kx * sim_object.kT / nm2 )
+    force.addGlobalParameter("kx", kx * sim_object.kT / nm2)
     force.addGlobalParameter("ky", ky * sim_object.kT / nm2)
     force.addGlobalParameter("kz", kz * sim_object.kT / nm2)
     force.addPerParticleParameter("x0")
@@ -889,7 +916,9 @@ def pull_force(sim_object, particles, force_vecs, name="Pull"):
     return force
 
 
-def grosberg_polymer_bonds(sim_object, bonds, k=30, name="grosberg_polymer", override_checks=False):
+def grosberg_polymer_bonds(
+    sim_object, bonds, k=30, name="grosberg_polymer", override_checks=False
+):
     """Adds FENE bonds according to Halverson-Grosberg paper.
     (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
      nonconcatenated ring polymers in a melt. I. Statics."
@@ -912,7 +941,7 @@ def grosberg_polymer_bonds(sim_object, bonds, k=30, name="grosberg_polymer", ove
     # check for repeated bonds
     if not override_checks:
         _check_bonds(bonds, sim_object.N)
-    
+
     equation = "- 0.5 * k * r0 * r0 * log(1-(r/r0)* (r / r0))"
     force = openmm.CustomBondForce(equation)
     force.name = name
@@ -934,7 +963,9 @@ def grosberg_polymer_bonds(sim_object, bonds, k=30, name="grosberg_polymer", ove
     return force
 
 
-def grosberg_angle(sim_object, triplets, k=1.5, name="grosberg_angle", override_checks=False):
+def grosberg_angle(
+    sim_object, triplets, k=1.5, name="grosberg_angle", override_checks=False
+):
     """
     Adds stiffness according to the Grosberg paper.
     (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
@@ -960,11 +991,11 @@ def grosberg_angle(sim_object, triplets, k=1.5, name="grosberg_angle", override_
         If True then do not check that no bonds are repeated.
         False by default.
     """
-    
+
     # check for repeated triplets
     if not override_checks:
         _check_angle_bonds(triplets)
-    
+
     k = _to_array_1d(k, len(triplets))
 
     force = openmm.CustomAngleForce("GRk * kT * (1 - cos(theta - 3.141592))")

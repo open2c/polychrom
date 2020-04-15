@@ -631,6 +631,3 @@ def monomerResolutionContactMapSubchains(
         uniqueContacts=True,
         nproc=n,
     )
-
-
-

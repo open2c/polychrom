@@ -72,6 +72,7 @@ import os
 
 DEFAULT_OPTS = {"compression_opts": 9, "compression": "gzip"}
 
+
 def _read_h5_group(gr):
     """
     Reads all attributes of an HDF5 group, and returns a dict of them
@@ -226,13 +227,13 @@ def load_hdf5_file(fname):
 
 class HDF5Reporter(object):
     def __init__(
-            self,
-            folder,
-            max_data_length=50,
-            h5py_dset_opts=None,
-            overwrite=False,
-            blocks_only=False,
-            check_exists=True,
+        self,
+        folder,
+        max_data_length=50,
+        h5py_dset_opts=None,
+        overwrite=False,
+        blocks_only=False,
+        check_exists=True,
     ):
         """
         Creates a reporter object that saves a trajectory to a folder 
@@ -363,7 +364,7 @@ class HDF5Reporter(object):
         inds_tosave = np.nonzero((uri_fnames == uri_fnames[ind]) * (uri_inds <= ind))[0]
 
         for (
-                saveind
+            saveind
         ) in inds_tosave:  # we are saving some data and deleting the whole last file
             self.datas[uri_inds[saveind]] = load_URI(uri_vals[saveind])
         self.counter["data"] = ind + 1
@@ -410,7 +411,7 @@ class HDF5Reporter(object):
         if name not in ["data"]:
             if not self.blocks_only:
                 filename = f"{name}_{count}.h5"
-                with h5py.File(os.path.join(self.folder, filename),mode='w') as file:
+                with h5py.File(os.path.join(self.folder, filename), mode="w") as file:
                     _write_group(values, file, dset_opts=self.h5py_dset_opts)
 
         else:
@@ -424,7 +425,7 @@ class HDF5Reporter(object):
             cmin = min(self.datas.keys())
             cmax = max(self.datas.keys())
             filename = f"blocks_{cmin}-{cmax}.h5"
-            with h5py.File(os.path.join(self.folder, filename),mode='w') as file:
+            with h5py.File(os.path.join(self.folder, filename), mode="w") as file:
                 for count, values in self.datas.items():
                     gr = file.create_group(str(count))
                     _write_group(values, gr, dset_opts=self.h5py_dset_opts)
