@@ -10,6 +10,7 @@ def polymer_chains(
     bond_force_kwargs={'bondWiggleDistance':0.05,
                      'bondLength':1.0},
 
+    extraAngles=[],
     angle_force_func=forces.angle_force,
     angle_force_kwargs={'k':0.05},
 
@@ -38,7 +39,7 @@ def polymer_chains(
     force_list = []
 
     bonds = extraBonds
-    triplets = []
+    triplets = extraAngles
     for start, end, is_ring in chains:
         end = sim_object.N if (end is None) else end
         
