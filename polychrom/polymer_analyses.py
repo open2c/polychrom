@@ -48,6 +48,7 @@ try:
 except:
     pass
 
+
 def calculate_contacts(data, cutoff=1.7):
     """Calculates contacts between points give the contact radius (cutoff)
 
@@ -73,7 +74,7 @@ def calculate_contacts(data, cutoff=1.7):
     return pairs
 
 
-def smart_contacts(data, cutoff=1.7, min_cutoff=2.1, percent_func=lambda x:1/x):
+def smart_contacts(data, cutoff=1.7, min_cutoff=2.1, percent_func=lambda x: 1 / x):
     """Calculates contacts for a polymer, give the contact radius (cutoff)
     This method takes a random fraction of the monomers that is equal to (
     1/cutoff).
@@ -131,14 +132,13 @@ def generate_bins(N, start=4, bins_per_order_magn=10):
     lstart = np.log10(start)
     lend = np.log10(N - 1) + 1e-6
     num = int(np.ceil((lend - lstart) * bins_per_order_magn))
-    bins = np.unique(np.logspace(lstart, lend, dtype=int, num=max(num,0)))
+    bins = np.unique(np.logspace(lstart, lend, dtype=int, num=max(num, 0)))
     if len(bins) > 0:
         assert bins[-1] == N - 1
     return bins
 
 
-def contact_scaling(
-    data, bins0=None, cutoff=1.1, integrate=False, ring=False):
+def contact_scaling(data, bins0=None, cutoff=1.1, integrate=False, ring=False):
     """
     Returns contact probability scaling for a given polymer conformation
     Contact between monomers X and X+1 is counted as s=1 
@@ -202,6 +202,7 @@ def contact_scaling(
     a = [sqrt(i[0] * (i[1] - 1)) for i in bins]
     return a, connumbers
 
+
 def Rg2_scaling(data, bins=None, ring=False):
     """Calculates average gyration radius of subchains a function of s
     
@@ -248,6 +249,7 @@ def Rg2_scaling(data, bins=None, ring=False):
     for i in range(len(bins)):
         rads[i] = radius_gyration(int(bins[i]))
     return np.array(bins), rads
+
 
 def R2_scaling(data, bins=None, ring=False):
     """

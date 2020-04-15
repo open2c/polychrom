@@ -113,6 +113,7 @@ class Simulation(object):
     Forces are defined in :py:mod:`polychrom.forces` module, and are added
     using :py:meth:`polychrom.simulation.Simulation.add_force` method. 
     """
+
     def __init__(self, **kwargs):
         """
         All numbers here are floats. Units specified in a parameter. 
@@ -227,9 +228,11 @@ class Simulation(object):
                         i, valid_names
                     )
                 )
-                
+
         if None in kwargs.values():
-            raise ValueError("None is not allowed in arguments due to HDF5 incompatiliblity. Use False instead.")
+            raise ValueError(
+                "None is not allowed in arguments due to HDF5 incompatiliblity. Use False instead."
+            )
         default_args.update(kwargs)
         kwargs = default_args
         self.kwargs = kwargs
@@ -316,7 +319,8 @@ class Simulation(object):
         self.conlen = 1.0 * simtk.unit.nanometer * self.length_scale
 
         self.kbondScalingFactor = float(
-            (2 * self.kT / self.conlen ** 2) / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer ** 2)
+            (2 * self.kT / self.conlen ** 2)
+            / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer ** 2)
         )
 
         self.system = openmm.System()
@@ -445,7 +449,7 @@ class Simulation(object):
                 )
             forces._prepend_force_name_to_params(force)
             self.force_dict[force.name] = force
-        
+
         if self.forces_applied:
             raise RuntimeError("Cannot add force after the context has been created")
 
@@ -731,7 +735,7 @@ class Simulation(object):
         }
         if get_velocities:
             result["vel"] = self.state.getVelocities() / (
-                    simtk.unit.nanometer / simtk.unit.picosecond
+                simtk.unit.nanometer / simtk.unit.picosecond
             )
         result.update(save_extras)
         if save:

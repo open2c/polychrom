@@ -116,7 +116,6 @@ def fetch_block(folder, ind, full_output=False):
     if (len(blocksh5) == 0) and (len(blocksdat) == 0):
         raise ValueError("no blocks found")
 
-
     if len(blocksh5) > 0:
         fnames = [os.path.split(i)[-1] for i in blocksh5]
         inds = [i.split("_")[-1].split(".")[0].split("-") for i in fnames]
