@@ -5,13 +5,11 @@ from collections.abc import Iterable
 import numpy as np 
 
 import simtk.openmm as openmm
-import simtk.unit as units
-import simtk.openmm as openmm
 import simtk.unit 
 
-nm = units.meter * 1e-9
-fs = units.second * 1e-15
-ps = units.second * 1e-12
+nm = simtk.unit.meter * 1e-9
+fs = simtk.unit.second * 1e-15
+ps = simtk.unit.second * 1e-12
 
 
 def _prepend_force_name_to_params(force):
