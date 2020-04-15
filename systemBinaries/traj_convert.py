@@ -10,6 +10,15 @@ FAQ
 Q: What happens to block numbers from old style trajectories?
 A: they are put in the data dict under "block" key, the same way HDF5 trajectories in polychrom do it
 
+Q: What happens to loop extrusion positions? 
+A: SMC12345.dat are automatically swept in under the key "lef_positions" and would be returned in a dict returned by polychrom.hdf5_format.load_URI
+
+Q: What is the best way to save space? 
+A: Rounding to 1 digit (0.05 max error) would save 30-40%. Picking every second/5th/etc. file would save it by 2x/5x on top of that
+
+Q: How to find how much do folders occupy? 
+A: `du -sch *`  ; alternatively `du -sc * | sort -n` if you want to sort the output by size. 
+`find . | wc -l` to find how many files 
 
 Default Behavior
 ----------------
