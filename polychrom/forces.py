@@ -627,10 +627,12 @@ def heteropolymer_SSW(
     Ntypes = max(monomerTypes) + 1  # IDs should be zero based
     if any(np.less(interactionMatrix.shape, [Ntypes, Ntypes])):
         raise ValueError("Need interactions for {0:d} types!".format(Ntypes))
+    if not np.allclose(interactionMatrix.T, interactionMatrix):
+        raise ValueError("Interaction matrix should be symmetric!")
 
     indexpairs = []
     for i in range(0, Ntypes):
-        for j in range(i, Ntypes):
+        for j in range(0, Ntypes):
             if (not interactionMatrix[i, j] == 0) or keepVanishingInteractions:
                 indexpairs.append((i, j))
 
