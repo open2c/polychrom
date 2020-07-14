@@ -897,8 +897,8 @@ def grosberg_selective_repulsive_force(sim_object,
     force.addGlobalParameter('sigma', radius)
     force.addGlobalParameter('sigma03', 0.3 * radius)
 
-    force.addGlobalParameter('cut', sim_object.kT * trunc)
-    force.addGlobalParameter('cut2', 0.5 * trunc * sim_object.kT)
+    force.addGlobalParameter('cut', sim_object.kT * 'trunc')
+    force.addGlobalParameter('cut2', 0.5 * 'trunc' * sim_object.kT)
         
     force.addPerParticleParameter("trunc")
     
