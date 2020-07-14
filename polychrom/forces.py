@@ -863,3 +863,52 @@ def grosberg_repulsive_force(sim_object,
     force.setCutoffDistance(nbCutOffDist)
     
     return force 
+
+
+
+def grosberg_selective_repulsive_force(sim_object,
+                             trunc_values,
+                             radiusMult=1.,
+                            name="grosberg_repulsive"):
+    """This is the fastest non-transparent repulsive force.
+    (that preserves topology, doesn't allow chain passing)
+    Done according to the paper:
+    (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
+     nonconcatenated ring polymers in a melt. I. Statics."
+     The Journal of chemical physics 134 (2011): 204904.)
+    Parameters
+    ----------
+    trunc : float for a particular particle
+         truncation energy in kT, used for chain crossing.
+         Value of 1.5 yields frequent passing,
+         3 - average passing, 5 - rare passing.
+    """
+    radius = sim_object.conlen * radiusMult
+    nbCutOffDist = radius * 2. ** (1. / 6.)
+    if trunc is None:
+        repul_energy = "4 * e * ((sigma/r)^12 - (sigma/r)^6) + e"
+    else:
+        repul_energy = (
+            "step(cut2 - U) * U"
+            " + step(U - cut2) * cut2 * (1 + tanh(U/cut2 - 1));"
+            "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
+            "r2 = (r^10. + (sigma03)^10.)^0.1")
+    force = openmm.CustomNonbondedForce(repul_energy)
+    force.name = name
+
+    force.addGlobalParameter('e', sim_object.kT)
+    force.addGlobalParameter('sigma', radius)
+    force.addGlobalParameter('sigma03', 0.3 * radius)
+    if trunc is not None:
+        force.addGlobalParameter('cut', sim_object.kT * trunc)
+        force.addGlobalParameter('cut2', 0.5 * trunc * sim_object.kT)
+        
+    force.addPerParticleParameter("trunc")
+    
+    for i in range(sim_object.N):  # adding all the particles on which force acts
+        i = int(i)
+        force.addParticle(i, float(trunc_values[i]))
+        
+    force.setCutoffDistance(nbCutOffDist)
+    
+    return force 
