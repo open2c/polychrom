@@ -885,23 +885,20 @@ def grosberg_selective_repulsive_force(sim_object,
     """
     radius = sim_object.conlen * radiusMult
     nbCutOffDist = radius * 2. ** (1. / 6.)
-    if trunc is None:
-        repul_energy = "4 * e * ((sigma/r)^12 - (sigma/r)^6) + e"
-    else:
-        repul_energy = (
-            "step(cut2 - U) * U"
-            " + step(U - cut2) * cut2 * (1 + tanh(U/cut2 - 1));"
-            "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
-            "r2 = (r^10. + (sigma03)^10.)^0.1")
+    repul_energy = (
+        "step(cut2 - U) * U"
+        " + step(U - cut2) * cut2 * (1 + tanh(U/cut2 - 1));"
+        "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
+        "r2 = (r^10. + (sigma03)^10.)^0.1")
     force = openmm.CustomNonbondedForce(repul_energy)
     force.name = name
 
     force.addGlobalParameter('e', sim_object.kT)
     force.addGlobalParameter('sigma', radius)
     force.addGlobalParameter('sigma03', 0.3 * radius)
-    if trunc is not None:
-        force.addGlobalParameter('cut', sim_object.kT * trunc)
-        force.addGlobalParameter('cut2', 0.5 * trunc * sim_object.kT)
+
+    force.addGlobalParameter('cut', sim_object.kT * trunc)
+    force.addGlobalParameter('cut2', 0.5 * trunc * sim_object.kT)
         
     force.addPerParticleParameter("trunc")
     
