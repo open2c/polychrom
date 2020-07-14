@@ -886,8 +886,9 @@ def grosberg_selective_repulsive_force(sim_object,
     radius = sim_object.conlen * radiusMult
     nbCutOffDist = radius * 2. ** (1. / 6.)
     repul_energy = (
-        "step(cut2*trunc - U) * U"
-        " + step(U - cut2*trunc) * cut2 * trunc * (1 + tanh(U/(cut2*trunc) - 1));"
+        "step(cut2*tr - U) * U"
+        " + step(U - cut2*tr) * cut2 * tr * (1 + tanh(U/(cut2*tr) - 1));"
+        "tr = sqrt(trunc1*trunc2);"
         "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
         "r2 = (r^10. + (sigma03)^10.)^0.1")
     force = openmm.CustomNonbondedForce(repul_energy)
