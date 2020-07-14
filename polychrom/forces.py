@@ -903,8 +903,8 @@ def grosberg_selective_repulsive_force(sim_object,
     force.addPerParticleParameter("trunc")
     
     for i in range(sim_object.N):  # adding all the particles on which force acts
-        i = float(i)
-        force.addParticle((i, float(trunc_values[i])))
+        i = int(i)
+        force.addParticle((float(i), float(trunc_values[i])))
         
     force.setCutoffDistance(nbCutOffDist)
     
