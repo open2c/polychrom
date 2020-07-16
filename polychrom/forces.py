@@ -867,28 +867,25 @@ def grosberg_repulsive_force(sim_object,
 
 
 def grosberg_selective_repulsive_force(sim_object,
-                             trunc_values,
+                             transp_values=np.ones(sim_object.N)*10, 
+                             trunc = "min(transp1, transp2)",
                              radiusMult=1.,
-                            name="grosberg_repulsive"):
-    """This is the fastest non-transparent repulsive force.
-    (that preserves topology, doesn't allow chain passing)
-    Done according to the paper:
-    (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
-     nonconcatenated ring polymers in a melt. I. Statics."
-     The Journal of chemical physics 134 (2011): 204904.)
+                             name="grosberg_selective_repulsive"):
+    """
+    Same as grosberg_repulsive, but allows for different "transparency" of the particles
     Parameters
     ----------
-    trunc : float for a particular particle
-         truncation energy in kT, used for chain crossing.
-         Value of 1.5 yields frequent passing,
-         3 - average passing, 5 - rare passing.
+    transp_values : array of "transparency" values for each particular particle, 
+    which correspond to the trancation values for the grosberg repulsion energy between a pair of such particles.
+    
+    trunc : a formula to calculate the truncation between a pair of particles with transparencies transp1 and transp2
+    
     """
     radius = sim_object.conlen * radiusMult
     nbCutOffDist = radius * 2. ** (1. / 6.)
     repul_energy = (
-        "step(cut2*tr - U) * U"
-        " + step(U - cut2*tr) * cut2 * tr * (1 + tanh(U/(cut2*tr) - 1));"
-        "tr = min(trunc1, trunc2);"
+        "step(cut2*trunc - U) * U"
+        " + step(U - cut2*trunc) * cut2 * trunc * (1 + tanh(U/(cut2*trunc) - 1));"
         "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
         "r2 = (r^10. + (sigma03)^10.)^0.1")
     force = openmm.CustomNonbondedForce(repul_energy)
@@ -901,11 +898,11 @@ def grosberg_selective_repulsive_force(sim_object,
     force.addGlobalParameter('cut', sim_object.kT)
     force.addGlobalParameter('cut2', 0.5 * sim_object.kT)
     
-    force.addPerParticleParameter("typee")
-    force.addPerParticleParameter("trunc")
+    force.addPerParticleParameter("type")
+    force.addPerParticleParameter("transp")
     
     for i in range(sim_object.N):  # adding all the particles on which force acts
-        force.addParticle((i,float(trunc_values[i])))
+        force.addParticle((i,float(transp_values[i])))
         
  
     force.setCutoffDistance(nbCutOffDist)
