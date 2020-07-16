@@ -1044,6 +1044,7 @@ def grosberg_repulsive_force(
         repul_energy = (
             "step(cut2*trunc - U) * U"
             " + step(U - cut2*trunc) * cut2 * trunc * (1 + tanh(U/(cut2*trunc) - 1));"
+            f"trunc={trunc};"
             "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
             "r2 = (r^10. + (sigma03)^10.)^0.1"
         )
