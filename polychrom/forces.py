@@ -1046,7 +1046,7 @@ def grosberg_repulsive_force(
         repul_energy = (
             "step(cut2*trunc_pair - U) * U"
             " + step(U - cut2*trunc_pair) * cut2 * trunc_pair * (1 + tanh(U/(cut2*trunc_pair) - 1));"
-            f"trunc_pair={trunc};"
+            f"trunc_pair={trunc_function};"
             "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
             "r2 = (r^10. + (sigma03)^10.)^0.1"
         )
@@ -1057,7 +1057,7 @@ def grosberg_repulsive_force(
     force.addGlobalParameter("sigma", radius)
     force.addGlobalParameter("sigma03", 0.3 * radius)
     
-    if transp_values is not None:
+    if trunc is not None:
         force.addGlobalParameter("cut2", 0.5 * sim_object.kT)
         force.addPerParticleParameter("trunc")
 
