@@ -881,7 +881,7 @@ def grosberg_selective_repulsive_force(sim_object,
     trunc : a formula to calculate the truncation between a pair of particles with transparencies transp1 and transp2
     
     """
-    if transp_values == None:
+    if len(transp_values) != sim_object.N:
         transp_values = np.ones(sim_object.N)*10
         
     radius = sim_object.conlen * radiusMult
