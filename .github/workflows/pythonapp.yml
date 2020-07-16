@@ -19,6 +19,7 @@ jobs:
       - run: which python
       - name: Install dependencies
         run: |
+          pip install pyknotid 
           conda install --file requirements.txt
           conda install -c omnia openmm  
           conda install pip 
