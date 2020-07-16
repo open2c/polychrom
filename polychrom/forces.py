@@ -1013,7 +1013,7 @@ def grosberg_angle(
 
 
 def grosberg_repulsive_force(
-    sim_object, trunc=None, radiusMult=1.0, name="grosberg_repulsive"
+    sim_object, trunc=None,  radiusMult=1.0, name="grosberg_repulsive",trunc_function = "min(trunc1, trunc2)",
 ):
     """This is the fastest non-transparent repulsive force.
     (that preserves topology, doesn't allow chain passing)
@@ -1022,12 +1022,19 @@ def grosberg_repulsive_force(
      nonconcatenated ring polymers in a melt. I. Statics."
      The Journal of chemical physics 134 (2011): 204904.)
     Parameters
-    ----------
-
-    trunc : None or float
-         truncation energy in kT, used for chain crossing.
-         Value of 1.5 yields frequent passing,
-         3 - average passing, 5 - rare passing.
+    ----------    
+    
+    trunc : None, float or N-array of floats    
+        "transparency" values for each particular particle, 
+        which correspond to the truncation values in kT for the grosberg repulsion energy between a pair of such particles.
+        Value of 1.5 yields frequent passing,
+        3 - average passing, 5 - rare passing.
+    radiusMult : float (optional)
+        Multiplier for the size of the force. To make scale the energy larger, set to be more than 1.         
+    trunc_function : str (optional)
+        a formula to calculate the truncation between a pair of particles with transparencies trunc1 and trunc2
+        Default is min(trunc1, trunc2)
+ 
 
     """
     radius = sim_object.conlen * radiusMult
@@ -1035,9 +1042,11 @@ def grosberg_repulsive_force(
     if trunc is None:
         repul_energy = "4 * e * ((sigma/r)^12 - (sigma/r)^6) + e"
     else:
+        trunc = _to_array_1d(trunc, sim_object.N)
         repul_energy = (
-            "step(cut2 - U) * U"
-            " + step(U - cut2) * cut2 * (1 + tanh(U/cut2 - 1));"
+            "step(cut2*trunc_pair - U) * U"
+            " + step(U - cut2*trunc_pair) * cut2 * trunc_pair * (1 + tanh(U/(cut2*trunc_pair) - 1));"
+            f"trunc_pair={trunc_function};"
             "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
             "r2 = (r^10. + (sigma03)^10.)^0.1"
         )
@@ -1047,12 +1056,17 @@ def grosberg_repulsive_force(
     force.addGlobalParameter("e", sim_object.kT)
     force.addGlobalParameter("sigma", radius)
     force.addGlobalParameter("sigma03", 0.3 * radius)
+    
     if trunc is not None:
-        force.addGlobalParameter("cut", sim_object.kT * trunc)
-        force.addGlobalParameter("cut2", 0.5 * trunc * sim_object.kT)
-    for _ in range(sim_object.N):
-        force.addParticle(())
+        force.addGlobalParameter("cut2", 0.5 * sim_object.kT)
+        force.addPerParticleParameter("trunc")
 
+        for i in range(sim_object.N):  # adding all the particles on which force acts
+            force.addParticle([float(trunc[i])])
+    else:
+        for i in range(sim_object.N):  # adding all the particles on which force acts
+            force.addParticle(())
+        
     force.setCutoffDistance(nbCutOffDist)
 
     return force
