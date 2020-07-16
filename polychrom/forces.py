@@ -1059,11 +1059,10 @@ def grosberg_repulsive_force(
     
     if transp_values is not None:
         force.addGlobalParameter("cut2", 0.5 * sim_object.kT)
-        force.addPerParticleParameter("type")
         force.addPerParticleParameter("trunc")
 
         for i in range(sim_object.N):  # adding all the particles on which force acts
-            force.addParticle((i,float(trunc[i])))
+            force.addParticle([float(trunc[i])])
     else:
         for i in range(sim_object.N):  # adding all the particles on which force acts
             force.addParticle(())
