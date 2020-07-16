@@ -7,6 +7,21 @@ This module defines forces commonly used in polychrom. Most forces are implement
 custom forces in openmm. The force equations were generally derived such that the force and the 
 first derivative both go to zero at the cutoff radius. 
 
+Parametrization of bond forces 
+******************************
+
+Most of the bond forces are parametrized using two parametrs: bondLength and bondWiggleDistance. 
+The parameter *bondLength* is length of the bond at rest, while *bondWiggleDistance* 
+is the estension of the bond at which energy reaches 1kT. 
+
+Note that the actual standard deviation of the bond length is bondWiggleDistance/sqrt(2) 
+for a harmonic bond force, and is bondWiggleDistance*sqrt(2) for constant force bonds, 
+so if you are switching from harmonic bonds to constant force, you may choose to decrease 
+the wiggleDistance by a factor of 2. 
+
+
+
+
 Note on energy equations
 ************************
 
@@ -149,7 +164,16 @@ def harmonic_bonds(
     name="harmonic_bonds",
     override_checks=False,
 ):
-    """Adds harmonic bonds
+    """Adds harmonic bonds.
+    
+    Bonds are parametrized in the following way. 
+    
+    * A length of a bond at rest is `bondLength`
+    * Bond energy equal to 1kT at bondWiggleDistance 
+    
+    Note that bondWiggleDistance is not the standard deviation of the bond extension:
+    that is actually smaller by a factor of sqrt(2). 
+    
 
     Parameters
     ----------
@@ -157,7 +181,7 @@ def harmonic_bonds(
     bonds : iterable of (int, int)
         Pairs of particle indices to be connected with a bond.
     bondWiggleDistance : float or iterable of float
-        Average displacement from the equilibrium bond distance.
+        Distance at which bond energy equals kT. 
         Can be provided per-particle.
         If 0 then set k=0.
     bondLength : float or iterable of float
@@ -198,23 +222,34 @@ def harmonic_bonds(
     return force
 
 
-def FENE_bonds(
+def constant_force_bonds(
     sim_object,
     bonds,
     bondWiggleDistance=0.05,
     bondLength=1.0,
-    name="FENE_bonds",
+    quadraticPart = 0.02,
+    name="abs_bonds",
     override_checks=False,
 ):
-    """Adds harmonic bonds
-
+    """
+    
+    Constant force bond force. Energy is roughly linear with estension 
+    after r=quadraticPart; before it is quadratic to make sure the force
+    is differentiable. 
+    
+    Force is parametrized using the same approach as bond force:
+    it reaches U=kT at extension = bondWiggleDistance 
+    
+    Note that, just as with bondForce, mean squared extension 
+    is actually larger than wiggleDistance by sqrt(2) factor. 
+    
     Parameters
     ----------
     
     bonds : iterable of (int, int)
         Pairs of particle indices to be connected with a bond.
     bondWiggleDistance : float
-        Average displacement from the equilibrium bond distance.
+        Displacement at which bond energy equals 1 kT. 
         Can be provided per-particle.
     bondLength : float
         The length of the bond.
@@ -239,7 +274,7 @@ def FENE_bonds(
     force.addPerBondParameter("wiggle")
     force.addPerBondParameter("r0")
     force.addGlobalParameter("univK", sim_object.kT / sim_object.conlen)
-    force.addGlobalParameter("a", 0.02 * sim_object.conlen)
+    force.addGlobalParameter("a", quadraticPart * sim_object.conlen)
     force.addGlobalParameter("conlen", sim_object.conlen)
 
     bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
