@@ -1056,3 +1056,51 @@ def grosberg_repulsive_force(
     force.setCutoffDistance(nbCutOffDist)
 
     return force
+
+
+def grosberg_selective_repulsive_force(sim_object,
+                             transp_values=None, 
+                             trunc = "min(transp1, transp2)",
+                             radiusMult=1.,
+                             name="grosberg_selective_repulsive"):
+    """
+    Same as grosberg_repulsive, but allows for different "transparency" of the particles
+    Parameters
+    ----------
+    transp_values : array of "transparency" values for each particular particle, 
+    which correspond to the trancation values for the grosberg repulsion energy between a pair of such particles.
+    
+    trunc : a formula to calculate the truncation between a pair of particles with transparencies transp1 and transp2
+    
+    """
+    if len(transp_values) != sim_object.N:
+        transp_values = np.ones(sim_object.N)*10
+        
+    radius = sim_object.conlen * radiusMult
+    nbCutOffDist = radius * 2. ** (1. / 6.)
+    repul_energy = (
+        "step(cut2*trunc - U) * U"
+        " + step(U - cut2*trunc) * cut2 * trunc * (1 + tanh(U/(cut2*trunc) - 1));"
+        "trunc="+str(trunc)+";"
+        "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
+        "r2 = (r^10. + (sigma03)^10.)^0.1")
+    force = openmm.CustomNonbondedForce(repul_energy)
+    force.name = name
+
+    force.addGlobalParameter('e', sim_object.kT)
+    force.addGlobalParameter('sigma', radius)
+    force.addGlobalParameter('sigma03', 0.3 * radius)
+
+    force.addGlobalParameter('cut', sim_object.kT)
+    force.addGlobalParameter('cut2', 0.5 * sim_object.kT)
+    
+    force.addPerParticleParameter("type")
+    force.addPerParticleParameter("transp")
+    
+    for i in range(sim_object.N):  # adding all the particles on which force acts
+        force.addParticle((i,float(transp_values[i])))
+        
+ 
+    force.setCutoffDistance(nbCutOffDist)
+    
+    return force 
