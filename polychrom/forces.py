@@ -1032,7 +1032,7 @@ def grosberg_repulsive_force(
     radiusMult : float (optional)
         Multiplier for the size of the force. To make scale the energy larger, set to be more than 1.         
     trunc_function : str (optional)
-        a formula to calculate the truncation between a pair of particles with transparencies transp1 and transp2
+        a formula to calculate the truncation between a pair of particles with transparencies trunc1 and trunc2
         Default is min(trunc1, trunc2)
  
 
