@@ -1078,6 +1078,7 @@ def grosberg_repulsive_force(
         repul_energy = "4 * e * ((sigma/r)^12 - (sigma/r)^6) + e"
     else:
         trunc = _to_array_1d(trunc, sim_object.N)
+        print(trunc)
         repul_energy = (
             "step(cut2*trunc_pair - U) * U"
             " + step(U - cut2*trunc_pair) * cut2 * trunc_pair * (1 + tanh(U/(cut2*trunc_pair) - 1));"
