@@ -12,9 +12,17 @@ jobs:
         uses: actions/setup-python@v1
         with:
           python-version: 3.7
-      - uses: s-weigand/setup-conda@v1
+      - uses: conda-incubator/setup-miniconda@v1
         with:
-          activate-conda: true
+          auto-update-conda: true
+          python-version: 3.7
+      - name: Conda info
+        shell: bash -l {0}
+        run: conda info
+      - name: Conda list
+        shell: pwsh
+        run: conda list
+              
       - run: conda --version
       - run: which python
       - name: Install dependencies
