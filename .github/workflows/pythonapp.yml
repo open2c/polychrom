@@ -22,6 +22,12 @@ jobs:
       - name: Conda list
         shell: pwsh
         run: conda list
+      - name: where am I 
+        shell: pwsh
+        run: | 
+          pwd
+          ls -a 
+          ls .. 
       - name: install dependencies
         shell: pwsh
         run: |
