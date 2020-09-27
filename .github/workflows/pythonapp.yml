@@ -30,8 +30,8 @@ jobs:
         run: |
           conda install -c omnia openmm  
           conda install pip 
-          pip install -r polychrom/requirements.txt 
-          pip install -e polychrom 
+          pip install -r ../requirements.txt 
+          pip install -e .. 
       - name: Test with pytest
         run: |          
           pytest
