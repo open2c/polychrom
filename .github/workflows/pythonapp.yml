@@ -3,23 +3,27 @@ name: Run pytest
 on: [push]
 
 jobs:
-  build:
-    name: build
-    runs-on: "ubuntu-latest"
+  example-1:
+    name: Ex1 (${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.7"]
     steps:
-      - uses: actions/checkout@v2
       - uses: conda-incubator/setup-miniconda@v1
         with:
-          python-version: 3.7
-          auto-activate-base: true
-      - shell: bash -l {0}
-        run: |
-          conda activate test 
-          conda info
-          conda list
-      - run: which python
-        
-      - name: Install dependencies
+          auto-update-conda: true
+          python-version: ${{ matrix.python-version }}
+      - name: Conda info
+        shell: bash -l {0}
+        run: conda info
+      - name: Conda list
+        shell: pwsh
+        run: conda list
+      - name: install dependencies
+        shell: pwsh
         run: |
           conda install -c omnia openmm  
           conda install pip 
