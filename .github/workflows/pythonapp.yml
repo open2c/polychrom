@@ -14,9 +14,12 @@ jobs:
           python-version: 3.7
       - uses: s-weigand/setup-conda@v1
         with:
+          python-version: 3.7
           activate-conda: true
       - run: conda --version
       - run: which python
+      - run: pwd 
+      - run: ls -la
       - name: Install dependencies
         run: |
           conda install -c omnia openmm  
