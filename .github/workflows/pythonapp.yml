@@ -14,6 +14,7 @@ jobs:
           auto-activate-base: true
       - shell: bash -l {0}
         run: |
+          conda activate test 
           conda info
           conda list
       - run: which python
