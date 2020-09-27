@@ -4,13 +4,12 @@ on: [push]
 
 jobs:
   build:
-    name: Ex3 Linux
+    name: build
     runs-on: "ubuntu-latest"
     steps:
       - uses: actions/checkout@v2
       - uses: conda-incubator/setup-miniconda@v1
         with:
-          activate-environment: anaconda-client-env
           python-version: 3.7
           auto-activate-base: true
       - shell: bash -l {0}
