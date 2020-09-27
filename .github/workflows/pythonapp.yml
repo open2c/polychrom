@@ -16,10 +16,9 @@ jobs:
         run: |
           conda info
           conda list
-
       - name: where am I 
         shell: bash -l {0}
-        run:  ls -a 
+        run:  pwd; ls -la 
       - name: install dependencies
         shell: bash -l {0}
         run: |
