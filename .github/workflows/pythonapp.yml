@@ -4,25 +4,21 @@ on: [push]
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    name: Ex3 Linux
+    runs-on: "ubuntu-latest"
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Python 3.7
-        uses: actions/setup-python@v1
-        with:
-          python-version: 3.7
       - uses: conda-incubator/setup-miniconda@v1
         with:
-          auto-update-conda: true
+          activate-environment: anaconda-client-env
           python-version: 3.7
-      - name: Conda info
-        run: conda info
-      - name: Conda list
-        run: conda list
-              
-      - run: conda --version
+          auto-activate-base: true
+      - shell: bash -l {0}
+        run: |
+          conda info
+          conda list
       - run: which python
+        
       - name: Install dependencies
         run: |
           conda install -c omnia openmm  
