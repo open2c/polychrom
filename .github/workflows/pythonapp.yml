@@ -24,17 +24,14 @@ jobs:
         run: conda list
       - name: where am I 
         shell: pwsh
-        run: | 
-          pwd
-          ls -a 
-          ls .. 
+        run:  ls -a 
       - name: install dependencies
         shell: pwsh
         run: |
           conda install -c omnia openmm  
           conda install pip 
-          pip install -r requirements.txt 
-          pip install -e . 
+          pip install -r polychrom/requirements.txt 
+          pip install -e polychrom 
       - name: Test with pytest
         run: |          
           pytest
