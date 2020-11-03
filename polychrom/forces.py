@@ -304,7 +304,8 @@ def angle_force(
     force.addPerAngleParameter("angT0")
 
     for triplet_idx, (p1, p2, p3) in enumerate(triplets):
-        force.addAngle(p1, p2, p3, [k[triplet_idx], theta_0[triplet_idx]])
+        force.addAngle(int(p1), int(p2), int(p3), 
+                       (float(k[triplet_idx]), float(theta_0[triplet_idx])))
 
     return force
 
