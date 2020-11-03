@@ -7,6 +7,21 @@ This module defines forces commonly used in polychrom. Most forces are implement
 custom forces in openmm. The force equations were generally derived such that the force and the 
 first derivative both go to zero at the cutoff radius. 
 
+Parametrization of bond forces 
+******************************
+
+Most of the bond forces are parametrized using two parametrs: bondLength and bondWiggleDistance. 
+The parameter *bondLength* is length of the bond at rest, while *bondWiggleDistance* 
+is the estension of the bond at which energy reaches 1kT. 
+
+Note that the actual standard deviation of the bond length is bondWiggleDistance/sqrt(2) 
+for a harmonic bond force, and is bondWiggleDistance*sqrt(2) for constant force bonds, 
+so if you are switching from harmonic bonds to constant force, you may choose to decrease 
+the wiggleDistance by a factor of 2. 
+
+
+
+
 Note on energy equations
 ************************
 
@@ -149,7 +164,16 @@ def harmonic_bonds(
     name="harmonic_bonds",
     override_checks=False,
 ):
-    """Adds harmonic bonds
+    """Adds harmonic bonds.
+    
+    Bonds are parametrized in the following way. 
+    
+    * A length of a bond at rest is `bondLength`
+    * Bond energy equal to 1kT at bondWiggleDistance 
+    
+    Note that bondWiggleDistance is not the standard deviation of the bond extension:
+    that is actually smaller by a factor of sqrt(2). 
+    
 
     Parameters
     ----------
@@ -157,7 +181,7 @@ def harmonic_bonds(
     bonds : iterable of (int, int)
         Pairs of particle indices to be connected with a bond.
     bondWiggleDistance : float or iterable of float
-        Average displacement from the equilibrium bond distance.
+        Distance at which bond energy equals kT. 
         Can be provided per-particle.
         If 0 then set k=0.
     bondLength : float or iterable of float
@@ -198,23 +222,34 @@ def harmonic_bonds(
     return force
 
 
-def FENE_bonds(
+def constant_force_bonds(
     sim_object,
     bonds,
     bondWiggleDistance=0.05,
     bondLength=1.0,
-    name="FENE_bonds",
+    quadraticPart = 0.02,
+    name="abs_bonds",
     override_checks=False,
 ):
-    """Adds harmonic bonds
-
+    """
+    
+    Constant force bond force. Energy is roughly linear with estension 
+    after r=quadraticPart; before it is quadratic to make sure the force
+    is differentiable. 
+    
+    Force is parametrized using the same approach as bond force:
+    it reaches U=kT at extension = bondWiggleDistance 
+    
+    Note that, just as with bondForce, mean squared extension 
+    is actually larger than wiggleDistance by sqrt(2) factor. 
+    
     Parameters
     ----------
     
     bonds : iterable of (int, int)
         Pairs of particle indices to be connected with a bond.
     bondWiggleDistance : float
-        Average displacement from the equilibrium bond distance.
+        Displacement at which bond energy equals 1 kT. 
         Can be provided per-particle.
     bondLength : float
         The length of the bond.
@@ -239,7 +274,7 @@ def FENE_bonds(
     force.addPerBondParameter("wiggle")
     force.addPerBondParameter("r0")
     force.addGlobalParameter("univK", sim_object.kT / sim_object.conlen)
-    force.addGlobalParameter("a", 0.02 * sim_object.conlen)
+    force.addGlobalParameter("a", quadraticPart * sim_object.conlen)
     force.addGlobalParameter("conlen", sim_object.conlen)
 
     bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
@@ -628,10 +663,12 @@ def heteropolymer_SSW(
     Ntypes = max(monomerTypes) + 1  # IDs should be zero based
     if any(np.less(interactionMatrix.shape, [Ntypes, Ntypes])):
         raise ValueError("Need interactions for {0:d} types!".format(Ntypes))
+    if not np.allclose(interactionMatrix.T, interactionMatrix):
+        raise ValueError("Interaction matrix should be symmetric!")
 
     indexpairs = []
     for i in range(0, Ntypes):
-        for j in range(i, Ntypes):
+        for j in range(0, Ntypes):
             if (not interactionMatrix[i, j] == 0) or keepVanishingInteractions:
                 indexpairs.append((i, j))
 
@@ -1012,7 +1049,7 @@ def grosberg_angle(
 
 
 def grosberg_repulsive_force(
-    sim_object, trunc=None, radiusMult=1.0, name="grosberg_repulsive"
+    sim_object, trunc=None,  radiusMult=1.0, name="grosberg_repulsive",trunc_function = "min(trunc1, trunc2)",
 ):
     """This is the fastest non-transparent repulsive force.
     (that preserves topology, doesn't allow chain passing)
@@ -1021,12 +1058,19 @@ def grosberg_repulsive_force(
      nonconcatenated ring polymers in a melt. I. Statics."
      The Journal of chemical physics 134 (2011): 204904.)
     Parameters
-    ----------
-
-    trunc : None or float
-         truncation energy in kT, used for chain crossing.
-         Value of 1.5 yields frequent passing,
-         3 - average passing, 5 - rare passing.
+    ----------    
+    
+    trunc : None, float or N-array of floats    
+        "transparency" values for each particular particle, 
+        which correspond to the truncation values in kT for the grosberg repulsion energy between a pair of such particles.
+        Value of 1.5 yields frequent passing,
+        3 - average passing, 5 - rare passing.
+    radiusMult : float (optional)
+        Multiplier for the size of the force. To make scale the energy larger, set to be more than 1.         
+    trunc_function : str (optional)
+        a formula to calculate the truncation between a pair of particles with transparencies trunc1 and trunc2
+        Default is min(trunc1, trunc2)
+ 
 
     """
     radius = sim_object.conlen * radiusMult
@@ -1034,9 +1078,11 @@ def grosberg_repulsive_force(
     if trunc is None:
         repul_energy = "4 * e * ((sigma/r)^12 - (sigma/r)^6) + e"
     else:
+        trunc = _to_array_1d(trunc, sim_object.N)
         repul_energy = (
-            "step(cut2 - U) * U"
-            " + step(U - cut2) * cut2 * (1 + tanh(U/cut2 - 1));"
+            "step(cut2*trunc_pair - U) * U"
+            " + step(U - cut2*trunc_pair) * cut2 * trunc_pair * (1 + tanh(U/(cut2*trunc_pair) - 1));"
+            f"trunc_pair={trunc_function};"
             "U = 4 * e * ((sigma/r2)^12 - (sigma/r2)^6) + e;"
             "r2 = (r^10. + (sigma03)^10.)^0.1"
         )
@@ -1046,12 +1092,17 @@ def grosberg_repulsive_force(
     force.addGlobalParameter("e", sim_object.kT)
     force.addGlobalParameter("sigma", radius)
     force.addGlobalParameter("sigma03", 0.3 * radius)
+    
     if trunc is not None:
-        force.addGlobalParameter("cut", sim_object.kT * trunc)
-        force.addGlobalParameter("cut2", 0.5 * trunc * sim_object.kT)
-    for _ in range(sim_object.N):
-        force.addParticle(())
+        force.addGlobalParameter("cut2", 0.5 * sim_object.kT)
+        force.addPerParticleParameter("trunc")
 
+        for i in range(sim_object.N):  # adding all the particles on which force acts
+            force.addParticle([float(trunc[i])])
+    else:
+        for i in range(sim_object.N):  # adding all the particles on which force acts
+            force.addParticle(())
+        
     force.setCutoffDistance(nbCutOffDist)
 
     return force
