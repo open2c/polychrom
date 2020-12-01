@@ -85,8 +85,8 @@ import os
 import time
 import tempfile
 import logging
+import warnings
 
-from six import string_types
 
 from collections.abc import Iterable
 
@@ -97,6 +97,17 @@ from . import forces
 
 logging.basicConfig(level=logging.INFO)
 
+# updated manually every now and then
+VER_LATEST = "7.4.2"
+VER_DATE = "2020-12-01"
+
+ver_cur = openmm.__version__
+if ver_cur < VER_LATEST:
+    warnings.warn(f"\n WARNING: you have OpenMM {ver_cur}; {VER_LATEST} is the latest as of {VER_DATE}, "
+                  "Upgrade is recommended.")
+    print("to upgrade openmm, run --->  conda update  -c omnia openmm")
+    
+    
 
 class IntegrationFailError(Exception):
     pass
@@ -264,7 +275,7 @@ class Simulation(object):
         self.collisionRate = kwargs["collision_rate"] * (1 / simtk.unit.picosecond)
 
         self.integrator_type = kwargs["integrator"]
-        if isinstance(self.integrator_type, string_types):
+        if isinstance(self.integrator_type, str):
             self.integrator_type = str(self.integrator_type)
             if self.integrator_type.lower() == "langevin":
                 self.integrator = openmm.LangevinIntegrator(
