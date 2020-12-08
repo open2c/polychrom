@@ -289,6 +289,12 @@ class Simulation(object):
                     kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
                     kwargs["error_tol"],
                 )
+            elif self.integrator_type.lower() == "langevinmiddle":
+                self.integrator = openmm.LangevinMiddleIntegrator(
+                    self.temperature,
+                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
+                    kwargs["timestep"] * simtk.unit.femtosecond,
+                )
             elif self.integrator_type.lower() == "verlet":
                 self.integrator = openmm.VariableVerletIntegrator(
                     kwargs["timestep"] * simtk.unit.femtosecond
