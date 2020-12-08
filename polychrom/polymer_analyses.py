@@ -536,3 +536,63 @@ def getLinkingNumber(data1, data2, simplify=True, randomOffset=True, verbose=Fal
     if simplify:
         data1, data2 = mutualSimplify(a=data1, b=data2, verbose=verbose)
     return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)
+
+
+def calculate_cistrans(data, chains=None, chain_id=0, cutoff=5, pbc_box=False, box_size=None):
+    
+    """
+    Analysis of the territoriality of polymer chains from simulations, using the cis/trans ratio.
+    Cis signal is computed for the marked chain ('chain_id') as amount of contacts of the chain with itself
+    Trans signal is the total amount of trans contacts for the marked chain with other chains from 'chains' 
+    (and with all the replicas for 'pbc_box'=True)
+    
+    """
+    if data.shape[1] != 3:
+        raise ValueError("Incorrect polymer data shape. Must be Nx3.")
+
+    if np.isnan(data).any():
+        raise RuntimeError("Data contains NANs")
+        
+    N = len(data)
+    
+    if pbc_box == True:
+        if box_size is None:
+            raise ValueError("Box size is not given")
+        else:
+            data_scaled = np.mod(data, box_size)
+            
+    else:
+        box_size = None
+        data_scaled = np.copy(data)
+        
+    if chains is None:
+        chains = [[0, N]]
+        chain_id = 0
+
+    chain_start = chains[chain_id][0]
+    chain_end = chains[chain_id][1]
+    
+    # all contact pairs available in the scaled data
+    tree = ckdtree.cKDTree(data_scaled, boxsize=box_size)
+    pairs = tree.query_pairs(cutoff, output_type="ndarray")
+    
+    # total number of contacts of the marked chain:
+    # each contact is counted twice if both monomers belong to the marked chain and 
+    # only once if just one of the monomers in the pair belong to the marked chain
+    all_signal = len(pairs[pairs<chain_end])-len(pairs[pairs<chain_start])
+    
+    # contact pairs of the marked chain with itself
+    tree = ckdtree.cKDTree(data[chain_start:chain_end], boxsize=None)
+    pairs = tree.query_pairs(cutoff, output_type="ndarray")
+    
+    # doubled number of contacts of the marked chain with itself (i.e. cis signal)
+    cis_signal = 2*len(pairs)
+    
+    trans_signal = all_signal - cis_signal
+        
+    if trans_signal != 0:
+        cistrans = cis_signal/trans_signal
+    else:
+        cistrans = np.nan
+        
+    return cistrans
