@@ -538,7 +538,7 @@ def getLinkingNumber(data1, data2, simplify=True, randomOffset=True, verbose=Fal
     return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)
 
 
-def calculate_cistrans(data, chains=None, chain_id=0, cutoff=5, pbc_box=False, box_size=None):
+def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_size=None):
     
     """
     Analysis of the territoriality of polymer chains from simulations, using the cis/trans ratio.
@@ -588,11 +588,8 @@ def calculate_cistrans(data, chains=None, chain_id=0, cutoff=5, pbc_box=False, b
     # doubled number of contacts of the marked chain with itself (i.e. cis signal)
     cis_signal = 2*len(pairs)
     
+    assert all_signal >= cis_signal
+    
     trans_signal = all_signal - cis_signal
         
-    if trans_signal != 0:
-        cistrans = cis_signal/trans_signal
-    else:
-        cistrans = np.nan
-        
-    return cistrans
+    return cis_signal, trans_signal
