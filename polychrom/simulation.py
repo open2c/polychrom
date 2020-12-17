@@ -98,14 +98,15 @@ from . import forces
 logging.basicConfig(level=logging.INFO)
 
 # updated manually every now and then
-VER_LATEST = "7.4.2"
-VER_DATE = "2020-12-01"
+VER_LATEST = "7.5"
+VER_DATE = "2020-12-15"
 
 ver_cur = openmm.__version__
 if ver_cur < VER_LATEST:
     warnings.warn(f"\n WARNING: you have OpenMM {ver_cur}; {VER_LATEST} is the latest as of {VER_DATE}, "
                   "Upgrade is recommended.")
-    print("to upgrade openmm, run --->  conda update  -c omnia openmm")
+    print("to upgrade openmm, run --->  conda install -c conda-forge openmm")
+    print("Ideally in a new conda environment")
     
     
 
