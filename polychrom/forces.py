@@ -351,6 +351,9 @@ def polynomial_repulsive(
     """This is a simple polynomial repulsive potential. It has the value
     of `trunc` at zero, stays flat until 0.6-0.7 and then drops to zero
     together with its first derivative at r=1.0.
+    
+    See the gist below with an example of the potential. 
+    https://gist.github.com/mimakaev/0327bf6ffe7057ee0e0625092ec8e318
 
     Parameters
     ----------
