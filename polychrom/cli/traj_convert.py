@@ -1,8 +1,27 @@
 #!/usr/bin/env python
 """
-General description is in the dosctring of a function below, and in click decorators. 
-Motivation, FAQ, and  detailed description of _some_ features is here. 
+This is a function that would convert trajectories from the old format "blockXXX.dat" + "SMCXXX.dat"
+to the new HDF5-based format. 
 
+This glbal docstring has FAQ, general motivation, and examples. 
+To figure out how to use the function, either browse to the function below and read
+the click decorators, or just run "traj_convert.py --help". 
+
+Installation
+------------
+
+Copy the file traj_convert.py to your bin folder (e.g. ~/anaconda3/bin) 
+
+Usage
+-----
+
+traj_convert.py --help  will print the usage. 
+
+Useful arguments to consider
+
+* --dry-run --verbose (do not modify anything, and print what you're doing)
+* --empty-policy copy  (for not inplace conversions, will copy non-polymer-simulations trajectories as is) 
+* --inplace --empty-policy ignore --verbose (once you run the script a few times, you can do the rest of conversions inplace, it's faster)
 
 FAQ
 ---
@@ -24,19 +43,25 @@ Default Behavior
 ----------------
 
 Defaults are fairly conservative, and would use little rounding (to 2 digits, 0.005 maximum error), 
-would demand the trajectory to be consecutive, and would not do in-place conversions. 
+would demand the trajectory to be consecutive, and would not do in-place conversions.
 
-All examples below convert each sub-folder in a given folder, which is probably the most common usecase. 
+Examples 
+--------
 
-For very critical data, it is recommended to not convert in place. Script below does this, 
+First, run "traj_convert.py --help" to see general usage. 
+
+All examples below are real-life examples showing how to convert many trajectories at once. 
+Examples below convert each sub-folder in a given folder, which is probably the most common usecase. 
+
+For very critical data, it is recommended to not convert in place. The script below does this, 
 and converts each trajectory to a new-style, placed in a "../converted" folder with the same
 name. It rounds to 2 digits (max error 0.005) by default, which is very conservative. 
 It is recommended to round to 1 digit unless you specifically need bond lengths or angles
-to a high precision. Contactmaps are not affected by 1-digit rounding. 
+to a high precision. Contactmaps are not affected by 1-digit rounding.
 
-set - e 
+(put this in a bash script, set -e will take care of not continuing on errors) 
+set - e
 for i in *; do traj_convert.py --empty-policy raise --verbose  "$i" "../converted/$i" ; done
-
 
 For less critical data, in-place conversion is acceptable. Example below converts every trajectory in-place, 
 and rounds to 1 digit, and also skips every second file. This gives ~4x space savings. 
@@ -52,8 +77,6 @@ the script below would round data to 0.05, and take every 5th file (10x space re
 through all sub-subdirectories, (not sub-directories), which is also a common data layout. 
 
 for i in */*; do traj_convert.py --empty-policy ignore --verbose --input-style new --round-to 1 --skip-files 5 --allow-nonconsecutive --replace "$i" `mktemp -d` ; done
-
-
 
 """
 
