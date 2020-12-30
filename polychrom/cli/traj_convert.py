@@ -368,7 +368,7 @@ def trajcopy(
                 if name not in subdf:
                     continue
                 filename = subdf[name]
-                if filename is not None:
+                if not pd.isna(filename):
                     cur[name] = eval(ldr)
             rep.report("data", cur)
         rep.dump_data()
