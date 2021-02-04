@@ -743,52 +743,6 @@ def heteropolymer_SSW(
     return force
 
 
-def spherical_well(
-    sim_object, particles, r, center=[0, 0, 0], width=1, depth=1, name="spherical_well"
-):
-    """
-    A spherical potential well, suited for example to simulate attraction to a lamina.
-
-    Parameters
-    ----------
-
-    particles : list of int or np.array
-        indices of particles that are attracted
-    r : float
-        Radius of the nucleus
-    center : vector, optional
-        center position of the sphere. This parameter is useful when confining
-        chromosomes to their territory.
-    width : float, optional
-        Width of attractive well, nm.
-    depth : float, optional
-        Depth of attractive potential in kT
-        NOTE: switched sign from openmm-polymer, because it was confusing. Now
-        this parameter is really the depth of the well, i.e. positive =
-        attractive, negative = repulsive
-    """
-
-    force = openmm.CustomExternalForce(
-        "-step(1+d)*step(1-d)*SPHWELLdepth*cos(3.1415926536*d)/2 + 0.5;"
-        "d = (sqrt((x-SPHWELLx)^2 + (y-SPHWELLy)^2 + (z-SPHWELLz)^2) - SPHWELLradius) / SPHWELLwidth"
-    )
-    force.name = name
-
-    force.addGlobalParameter("SPHWELLradius", r * sim_object.conlen)
-    force.addGlobalParameter("SPHWELLwidth", width * sim_object.conlen)
-    force.addGlobalParameter("SPHWELLdepth", depth * sim_object.kT)
-    force.addGlobalParameter("SPHWELLx", center[0] * sim_object.conlen)
-    force.addGlobalParameter("SPHWELLy", center[1] * sim_object.conlen)
-    force.addGlobalParameter("SPHWELLz", center[2] * sim_object.conlen)
-
-    # adding all the particles on which force acts
-    for i in particles:
-        # NOTE: the explicit type cast seems to be necessary if we have an np.array...
-        force.addParticle(int(i), [])
-
-    return force
-
-
 def cylindrical_confinement(
     sim_object, r, bottom=None, k=0.1, top=9999, name="cylindrical_confinement"
 ):
@@ -880,6 +834,53 @@ def spherical_confinement(
 
     ## TODO: move 'r' elsewhere?..
     sim_object.sphericalConfinementRadius = r
+
+    return force
+
+
+def spherical_well(
+    sim_object, particles, r, center=[0, 0, 0], width=1, depth=1, name="spherical_well"
+):
+    """
+    A spherical potential well, suited for example to simulate attraction to a lamina.
+
+    Parameters
+    ----------
+
+    particles : list of int or np.array
+        indices of particles that are attracted
+    r : float
+        Radius of the nucleus
+    center : vector, optional
+        center position of the sphere. This parameter is useful when confining
+        chromosomes to their territory.
+    width : float, optional
+        Width of attractive well, nm.
+    depth : float, optional
+        Depth of attractive potential in kT
+        NOTE: switched sign from openmm-polymer, because it was confusing. Now
+        this parameter is really the depth of the well, i.e. positive =
+        attractive, negative = repulsive
+    """
+
+    force = openmm.CustomExternalForce(
+        "step(1+d) * step(1-d) * SPHWELLdepth * (1 - cos(3.1415926536*d)) / 2;"
+        "d = (sqrt((x-SPHWELLx)^2 + (y-SPHWELLy)^2 + (z-SPHWELLz)^2) - SPHWELLradius) / SPHWELLwidth"
+    )
+
+    force.name = name
+
+    force.addGlobalParameter("SPHWELLradius", r * sim_object.conlen)
+    force.addGlobalParameter("SPHWELLwidth", width * sim_object.conlen)
+    force.addGlobalParameter("SPHWELLdepth", depth * sim_object.kT)
+    force.addGlobalParameter("SPHWELLx", center[0] * sim_object.conlen)
+    force.addGlobalParameter("SPHWELLy", center[1] * sim_object.conlen)
+    force.addGlobalParameter("SPHWELLz", center[2] * sim_object.conlen)
+
+    # adding all the particles on which force acts
+    for i in particles:
+        # NOTE: the explicit type cast seems to be necessary if we have an np.array...
+        force.addParticle(int(i), [])
 
     return force
 
