@@ -835,6 +835,7 @@ def spherical_confinement(
     k=5.0,  # How steep the walls are
     density=0.3,  # target density, measured in particles
     # per cubic nanometer (bond size is 1 nm)
+    center=[0,0,0],
     name="spherical_confinement",
 ):
     """Constrain particles to be within a sphere.
@@ -855,7 +856,7 @@ def spherical_confinement(
 
     force = openmm.CustomExternalForce(
         "step(r-aa) * kb * (sqrt((r-aa)*(r-aa) + t*t) - t); "
-        "r = sqrt(x^2 + y^2 + z^2 + tt^2)"
+        "r = sqrt((x-x0)^2 + (y-y0)^2 + (z-z0)^2 + tt^2)"
     )
     force.name = name
 
@@ -871,6 +872,11 @@ def spherical_confinement(
     force.addGlobalParameter("aa", (r - 1.0 / k) * simtk.unit.nanometer)
     force.addGlobalParameter("t", (1.0 / k) * simtk.unit.nanometer / 10.0)
     force.addGlobalParameter("tt", 0.01 * simtk.unit.nanometer)
+
+    force.addGlobalParameter("x0", center[0] * simtk.unit.nanometer)
+    force.addGlobalParameter("y0", center[1] * simtk.unit.nanometer)
+    force.addGlobalParameter("z0", center[2] * simtk.unit.nanometer)
+
 
     ## TODO: move 'r' elsewhere?..
     sim_object.sphericalConfinementRadius = r
