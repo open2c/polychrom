@@ -55,6 +55,7 @@ One of the best examples of optimizing complex forces using polynomials is in
 """
 
 import re
+import warnings
 import itertools
 from collections.abc import Iterable
 
@@ -790,6 +791,8 @@ def spherical_confinement(
     density=0.3,  # target density, measured in particles
     # per cubic nanometer (bond size is 1 nm)
     center=[0,0,0],
+    invert=False,
+    particles=None,
     name="spherical_confinement",
 ):
     """Constrain particles to be within a sphere.
@@ -806,16 +809,25 @@ def spherical_confinement(
         Density for autodetection of confining radius.
         Density is calculated in particles per nm^3,
         i.e. at density 1 each sphere has a 1x1x1 cube.
+    center : [float, float, float]
+        The coordinates of the center of the sphere.
+    invert : bool
+        If True, particles are not confinded, but *excluded* from the sphere.
+    particles : list of int
+        The list of particles affected by the force. 
+        If None, apply the force to all particles.
     """
 
     force = openmm.CustomExternalForce(
-        "step(r-aa) * kb * (sqrt((r-aa)*(r-aa) + t*t) - t); "
+        "step(invert_sign*(r-aa)) * kb * (sqrt((r-aa)*(r-aa) + t*t) - t); "
         "r = sqrt((x-x0)^2 + (y-y0)^2 + (z-z0)^2 + tt^2)"
     )
     force.name = name
 
-    for i in range(sim_object.N):
-        force.addParticle(i, [])
+    particles = range(sim_object.N) if particles is None else particles
+    for i in particles:
+        force.addParticle(int(i), [])
+
     if r == "density":
         r = (3 * sim_object.N / (4 * 3.141592 * density)) ** (1 / 3.0)
 
@@ -826,6 +838,7 @@ def spherical_confinement(
     force.addGlobalParameter("aa", (r - 1.0 / k) * simtk.unit.nanometer)
     force.addGlobalParameter("t", (1.0 / k) * simtk.unit.nanometer / 10.0)
     force.addGlobalParameter("tt", 0.01 * simtk.unit.nanometer)
+    force.addGlobalParameter("invert_sign", (-1) if invert else 1)
 
     force.addGlobalParameter("x0", center[0] * simtk.unit.nanometer)
     force.addGlobalParameter("y0", center[1] * simtk.unit.nanometer)
