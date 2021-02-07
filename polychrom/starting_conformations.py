@@ -92,21 +92,81 @@ def create_spiral(r1, r2, N):
                 add_point(fullcoord(curphi, z))
 
 
-def create_random_walk(step_size, N):
-    """
-    Creates a freely joined chain of length N with step step_size 
-    """
+def _random_points_sphere(N):
     theta = np.random.uniform(0.0, 1.0, N)
     theta = 2.0 * np.pi * theta
 
     u = np.random.uniform(0.0, 1.0, N)
-
     u = 2.0 * u - 1.0
-    x = step_size * np.sqrt(1.0 - u * u) * np.cos(theta)
-    y = step_size * np.sqrt(1.0 - u * u) * np.sin(theta)
-    z = step_size * u
-    x, y, z = np.cumsum(x), np.cumsum(y), np.cumsum(z)
+    
+    return np.vstack([theta, u]).T
+    
+    
+def create_random_walk(step_size, N):
+    """
+    Creates a freely joined chain of length N with step step_size 
+    """
+    
+    theta, u =  _random_points_sphere(N).T
+    
+    dx = step_size * np.sqrt(1.0 - u * u) * np.cos(theta)
+    dy = step_size * np.sqrt(1.0 - u * u) * np.sin(theta)
+    dz = step_size * u    
+    
+    x, y, z = np.cumsum(dx), np.cumsum(dy), np.cumsum(dz)
+        
     return np.vstack([x, y, z]).T
+
+
+def create_constrained_random_walk(N, 
+    constraint_f, 
+    starting_point = (0, 0, 0),
+    step_size=1.0
+    ):
+    """
+    Creates a constrained freely joined chain of length N with step step_size.
+    Each step of a random walk is tested with the constraint function and is
+    rejected if the tried step lies outside of the constraint.
+    This function is much less efficient than create_random_walk().
+   
+    Parameters
+    ----------
+    N : int
+        The number of steps
+    constraint_f : function((float, float, float))
+        The constraint function. 
+        Must accept a tuple of 3 floats with the tentative position of a particle
+        and return True if the new position is accepted and False is it is forbidden.
+    starting_point : a tuple of (float, float, float)
+        The starting point of a random walk.
+    step_size: float
+        The size of a step of the random walk.
+
+    """    
+    
+    i = 1
+    j = N
+    out = np.full((N, 3), np.nan)
+    out[0] = starting_point
+    
+    while i < N:
+        if j == N:
+            theta, u = _random_points_sphere(N).T        
+            dx = step_size * np.sqrt(1.0 - u * u) * np.cos(theta)
+            dy = step_size * np.sqrt(1.0 - u * u) * np.sin(theta)
+            dz = step_size * u
+            d = np.vstack([dx, dy, dz]).T
+            j = 0
+    
+        new_p = out[i-1] + d[j]
+        
+        if constraint_f(new_p):
+            out[i] = new_p
+            i += 1
+        
+        j += 1
+        
+    return out
 
 
 def grow_cubic(N, boxSize, method="standard"):
