@@ -915,7 +915,7 @@ def tether_particles(sim_object, particles, k=30, positions="current", name="Tet
         Can be provided as a vector [kx, ky, kz].
     """
 
-    energy = "kx * periodicdistance(x, x0)^2 + ky * periodicdistance(y, y0)^2 + kz * periodicdistance(z, z0)^2"
+    energy = "kx * periodicdistance(x, 0, 0, x0, 0, 0)^2 + ky * periodicdistance(0, y, 0, 0, y0, 0)^2 + kz * periodicdistance(0, 0, z, 0, 0, z0)^2"
     
     force = openmm.CustomExternalForce(energy)
     force.name = name
