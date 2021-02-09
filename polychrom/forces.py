@@ -898,7 +898,7 @@ def spherical_well(
     return force
 
 
-def tether_particles(sim_object, particles, k=30, positions="current", name="Tethers"):
+def tether_particles(sim_object, particles, pbc=False, k=30, positions="current", name="Tethers"):
     """tethers particles in the 'particles' array.
     Increase k to tether them stronger, but watch the system!
 
@@ -908,15 +908,21 @@ def tether_particles(sim_object, particles, k=30, positions="current", name="Tet
     particles : list of ints
         List of particles to be tethered (fixed in space).
         Negative values are allowed.
+        
+    pbc : Bool, optional
+        If True, periodicdistance function is applied
     k : int, optional
         The steepness of the tethering potential.
         Values >30 will require decreasing potential, but will make tethering 
         rock solid.
         Can be provided as a vector [kx, ky, kz].
     """
-
-    energy = "kx * periodicdistance(x, 0, 0, x0, 0, 0)^2 + ky * periodicdistance(0, y, 0, 0, y0, 0)^2 + kz * periodicdistance(0, 0, z, 0, 0, z0)^2"
     
+    if pbc:
+        energy = "kx * periodicdistance(x, 0, 0, x0, 0, 0)^2 + ky * periodicdistance(0, y, 0, 0, y0, 0)^2 + kz * periodicdistance(0, 0, z, 0, 0, z0)^2"
+    else:
+        energy = "kx * (x - x0)^2 + ky * (y - y0)^2 + kz * (z - z0)^2"
+        
     force = openmm.CustomExternalForce(energy)
     force.name = name
 
