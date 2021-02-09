@@ -898,7 +898,7 @@ def spherical_well(
     return force
 
 
-def tether_particles(sim_object, particles, pbc=False, k=30, positions="current", name="Tethers"):
+def tether_particles(sim_object, particles, *, pbc=False, k=30, positions="current", name="Tethers"):
     """tethers particles in the 'particles' array.
     Increase k to tether them stronger, but watch the system!
 
