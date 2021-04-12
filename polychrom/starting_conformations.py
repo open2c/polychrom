@@ -102,16 +102,26 @@ def _random_points_sphere(N):
     return np.vstack([theta, u]).T
     
     
-def create_random_walk(step_size, N):
+def create_random_walk(step_size, N, repeat_step=1):
     """
-    Creates a freely joined chain of length N with step step_size 
+    Creates a freely joined chain of length N with step step_size.
+
+    Parameters
+    ----------
+    step_size: float
+        The size of a step of the random walk.
+    N : int
+        The number of steps
+    repeat_step : int
+        The number of times each step should be repeated. Default is 1.
+
     """
     
-    theta, u =  _random_points_sphere(N).T
+    theta, u =  _random_points_sphere(-(N // -repeat_step)).T
     
-    dx = step_size * np.sqrt(1.0 - u * u) * np.cos(theta)
-    dy = step_size * np.sqrt(1.0 - u * u) * np.sin(theta)
-    dz = step_size * u    
+    dx = np.repeat(step_size * np.sqrt(1.0 - u * u) * np.cos(theta), repeat_step)
+    dy = np.repeat(step_size * np.sqrt(1.0 - u * u) * np.sin(theta), repeat_step)
+    dz = np.repeat(step_size * u, repeat_step)
     
     x, y, z = np.cumsum(dx), np.cumsum(dy), np.cumsum(dz)
         
@@ -121,7 +131,8 @@ def create_random_walk(step_size, N):
 def create_constrained_random_walk(N, 
     constraint_f, 
     starting_point = (0, 0, 0),
-    step_size=1.0
+    step_size=1.0,
+    repeat_step=1
     ):
     """
     Creates a constrained freely joined chain of length N with step step_size.
@@ -141,9 +152,11 @@ def create_constrained_random_walk(N,
         The starting point of a random walk.
     step_size: float
         The size of a step of the random walk.
+    repeat_step : int
+        The number of times each step should be repeated. Default is 1.
 
     """    
-    
+
     i = 1
     j = N
     out = np.full((N, 3), np.nan)
@@ -151,10 +164,10 @@ def create_constrained_random_walk(N,
     
     while i < N:
         if j == N:
-            theta, u = _random_points_sphere(N).T        
-            dx = step_size * np.sqrt(1.0 - u * u) * np.cos(theta)
-            dy = step_size * np.sqrt(1.0 - u * u) * np.sin(theta)
-            dz = step_size * u
+            theta, u = _random_points_sphere(-(N // -repeat_step)).T        
+            dx = np.repeat(step_size * np.sqrt(1.0 - u * u) * np.cos(theta), repeat_step)
+            dy = np.repeat(step_size * np.sqrt(1.0 - u * u) * np.sin(theta), repeat_step)
+            dz = np.repeat(step_size * u, repeat_step)
             d = np.vstack([dx, dy, dz]).T
             j = 0
     
