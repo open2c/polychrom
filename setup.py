@@ -8,6 +8,8 @@ from Cython.Build import cythonize
 
 import numpy
 
+INSTALL_DEPS_PATH = 'requirements.txt'
+
 cmdclass = {}
 
 def _read(*parts, **kwargs):
@@ -61,6 +63,9 @@ setup(
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     packages=find_packages(),
+    install_requires=get_requirements(INSTALL_DEPS_PATH),
+    tests_require=['pytest'],
+    setup_requires=['wheel'],
     entry_points={
         'console_scripts': [
              'polychrom = polychrom.cli:cli',
