@@ -11,16 +11,15 @@ import polychrom
 from polychrom import simulation, starting_conformations, forces, forcekits
 import simtk.openmm as openmm
 import os
-from polychrom.hdf5_format import HDF5Reporter
+from polychrom.storage import HDF5Reporter
 
 N=10000
 
 reporter = HDF5Reporter(folder="trajectory", max_data_length=5, overwrite=True)
 sim = simulation.Simulation(
-    platform="CUDA", 
+    platform="reference", 
     integrator="variableLangevin",
     error_tol=0.003,
-    GPU="0",
     collision_rate=0.03,
     N=N,
     save_decimals=2,

@@ -20,7 +20,7 @@ The following are required before installing polychrom:
 * `cython`
 * OpenMM
 
-Polychrom requires OpenMM, whcih we currently recommend installing via conda: ``conda install -c omnia openmm``. 
+Polychrom requires OpenMM, which we currently recommend installing via conda: ```conda install -c omnia openmm``` 
 See http://docs.openmm.org/latest/userguide/application.html#installing-openmm. 
 In our experience, adding ``-c conda-forge`` listed in the link above is optional. 
 CUDA is the fastest GPU-assisted backend to OpenMM. To use this feature with polychrom, see OpenMM CUDA installation instructions. 
