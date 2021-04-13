@@ -53,7 +53,7 @@ import random
 import ctypes
 import multiprocessing as mp
 from contextlib import closing
-from . import polymerutils
+from . import storage
 import warnings
 from . import polymer_analyses
 
@@ -473,7 +473,7 @@ def monomerResolutionContactMap(
     cutoff=5,
     n=8,  # Num threads
     contactFinder=polymer_analyses.calculate_contacts,
-    loadFunction=polymerutils.load,
+    loadFunction=storage.load,
     exceptionsToIgnore=[],
     useFmap=False,
 ):
@@ -498,7 +498,7 @@ def binnedContactMap(
     cutoff=5,
     n=8,  # Num threads
     contactFinder=polymer_analyses.calculate_contacts,
-    loadFunction=polymerutils.load,
+    loadFunction=storage.load,
     exceptionsToIgnore=None,
     useFmap=False,
 ):
@@ -616,7 +616,7 @@ def monomerResolutionContactMapSubchains(
     cutoff=5,
     n=8,  # Num threads
     method=polymer_analyses.calculate_contacts,
-    loadFunction=polymerutils.load,
+    loadFunction=storage.load,
     exceptionsToIgnore=[],
     useFmap=False,
 ):

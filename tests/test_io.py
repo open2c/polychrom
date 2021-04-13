@@ -1,6 +1,6 @@
 import polychrom.starting_conformations
-import polychrom.forces, polychrom.forcekits, polychrom.polymerutils
-from polychrom.hdf5_format import HDF5Reporter, list_URIs, load_URI
+import polychrom.forces, polychrom.forcekits
+from polychrom.storage import HDF5Reporter, list_URIs, load_URI
 from polychrom.simulation import Simulation
 import numpy as np
 
@@ -60,7 +60,7 @@ def test_basic_simulation_and_hdf5(tmp_path):
 
     assert np.abs(d1["pos"] - d1_direct).max() <= 0.0051
 
-    d1_fetch = polychrom.polymerutils.fetch_block(tmp_path, 1)
+    d1_fetch = polychrom.storage.fetch_block(tmp_path, 1)
     assert np.allclose(d1["pos"], d1_fetch)
 
     assert np.allclose(d1["spam"], [1, 2, 3])  # spam got saved correctly

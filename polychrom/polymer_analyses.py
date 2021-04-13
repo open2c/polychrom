@@ -285,6 +285,19 @@ def R2_scaling(data, bins=None, ring=False):
             rads[i] = np.mean((np.sum((data[:, :-length] - data[:, length:]) ** 2, 0)))
     return np.array(bins), rads
 
+def rotation_matrix(rotate):
+    """Calculates rotation matrix based on three rotation angles (tx, ty, tz)"""
+    tx, ty, tz = rotate
+    Rx = np.array(
+        [[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]]
+    )
+    Ry = np.array(
+        [[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]]
+    )
+    Rz = np.array(
+        [[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]]
+    )
+    return np.dot(Rx, np.dot(Ry, Rz))
 
 def Rg2(data):
     """

@@ -13,9 +13,8 @@ import numpy as np
 
 from math import sqrt
 import sys
-from polychrom.polymerutils import load
+from polychrom.storage import load
 import warnings
-import polychrom.polymerutils as polymerutils
 import time
 from scipy.spatial import ckdtree
 from polychrom.polymer_analyses import calculate_contacts as giveContacts

@@ -1,3 +1,37 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+"""
+Storage New-style HDF5 trajectories 
+===========================
+
+This module contains functions for working with hdf5 trajectories, as well as 
+backwards-compatatible functions for loading individual conformations.
+
+A typical workflow with the new-style trajectories should be: 
+
+.. code-block:: python
+
+    URIs = polychrom.hdf5_format.list_URIs(folder)
+    for URI in URIs:
+        data = polychrom.hdf5_format.load_URI(URI)
+        xyz = data["pos"] 
+
+
+"""
+
+import numpy as np
+import warnings
+import h5py
+import glob
+import os
+
+import six
+import joblib
+
+
+DEFAULT_OPTS = {"compression_opts": 9, "compression": "gzip"}
+
+
 """
 New-style HDF5 trajectories 
 ===========================
@@ -47,32 +81,34 @@ The HDF5 reporter used here saves everything into an HDF5 file. For anything exc
 Multi-stage simulations or loop extrusion
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We frequently have simulations in which a simulation object changes. One example would be changing forces or parameters throughout the simulation. Another example would be loop extrusion simulations. 
+We frequently have simulations in which a simulation object changes. 
+One example would be changing forces or parameters throughout the simulation. 
+Another example would be loop extrusion simulations. 
 
-In this design, a reporter object can be reused and passed to a new simulation. This would keep counter of conformations, and also save applied forces etc. again. The reporter would create a file "applied_forces_0.h5" the first time it receives forces, and "applied_forces_1.h5" the second time it receives forces from a simulation. Setting `reporter.blocks_only=True` would stop the reporter from saving anything but blocks, which may be helpful for making loop extrusion conformations. This is currently implemented in the examples
+In this design, a reporter object can be reused and passed to a new simulation. 
+This would keep counter of conformations, and also save applied forces etc. again. 
+The reporter would create a file "applied_forces_0.h5" the first time it receives forces, 
+and "applied_forces_1.h5" the second time it receives forces from a simulation. 
+Setting `reporter.blocks_only=True` would stop the reporter from saving anything but blocks, 
+which may be helpful for making loop extrusion conformations. 
+This is currently implemented in the examples
 
 
 URIs to identify individual conformations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Because we're saving several conformations into one file, we designed an URI format to quickly fetch a conformation by a unique identifyer. 
+Because we save multiple conformations into one hdf5 file, we designed an URI format to 
+quickly fetch a conformation by a unique identifier. 
 
-URIs are like that: `/path/to/the/trajectory/blocks_1-50.h5::42` 
-
-This URI will fetch block #42 from a file blocks_1-50.h5, which contains blocks 1 through 50 including 1 and 50
-:py:func:`polychrom.polymerutils.load` function is compatible with URIs 
-Also, to make it easy to load both old-style filenames and new-style URIs, there is a function :py:func:`polychrom.polymerutils.fetch_block`. fetch_block will autodetermine the type of a trajectory folder. So it will fetch both `/path/to/the/trajectory/block42.dat` and  `/path/to/the/trajectory/blocks_x-y.h5::42` automatically 
+For example, the URI: `/path/to/the/trajectory/blocks_1-50.h5::42` will fetch block #42 
+from a file blocks_1-50.h5, which contains blocks 1 through 50 including 1 and 50.
+:py:func:`polychrom.storage.load` function is compatible with URIs 
+Also, to make it easy to load both old-style filenames and new-style URIs, 
+there is a function :py:func:`polychrom.storage.fetch_block`. 
+`fetch_block` will autodetermine the type of a trajectory folder, and can automatically fetch either 
+`/path/to/the/trajectory/block42.dat` or `/path/to/the/trajectory/blocks_x-y.h5::42`.
 
 """
-import numpy as np
-import warnings
-import h5py
-import glob
-import os
-
-DEFAULT_OPTS = {"compression_opts": 9, "compression": "gzip"}
-
-
 def _read_h5_group(gr):
     """
     Reads all attributes of an HDF5 group, and returns a dict of them
@@ -430,3 +466,198 @@ class HDF5Reporter(object):
                     gr = file.create_group(str(count))
                     _write_group(values, gr, dset_opts=self.h5py_dset_opts)
             self.datas = {}
+
+
+
+"""
+Loading and saving individual conformations
+===========================================
+
+While saving and loading trajectories should generally be done using the hdf5 
+format described above, polychrom also has utilites for working with other formats.
+
+For projects using both old-style (openmm-polymer) and new-style (polychrom) trajectories, 
+the function :py:func:`polychrom.storage.fetch_block` provides a unified interface for 
+fetching a conformation from either format. Note, however, that it is not the fastest way 
+to iterate over conformations in the new-style trajectory, and the 
+:py:func:`polychrom.storage.list_URIs` is faster. 
+
+"""
+
+
+def load(filename):
+    """Universal load function for any type of data file It always returns just XYZ
+    positions - use fetch_block or hdf5_format.load_URI for loading the whole metadata
+    
+    Accepted file types
+    -------------------
+    
+    New-style URIs (HDF5 based storage)
+    
+    Text files in openmm-polymer format
+    joblib files in openmm-polymer format 
+    
+    Parameters
+    ----------
+    
+    filename: str 
+        filename to load or a URI
+
+    """
+    if "::" in filename:
+        return load_URI(filename)["pos"]
+
+    if not os.path.exists(filename):
+        raise IOError("File not found :( \n %s" % filename)
+
+    try:  # loading from a joblib file here
+        return dict(joblib.load(filename)).pop("data")
+    except:  # checking for a text file
+        data_file = open(filename)
+        line0 = data_file.readline()
+        try:
+            N = int(line0)
+        except (ValueError, UnicodeDecodeError):
+            raise TypeError("Could not read the file. Not text or joblib.")
+        data = [list(map(float, i.split())) for i in data_file.readlines()]
+
+        if len(data) != N:
+            raise ValueError("N does not correspond to the number of lines!")
+        return np.array(data)
+
+
+def fetch_block(folder, ind, full_output=False):
+    """
+    A more generic function to fetch block number "ind" from a trajectory in a folder
+    
+    
+    This function is useful both if you want to load both "old style" trajectories (block1.dat), 
+    and "new style" trajectories ("blocks_1-50.h5")
+    
+    It will be used in files "show" 
+    
+    Parameters
+    ----------
+    
+        folder: str, folder with a trajectory
+
+        ind: str or int, number of a block to fetch 
+        
+        full_output: bool (default=False)
+            If set to true, outputs a dict with positions, eP, eK, time etc. 
+            if False, outputs just the conformation
+            (relevant only for new-style URIs, so default is False) 
+    
+    Returns
+    -------
+        data, Nx3 numpy array     
+        
+        if full_output==True, then dict with data and metadata; XYZ is under key "pos"
+    """
+    blocksh5 = glob.glob(os.path.join(folder, "blocks*.h5"))
+    blocksdat = glob.glob(os.path.join(folder, "block*.dat"))
+    ind = int(ind)
+    if (len(blocksh5) > 0) and (len(blocksdat) > 0):
+        raise ValueError("both .h5 and .dat files found in folder - exiting")
+    if (len(blocksh5) == 0) and (len(blocksdat) == 0):
+        raise ValueError("no blocks found")
+
+    if len(blocksh5) > 0:
+        fnames = [os.path.split(i)[-1] for i in blocksh5]
+        inds = [i.split("_")[-1].split(".")[0].split("-") for i in fnames]
+        exists = [(int(i[0]) <= ind) and (int(i[1]) >= ind) for i in inds]
+
+        if True not in exists:
+            raise ValueError(f"block {ind} not found in files")
+        if exists.count(True) > 1:
+            raise ValueError("Cannot find the file uniquely: names are wrong")
+        pos = exists.index(True)
+        block = load_URI(blocksh5[pos] + f"::{ind}")
+        if not full_output:
+            block = block["pos"]
+
+    if len(blocksdat) > 0:
+        block = load(os.path.join(folder, f"block{ind}.dat"))
+    return block
+
+
+def save(data, filename, mode="txt", pdbGroups=None):
+    """
+    Basically unchanged polymerutils.save function from openmm-polymer
+    
+    It can save into txt or joblib formats used by old openmm-polymer
+    
+    It is also very useful for saving files to PDB format to make them compatible
+    with nglview, pymol_show and others
+    """
+    data = np.asarray(data, dtype=np.float32)
+
+    if mode.lower() == "joblib":
+        joblib.dump({"data": data}, filename=filename, compress=9)
+        return
+
+    if mode.lower() == "txt":
+        lines = [str(len(data)) + "\n"]
+
+        for particle in data:
+            lines.append("{0:.3f} {1:.3f} {2:.3f}\n".format(*particle))
+        if filename == None:
+            return lines
+
+        elif isinstance(filename, six.string_types):
+            with open(filename, "w") as myfile:
+                myfile.writelines(lines)
+        elif hasattr(filename, "writelines"):
+            filename.writelines(lines)
+        else:
+            raise ValueError("Not sure what to do with filename {0}".format(filename))
+
+    elif mode == "pdb":
+        data = (
+            data - np.minimum(np.min(data, axis=0), np.zeros(3, float) - 100)[None, :]
+        )
+        retret = ""
+
+        def add(st, n):
+            if len(st) > n:
+                return st[:n]
+            else:
+                return st + " " * (n - len(st))
+
+        if pdbGroups == None:
+            pdbGroups = ["A" for i in range(len(data))]
+        else:
+            pdbGroups = [str(int(i)) for i in pdbGroups]
+
+        for i, line, group in zip(list(range(len(data))), data, pdbGroups):
+            atomNum = (i + 1) % 9000
+            segmentNum = (i + 1) // 9000 + 1
+            line = [float(j) for j in line]
+            ret = add("ATOM", 6)
+            ret = add(ret + "{:5d}".format(atomNum), 11)
+            ret = ret + " "
+            ret = add(ret + "CA", 17)
+            ret = add(ret + "ALA", 21)
+            ret = add(ret + group[0], 22)
+            ret = add(ret + str(atomNum), 26)
+            ret = add(ret + "         ", 30)
+            # ret = add(ret + "%i" % (atomNum), 30)
+            ret = add(ret + ("%8.3f" % line[0]), 38)
+            ret = add(ret + ("%8.3f" % line[1]), 46)
+            ret = add(ret + ("%8.3f" % line[2]), 54)
+            ret = add(ret + (" 1.00"), 61)
+            ret = add(ret + str(float(i % 8 > 4)), 67)
+            ret = add(ret, 73)
+            ret = add(ret + str(segmentNum), 77)
+            retret += ret + "\n"
+        with open(filename, "w") as f:
+            f.write(retret)
+            f.flush()
+    elif mode == "pyxyz":
+        with open(filename, "w") as f:
+            for i in data:
+                filename.write("C {0} {1} {2}".format(*i))
+
+    else:
+        raise ValueError("Unknown mode : %s, use h5dict, joblib, txt or pdb" % mode)
+

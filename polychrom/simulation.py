@@ -15,7 +15,7 @@ Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This inc
 
 * Platform (cuda (usually), opencl, or CPU (slow)) 
 * GPU index
-* reporter (where to save results): see :py:mod`polychrom.hdf5_reporter`
+* reporter (where to save results): see :py:class`polychrom.storage.HDF5Reporter`
 
 **Parameters affecting the simulation**
 
