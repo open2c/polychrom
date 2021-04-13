@@ -1,19 +1,20 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 """
-Storage New-style HDF5 trajectories 
+Storage 
 ===========================
 
-This module contains functions for working with hdf5 trajectories, as well as 
-backwards-compatatible functions for loading individual conformations.
+This module contains functions for working with polychrom (hdf5) trajectories, 
+as well as backwards-compatatible functions for loading individual conformations
+saved with the previous openmm-polymer formats (joblib and text).
 
-A typical workflow with the new-style trajectories should be: 
+A typical workflow for polychrom trajectories should be: 
 
 .. code-block:: python
 
-    URIs = polychrom.hdf5_format.list_URIs(folder)
+    URIs = polychrom.storage.list_URIs(folder)
     for URI in URIs:
-        data = polychrom.hdf5_format.load_URI(URI)
+        data = polychrom.storage.load_URI(URI)
         xyz = data["pos"] 
 
 
@@ -33,7 +34,7 @@ DEFAULT_OPTS = {"compression_opts": 9, "compression": "gzip"}
 
 
 """
-New-style HDF5 trajectories 
+Polychrom HDF5 trajectories 
 ===========================
 
 
@@ -103,8 +104,9 @@ quickly fetch a conformation by a unique identifier.
 For example, the URI: `/path/to/the/trajectory/blocks_1-50.h5::42` will fetch block #42 
 from a file blocks_1-50.h5, which contains blocks 1 through 50 including 1 and 50.
 :py:func:`polychrom.storage.load` function is compatible with URIs 
-Also, to make it easy to load both old-style filenames and new-style URIs, 
-there is a function :py:func:`polychrom.storage.fetch_block`. 
+
+Also, to make it easy to load both old (opemm-polymer) filenames and new (polyhchrom) URIs, 
+polychrom provides :py:func:`polychrom.storage.fetch_block`. 
 `fetch_block` will autodetermine the type of a trajectory folder, and can automatically fetch either 
 `/path/to/the/trajectory/block42.dat` or `/path/to/the/trajectory/blocks_x-y.h5::42`.
 
@@ -473,13 +475,13 @@ class HDF5Reporter(object):
 Loading and saving individual conformations
 ===========================================
 
-While saving and loading trajectories should generally be done using the hdf5 
+While saving and loading trajectories should generally be done using the polychrom hdf5 
 format described above, polychrom also has utilites for working with other formats.
 
-For projects using both old-style (openmm-polymer) and new-style (polychrom) trajectories, 
+For projects using a mix of old-style (openmm-polymer) and new-style (polychrom) trajectories, 
 the function :py:func:`polychrom.storage.fetch_block` provides a unified interface for 
 fetching a conformation from either format. Note, however, that it is not the fastest way 
-to iterate over conformations in the new-style trajectory, and the 
+to iterate over conformations in the polychrom hdf5 trajectory format, and the 
 :py:func:`polychrom.storage.list_URIs` is faster. 
 
 """
@@ -487,12 +489,12 @@ to iterate over conformations in the new-style trajectory, and the
 
 def load(filename):
     """Universal load function for any type of data file It always returns just XYZ
-    positions - use fetch_block or hdf5_format.load_URI for loading the whole metadata
+    positions - use `fetch_block` or `load_URI` for loading the whole metadata
     
     Accepted file types
     -------------------
     
-    New-style URIs (HDF5 based storage)
+    Polychrom URIs (HDF5 based storage)
     
     Text files in openmm-polymer format
     joblib files in openmm-polymer format 
@@ -531,10 +533,10 @@ def fetch_block(folder, ind, full_output=False):
     A more generic function to fetch block number "ind" from a trajectory in a folder
     
     
-    This function is useful both if you want to load both "old style" trajectories (block1.dat), 
-    and "new style" trajectories ("blocks_1-50.h5")
+    This function is useful both if you want to load both old (openmm-polymer) 
+    trajectories (e.g. 'block1.dat'), and new (polychrom hdf5) trajectories (e.g.'blocks_1-50.h5')
     
-    It will be used in files "show" 
+    It is also used in files for displaying conformations (i.e. "*_show") 
     
     Parameters
     ----------
@@ -546,7 +548,7 @@ def fetch_block(folder, ind, full_output=False):
         full_output: bool (default=False)
             If set to true, outputs a dict with positions, eP, eK, time etc. 
             if False, outputs just the conformation
-            (relevant only for new-style URIs, so default is False) 
+            (relevant only for polychrom URIs, so default is False) 
     
     Returns
     -------
