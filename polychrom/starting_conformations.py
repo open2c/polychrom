@@ -100,8 +100,18 @@ def _random_points_sphere(N):
     u = 2.0 * u - 1.0
     
     return np.vstack([theta, u]).T
-    
-    
+
+def _gen_random_points_sphere(buffer_size=100):
+    """
+    Generator which will yield an infinite sequence of random points on a sphere.
+    Points are generated in batches of buffer_size.
+    """
+    points = np.array([])
+
+    while True:
+        points = _random_points_sphere(buffer_size)
+        yield from points
+
 def create_random_walk(step_size, N, repeat_step=1):
     """
     Creates a freely joined chain of length N with step step_size.
@@ -155,32 +165,26 @@ def create_constrained_random_walk(N,
     repeat_step : int
         The number of times each step should be repeated. Default is 1.
 
-    """    
-
-    i = 1
-    j = N
+    """
+    
     out = np.full((N, 3), np.nan)
     out[0] = starting_point
     
-    while i < N:
-        if j == N:
-            theta, u = _random_points_sphere(-(N // -repeat_step)).T        
-            dx = np.repeat(step_size * np.sqrt(1.0 - u * u) * np.cos(theta), repeat_step)
-            dy = np.repeat(step_size * np.sqrt(1.0 - u * u) * np.sin(theta), repeat_step)
-            dz = np.repeat(step_size * u, repeat_step)
-            d = np.vstack([dx, dy, dz]).T
-            j = 0
+    i = 1
+    for theta, u in _gen_random_points_sphere(-(N // -repeat_step)):
+        if i == N:
+            return out
+
+        dx = np.repeat(step_size * np.sqrt(1.0 - u * u) * np.cos(theta), repeat_step)
+        dy = np.repeat(step_size * np.sqrt(1.0 - u * u) * np.sin(theta), repeat_step)
+        dz = np.repeat(step_size * u, repeat_step)
+        d = np.vstack([dx, dy, dz]).T
+
+        new_p = out[i - 1] + d
     
-        new_p = out[i-1] + d[j]
-        
         if constraint_f(new_p):
             out[i] = new_p
             i += 1
-        
-        j += 1
-        
-    return out
-
 
 def grow_cubic(N, boxSize, method="standard"):
     """
