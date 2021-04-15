@@ -373,7 +373,7 @@ class HDF5Reporter(object):
             self.folder
         )  # some heuristics to infer values of counters - not crucial but maybe useful
         for prefix in self.prefixes:
-            if prefix is not "data":
+            if prefix !=  "data":
                 myfiles = [i for i in files if i.startswith(prefix)]
                 inds = []
                 for i in myfiles:
