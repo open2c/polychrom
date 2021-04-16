@@ -97,7 +97,7 @@ def _spherical_to_cartesian(u, theta):
     y = np.sqrt(1.0 - u**2) * np.sin(theta)
     z = u
 
-    return x, y, z
+    return np.vstack((x, y, z))
 
 
 def _random_points_sphere(N):
@@ -114,7 +114,6 @@ def _gen_random_points_sphere(buffer_size=100):
     Generator which will yield an infinite sequence of random points on a sphere.
     Points are generated in batches of buffer_size.
     """
-    points = np.array([])
 
     while True:
         points = _random_points_sphere(buffer_size)
@@ -135,8 +134,8 @@ def create_random_walk(step_size, N, segment_size=1):
 
     """
     
-    theta, u =  _random_points_sphere(-(N // -segment_size)).T
-    dx, dy, dz = (np.repeat(step_size * p, segment_size) for p in _spherical_to_cartesian(u, theta))
+    theta, u = _random_points_sphere(-(N // -segment_size)).T
+    dx, dy, dz = np.repeat(step_size * _spherical_to_cartesian(u, theta), segment_size, axis=1)
     x, y, z = np.cumsum(dx), np.cumsum(dy), np.cumsum(dz)
         
     return np.vstack([x, y, z]).T[:N]
