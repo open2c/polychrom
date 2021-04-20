@@ -203,6 +203,23 @@ def contact_scaling(data, bins0=None, cutoff=1.1, integrate=False, ring=False):
     return a, connumbers
 
 
+
+def slope_contact_scaling(mids, cp, sigma=2):
+    
+    smooth=lambda x: gaussian_filter1d(x, sigma)
+    
+    # P(s) has to be smoothed in logspace, and both P and s have to be smoothed. 
+    # It is discussed in detail here
+    # https://gist.github.com/mimakaev/4becf1310ba6ee07f6b91e511c531e73
+    
+    # Values sigma=1.5-2 look reasonable for reasonable simulations
+    
+    slope = np.diff(smooth(np.log(cp))) / np.diff(
+            smooth(np.log(mids)))
+    
+    return mids[1:], slope
+
+
 def Rg2_scaling(data, bins=None, ring=False):
     """Calculates average gyration radius of subchains a function of s
     
