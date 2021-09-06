@@ -21,6 +21,7 @@ import numpy as np
 from . import forces
 
 
+
 def polymer_chains(
     sim_object,
     chains=[(0, None, False)],
@@ -63,7 +64,7 @@ def polymer_chains(
 
     force_list = []
 
-    bonds = extra_bonds if extra_bonds else []
+    bonds = [] if ((extra_bonds is None) or len(extra_bonds) == 0) else [tuple(b) for b in extra_bonds]
     triplets = extra_triplets if extra_triplets else []
     newchains = []
 
@@ -118,15 +119,19 @@ def polymer_chains(
                 for pair in exc:
                     nb_force.addException(int(pair[0]), int(pair[1]), 0, 0, 0, True)
 
+                num_exc = nb_force.getNumExceptions()
+
             # The built-in LJ nonbonded force uses "exclusions" instead of "exceptions"
             elif hasattr(nb_force, "addExclusion"):
                 print(
                     "Exclude neighbouring chain particles from {}".format(nb_force.name)
                 )
-                for pair in exc:
-                    nb_force.addExclusion(int(pair[0]), int(pair[1]))
+                nb_force.createExclusionsFromBonds([(int(b[0]), int(b[1])) for b in bonds], int(except_bonds))
+                    # for pair in exc:
+                    #     nb_force.addExclusion(int(pair[0]), int(pair[1]))
+                num_exc = nb_force.getNumExclusions()
 
-            print("Number of exceptions:", len(bonds))
+            print("Number of exceptions:", num_exc)
 
         force_list.append(nb_force)
 
