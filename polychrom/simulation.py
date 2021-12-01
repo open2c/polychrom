@@ -345,7 +345,7 @@ class Simulation(object):
 
         # adding PBC
         self.PBC = False
-        if kwargs["PBCbox"] is not False:
+        if kwargs["PBCbox"]:
             self.PBC = True
             PBCbox = np.array(kwargs["PBCbox"])
             self.system.setDefaultPeriodicBoxVectors(
