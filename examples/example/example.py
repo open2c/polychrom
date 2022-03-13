@@ -9,7 +9,7 @@ In this simulation, a simple polymer chain of 10,000 monomers is
 import os, sys
 import polychrom
 from polychrom import simulation, starting_conformations, forces, forcekits
-import simtk.openmm as openmm
+import openmm
 import os
 from polychrom.hdf5_format import HDF5Reporter
 
