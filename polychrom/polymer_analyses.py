@@ -41,7 +41,7 @@ from math import sqrt
 import numpy as np
 import pandas as pd
 
-from scipy.spatial import ckdtree
+from scipy.spatial import cKDTree
 
 try:
     from . import _polymer_math
@@ -69,7 +69,7 @@ def calculate_contacts(data, cutoff=1.7):
     if np.isnan(data).any():
         raise RuntimeError("Data contains NANs")
 
-    tree = ckdtree.cKDTree(data)
+    tree = cKDTree(data)
     pairs = tree.query_pairs(cutoff, output_type="ndarray")
     return pairs
 
@@ -590,7 +590,7 @@ def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_si
     chain_end = chains[chain_id][1]
     
     # all contact pairs available in the scaled data
-    tree = ckdtree.cKDTree(data_scaled, boxsize=box_size)
+    tree = cKDTree(data_scaled, boxsize=box_size)
     pairs = tree.query_pairs(cutoff, output_type="ndarray")
     
     # total number of contacts of the marked chain:
@@ -599,7 +599,7 @@ def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_si
     all_signal = len(pairs[pairs<chain_end])-len(pairs[pairs<chain_start])
     
     # contact pairs of the marked chain with itself
-    tree = ckdtree.cKDTree(data[chain_start:chain_end], boxsize=None)
+    tree = cKDTree(data[chain_start:chain_end], boxsize=None)
     pairs = tree.query_pairs(cutoff, output_type="ndarray")
     
     # doubled number of contacts of the marked chain with itself (i.e. cis signal)
