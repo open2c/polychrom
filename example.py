@@ -7,15 +7,17 @@ In this simulation, a simple polymer chain of 10,000 monomers is
 
 
 import os, sys
-sys.path.append("/home/dkannan/git-remotes/polychrom/")
 import polychrom
 from polychrom import simulation, starting_conformations, forces, forcekits
 import openmm
 from polychrom.hdf5_format import HDF5Reporter
 
 N=10000
+density = 0.224
+r = (3 * N / (4 * 3.141592 * density)) ** (1/3)
+print(f"Radius of confinement: {r}")
 
-reporter = HDF5Reporter(folder="trajectory", max_data_length=5, overwrite=True)
+reporter = HDF5Reporter(folder="simulations/self-avoidance", max_data_length=100, overwrite=True)
 sim = simulation.Simulation(
     platform="CUDA", 
     integrator="variableLangevin",
@@ -28,11 +30,11 @@ sim = simulation.Simulation(
     reporters=[reporter],
 )
 
-polymer = starting_conformations.grow_cubic(10000, 100)
+polymer = starting_conformations.grow_cubic(10000, 24)
 
 sim.set_data(polymer, center=True)  # loads a polymer, puts a center of mass at zero
 
-sim.add_force(forces.spherical_confinement(sim, density=0.85, k=1))
+sim.add_force(forces.spherical_confinement(sim, density=0.224, k=5.0))
 
 sim.add_force(
     forcekits.polymer_chains(
@@ -62,8 +64,8 @@ sim.add_force(
 )
 
 
-for _ in range(10):  # Do 10 blocks
-    sim.do_block(100)  # Of 100 timesteps each. Data is saved automatically. 
+for _ in range(35000):  # Do 10 blocks
+    sim.do_block(1)  # Of 100 timesteps each. Data is saved automatically. 
 sim.print_stats()  # In the end, print very simple statistics
 
 reporter.dump_data()  # always need to run in the end to dump the block cache to the disk

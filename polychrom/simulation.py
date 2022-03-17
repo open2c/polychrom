@@ -90,7 +90,7 @@ import warnings
 
 from collections.abc import Iterable
 
-import simtk.openmm as openmm
+import openmm
 import simtk.unit
 
 from . import forces
