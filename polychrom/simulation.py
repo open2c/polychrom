@@ -382,7 +382,7 @@ class Simulation(object):
         Parameters
         ----------
 
-        data : Nx3 array-line
+        data : Nx3 array-like
             Array of positions 
 
         center : bool or "zero", optional
@@ -431,6 +431,31 @@ class Simulation(object):
 
         if hasattr(self, "context"):
             self.init_positions()
+
+    def set_velocities(self, v):
+        """ Set initial velocities of particles. 
+        
+        Parameters
+        ----------
+        v : (N, 3) array-like
+            initial x, y, z velocities of the N particles
+        """
+
+        v = np.asarray(v, dtype="float")
+        if len(v) != self.N:
+            raise ValueError(f"length of velocity array, {len(v)} does not match N, {self.N}")
+
+        if v.shape[1] != 3:
+            raise ValueError(
+                "Data is not shaped correctly. Needs (N,3), provided: {0}".format(
+                    v.shape
+                )
+            )
+        if np.isnan(v).any():
+            raise ValueError("Data contains NANs")
+        self.velocities = simtk.unit.Quantity(v, simtk.unit.nanometer/simtk.unit.picosecond)
+        if hasattr(self, "context"):
+            self.init_velocities()
 
     def RG(self):
         """
@@ -523,12 +548,31 @@ class Simulation(object):
         self.init_velocities()
         self.forces_applied = True
 
+    def initialize(self, **kwargs):
+        """ Initialize, particles, velocities for the first time.
+        Only need to use this function if your system has no forces (free Brownian particles).
+        Otherwise _apply_force() will execute these lines to add particles to the system,
+        initialize their positions/velocities, initialize the context.
+        """
+        
+        self.masses = np.zeros(self.N, dtype=float) + self.kwargs["mass"]
+        for mass in self.masses:
+            self.system.addParticle(mass)
+        self.context = openmm.Context(
+            self.system, self.integrator, self.platform, self.properties
+        )
+        self.init_positions()
+        self.init_velocities(**kwargs)
+
     def init_velocities(self, temperature="current"):
         """Initializes particles velocities
 
         Parameters
         ----------
-        temperature: temperature to set velocities (default: temerature of the simulation)        
+        temperature: temperature to set velocities (default: temerature of the simulation)
+        v: (N,) array-like
+            Vector of initial velocities for the N particles. If None, velocities are chosen
+            from a Boltzmann distribution at a given temperature.
         """
         try:
             self.context
@@ -537,9 +581,12 @@ class Simulation(object):
                 "No context, cannot set velocs." "Initialize context before that"
             )
 
+        if hasattr(self, "velocities"):
+            self.context.setVelocities(self.velocities)
+            return
+
         if temperature == "current":
             temperature = self.temperature
-
         self.context.setVelocitiesToTemperature(temperature)
 
     def init_positions(self):
@@ -553,7 +600,6 @@ class Simulation(object):
             raise ValueError(
                 "No context, cannot set positions." " Initialize context before that"
             )
-
         self.context.setPositions(self.data)
         eP = (
             self.context.getState(getEnergy=True).getPotentialEnergy()
@@ -684,7 +730,14 @@ class Simulation(object):
                 logging.info("applying forces")
                 sys.stdout.flush()
             self._apply_forces()
+            #self.initialize(v=v)
             self.forces_applied = True
+        
+        #self.state = self.context.getState(
+        #    getPositions=True, getVelocities=get_velocities, getEnergy=True
+        #)
+        #velocities = self.state.getVelocities(asNumpy=True)
+        #print(velocities)
 
         a = time.time()
         self.integrator.step(steps)  # integrate!
@@ -692,7 +745,6 @@ class Simulation(object):
         self.state = self.context.getState(
             getPositions=True, getVelocities=get_velocities, getEnergy=True
         )
-
         b = time.time()
         coords = self.state.getPositions(asNumpy=True)
         newcoords = coords / simtk.unit.nanometer
@@ -717,8 +769,8 @@ class Simulation(object):
 
         if np.isnan(newcoords).any():
             raise IntegrationFailError("Coordinates are NANs")
-        if eK > self.eK_critical:
-            raise EKExceedsError("Ek={1} exceeds {0}".format(self.eK_critical, eK))
+        #if eK > self.eK_critical:
+        #    raise EKExceedsError("Ek={1} exceeds {0}".format(self.eK_critical, eK))
         if (np.isnan(eK)) or (np.isnan(eP)):
             raise IntegrationFailError("Energy is NAN)")
         if check_fail:

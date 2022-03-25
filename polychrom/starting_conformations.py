@@ -191,7 +191,7 @@ def grow_cubic(N, boxSize, method="standard"):
 
     """
     if N > boxSize ** 3:
-        raise ValueError("Steps ahs to be less than size^3")
+        raise ValueError("Steps has to be less than size^3")
     if N > 0.9 * boxSize ** 3:
         warnings.warn("N > 0.9 * boxSize**3. It will be slow")
     if (N % 2 != 0) and (method != "linear"):
