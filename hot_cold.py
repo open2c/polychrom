@@ -16,17 +16,17 @@ from simtk import unit
 from pathlib import Path
 
 total_runs = 5000
-runs_per_gpu = total_runs // 8
+runs_per_gpu = total_runs // 4
 
-def run_sim(i, timestep=170, ntimesteps=1000, blocksize=100):
+def run_sim(i, timestep=170, ntimesteps=10000, blocksize=100):
     """ Run a single simulation on GPU i."""
     N=100
     density = 0.224
     r = (3 * N / (4 * 3.141592 * density)) ** (1/3)
     print(f"Radius of confinement: {r}")
-    D = 0.25 * np.ones((N, 3))
-    D[10:30, :] = 1.75
-    D[50:80, :] = 1.75
+    D = 0.1 * np.ones((N, 3))
+    D[10:30, :] = 1.9
+    D[50:80, :] = 1.9
     timestep = timestep 
     collision_rate = 2.0
     friction = collision_rate * (1.0/unit.picosecond)
@@ -37,8 +37,8 @@ def run_sim(i, timestep=170, ntimesteps=1000, blocksize=100):
     kT = kB * temperature * unit.kelvin
     particleD = unit.Quantity(D, kT/(friction * mass))
     integrator = ActiveBrownianIntegrator(timestep, collision_rate, particleD)
-    gpuid = f"{i % 8}"
-    traj = f"/net/dau/home/dkannan/simulations/step_7x/ensemble1000_100/run{i}"
+    gpuid = f"{i % 4}"
+    traj = f"/net/dau/home/dkannan/simulations/step_19x/ensemble10000_100/run{i}"
     Path(traj).mkdir(parents=True, exist_ok=True)
     reporter = HDF5Reporter(folder=traj, max_data_length=100, overwrite=True)
     sim = simulation.Simulation(
@@ -92,5 +92,5 @@ def run_sim(i, timestep=170, ntimesteps=1000, blocksize=100):
 if __name__ == '__main__':
     #run 8 simulations, one on each gpu, for the same parameters
     #run_sim(1)
-    for i in range(4, 4 + 8*runs_per_gpu, 8):
+    for i in range(4, 4 + 4*runs_per_gpu, 4):
         run_sim(i)
