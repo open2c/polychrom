@@ -17,7 +17,7 @@ density = 0.224
 r = (3 * N / (4 * 3.141592 * density)) ** (1/3)
 print(f"Radius of confinement: {r}")
 
-reporter = HDF5Reporter(folder="simulations/self-avoidance", max_data_length=100, overwrite=True)
+reporter = HDF5Reporter(folder="test", max_data_length=100, overwrite=True)
 sim = simulation.Simulation(
     platform="CUDA", 
     integrator="brownian",
