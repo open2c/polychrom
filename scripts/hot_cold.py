@@ -18,15 +18,19 @@ from pathlib import Path
 total_runs = 2500
 runs_per_gpu = total_runs // 2
 
-def run_sim(i, timestep=170, ntimesteps=10000, blocksize=100):
+def run_sim(gpuid, run_number, timestep=170, ntimesteps=100000, blocksize=100):
     """ Run a single simulation on GPU i."""
-    N=100
+    ids = np.load('compartment_identities.npy')
+    N=len(ids)
+    D = np.ones((N, 3))
+    D[ids==1, :] = 0.1
+    D[ids==-1, :] = 1.9
     density = 0.224
     r = (3 * N / (4 * 3.141592 * density)) ** (1/3)
     print(f"Radius of confinement: {r}")
-    D = 0.25 * np.ones((N, 3))
-    D[10:30, :] = 1.75
-    D[50:80, :] = 1.75
+    #D = 0.25 * np.ones((N, 3))
+    #D[10:30, :] = 1.75
+    #D[50:80, :] = 1.75
     timestep = timestep 
     collision_rate = 2.0
     friction = collision_rate * (1.0/unit.picosecond)
@@ -37,8 +41,8 @@ def run_sim(i, timestep=170, ntimesteps=10000, blocksize=100):
     kT = kB * temperature * unit.kelvin
     particleD = unit.Quantity(D, kT/(friction * mass))
     integrator = ActiveBrownianIntegrator(timestep, collision_rate, particleD)
-    gpuid = f"{i % 4}"
-    traj = f"/net/dau/home/dkannan/simulations/step_7x/bondWiggle0.3_ensemble10000_100/run{i}"
+    gpuid = f"{gpuid}"
+    traj = f"/net/dau/home/dkannan/simulations/comps_19x/ensemble100000_100/run{run_number}"
     Path(traj).mkdir(parents=True, exist_ok=True)
     reporter = HDF5Reporter(folder=traj, max_data_length=100, overwrite=True)
     sim = simulation.Simulation(
@@ -54,7 +58,7 @@ def run_sim(i, timestep=170, ntimesteps=10000, blocksize=100):
         reporters=[reporter],
     )
 
-    polymer = starting_conformations.grow_cubic(N, 5)
+    polymer = starting_conformations.grow_cubic(N, int(np.ceil(r)))
     sim.set_data(polymer, center=True)  # loads a polymer, puts a center of mass at zero
     sim.set_velocities(v=np.zeros((N,3)))
     sim.add_force(forces.spherical_confinement(sim, density=density, k=5.0))
@@ -68,7 +72,7 @@ def run_sim(i, timestep=170, ntimesteps=10000, blocksize=100):
             bond_force_func=forces.harmonic_bonds,
             bond_force_kwargs={
                 "bondLength": 1.0,
-                "bondWiggleDistance": 0.3,  # Bond distance will fluctuate +- 0.05 on average
+                "bondWiggleDistance": 0.1,  # Bond distance will fluctuate +- 0.05 on average
             },
             angle_force_func=None,
             angle_force_kwargs={},
@@ -91,6 +95,8 @@ def run_sim(i, timestep=170, ntimesteps=10000, blocksize=100):
 
 if __name__ == '__main__':
     #run 8 simulations, one on each gpu, for the same parameters
-    #run_sim(1)
-    for i in range(1, 1 + 2*runs_per_gpu, 2):
-        run_sim(i)
+    gpuid = int(sys.argv[0])
+    run_number = int(sys.argv[1])
+    run_sim(gpuid, run_number)
+    #for i in range(1, 1 + 2*runs_per_gpu, 2):
+    #    run_sim(i)
