@@ -15,16 +15,16 @@ from polychrom.hdf5_format import HDF5Reporter
 from simtk import unit
 from pathlib import Path
 
-total_runs = 2500
-runs_per_gpu = total_runs // 2
+total_runs = 200
+runs_per_gpu = total_runs // 4
 
-def run_sim(gpuid, run_number, timestep=170, ntimesteps=100000, blocksize=100):
+def run_sim(gpuid, run_number, timestep=170, ntimesteps=200000, blocksize=100):
     """ Run a single simulation on GPU i."""
-    ids = np.load('compartment_identities.npy')
+    ids = np.load('compartment_identities.npy')[:-1]
     N=len(ids)
     D = np.ones((N, 3))
-    D[ids==1, :] = 0.1
-    D[ids==-1, :] = 1.9
+    D[ids==1, :] = 0.18
+    D[ids==-1, :] = 1.8
     density = 0.224
     r = (3 * N / (4 * 3.141592 * density)) ** (1/3)
     print(f"Radius of confinement: {r}")
@@ -42,7 +42,7 @@ def run_sim(gpuid, run_number, timestep=170, ntimesteps=100000, blocksize=100):
     particleD = unit.Quantity(D, kT/(friction * mass))
     integrator = ActiveBrownianIntegrator(timestep, collision_rate, particleD)
     gpuid = f"{gpuid}"
-    traj = f"/net/dau/home/dkannan/simulations/comps_19x/ensemble100000_100/run{run_number}"
+    traj = f"/net/dau/home/dkannan/simulations/comps_10x/runs200000_100/run{run_number}"
     Path(traj).mkdir(parents=True, exist_ok=True)
     reporter = HDF5Reporter(folder=traj, max_data_length=100, overwrite=True)
     sim = simulation.Simulation(
@@ -95,8 +95,8 @@ def run_sim(gpuid, run_number, timestep=170, ntimesteps=100000, blocksize=100):
 
 if __name__ == '__main__':
     #run 8 simulations, one on each gpu, for the same parameters
-    gpuid = int(sys.argv[0])
-    run_number = int(sys.argv[1])
-    run_sim(gpuid, run_number)
-    #for i in range(1, 1 + 2*runs_per_gpu, 2):
-    #    run_sim(i)
+    gpuid = int(sys.argv[1])
+    #run_number = int(sys.argv[2])
+    #run_sim(gpuid, run_number)
+    for i in range(gpuid*runs_per_gpu, (gpuid + 1)*runs_per_gpu):
+        run_sim(gpuid, i)
