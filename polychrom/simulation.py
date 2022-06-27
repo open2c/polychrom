@@ -730,15 +730,8 @@ class Simulation(object):
                 logging.info("applying forces")
                 sys.stdout.flush()
             self._apply_forces()
-            #self.initialize(v=v)
             self.forces_applied = True
         
-        #self.state = self.context.getState(
-        #    getPositions=True, getVelocities=get_velocities, getEnergy=True
-        #)
-        #velocities = self.state.getVelocities(asNumpy=True)
-        #print(velocities)
-
         a = time.time()
         self.integrator.step(steps)  # integrate!
 

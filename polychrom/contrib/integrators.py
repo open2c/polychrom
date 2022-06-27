@@ -13,7 +13,7 @@ from openmmtools import utils
 from openmmtools.integrators import PrettyPrintableIntegrator
 
 class ActiveBrownianIntegrator(utils.RestorableOpenMMObject, PrettyPrintableIntegrator, mm.CustomIntegrator):
-    """ Brownian integrator with Diffusion coefficient that varies along the chain.
+    """ Brownian integrator with monomer Diffusion coefficient that varies along the chain.
 
     Parameters
     ----------
@@ -22,7 +22,7 @@ class ActiveBrownianIntegrator(utils.RestorableOpenMMObject, PrettyPrintableInte
     collision_rate : float or simtk.unit.Quantity
         friction coefficient governing collisions with solvent, in units of inverse picoseconds
     particleD: (N, 3) array-like
-        diffusion coefficients of N monomers in units of kT/(collision_rate * mass)
+        diffusion coefficients of N monomers in x,y,z directions in units of kT/(collision_rate * mass)
 
     """
     def __init__(self, timestep, collision_rate, particleD):
@@ -41,7 +41,17 @@ class ActiveBrownianIntegrator(utils.RestorableOpenMMObject, PrettyPrintableInte
 class CorrelatedNoiseIntegrator(utils.RestorableOpenMMObject, PrettyPrintableIntegrator, mm.CustomIntegrator):
     """ Brownian motion integrator with correlated noise.
     
-    rhos = desired C(i, j)
+    Parameters
+    ----------
+    timestep : float or simtk.unit.Quantity
+        time step in units of femtoseconds
+    collision_rate : float or simtk.unit.Quantity
+        friction coefficient governing collisions with solvent, in units of inverse picoseconds
+    particleD: (N, 3) array-like
+        diffusion coefficients of N monomers in units of kT/(collision_rate * mass)
+    rhos: (k, N) array-like
+        kth row contains rho, 0, or -rho to assign monomers of type 1, type 0, or type -1 for the
+        kth feature, where rho is the associated correlation coefficient
     """
     def __init__(self, timestep, collision_rate, particleD, rhos):
         super(CorrelatedNoiseIntegrator, self).__init__(timestep * unit.femtosecond)
@@ -49,17 +59,17 @@ class CorrelatedNoiseIntegrator(utils.RestorableOpenMMObject, PrettyPrintableInt
         k, N = rhos.shape #each rho is +rho, -rho, or 0
         #global variables
         self.addGlobalVariable("zeta", collision_rate *(1 / unit.picosecond))
-        self.addGlobalVariable("k", k)
+        self.addGlobalVariable("k", k) #number of features
         #per dof variables
-        self.addPerDofVariable("noise", 0)
-        self.addPerDofVariable("D", 0)
-        self.addPerDofVariable("sigma", 0)
+        self.addPerDofVariable("noise", 0) #noise term in Langevin equation
+        self.addPerDofVariable("D", 0) #monomer diffusion coefficient
+        self.addPerDofVariable("sigma", 0)#standard deviation of noise
         self.addGlobalVariable("ghostx", 0) #the ghost random variable used to correlate noise
         self.addGlobalVariable("ghosty", 0)
         self.addGlobalVariable("ghostz", 0)
-        self.addPerDofVariable("maskx", 0)
-        self.addPerDofVariable("masky", 0)
-        self.addPerDofVariable("maskz", 0)
+        self.addPerDofVariable("maskx", 0) #mask y and z directions
+        self.addPerDofVariable("masky", 0) #mask x and z directions
+        self.addPerDofVariable("maskz", 0) #mask x and y directions
         self.addPerDofVariable("xx", 0) #standard normal random variable
         
         #set variables
@@ -83,7 +93,6 @@ class CorrelatedNoiseIntegrator(utils.RestorableOpenMMObject, PrettyPrintableInt
             rho[:, 0] = rhos[i, :]
             rho[:, 1] = rhos[i, :]
             rho[:, 2] = rhos[i, :]
-            #TODO: check if rho changes upon each iteration of this for loop
             self.addPerDofVariable(f"rho{i}", 0)
             self.setPerDofVariableByName(f"rho{i}", rho)
             #create a ghost random variable -- one per spatial dimension
@@ -91,7 +100,7 @@ class CorrelatedNoiseIntegrator(utils.RestorableOpenMMObject, PrettyPrintableInt
             self.addComputeGlobal("ghosty", "gaussian")
             self.addComputeGlobal("ghostz", "gaussian")
             self.addComputePerDof("xx", "ghostx*maskx + ghosty*masky + ghostz*maskz") 
-            #different standard normal random variable
+            #draw per dof noise that is correlated with the ghost random variable
             self.addComputePerDof("noise", f"noise + sigma * (rho{i} * xx + sqrt(1 - rho{i}*rho{i})*gaussian)")
               
         #Euler Marayama
@@ -100,5 +109,5 @@ class CorrelatedNoiseIntegrator(utils.RestorableOpenMMObject, PrettyPrintableInt
         self.addComputePerDof("x1", "x + (f/(zeta*m))*dt + noise")
         self.addComputePerDof("v", "(x1 - x)/dt")
         self.addComputePerDof("x", "x1")
-        #self.addConstrainVelocities()
+        self.addConstrainVelocities()
         self.addConstrainPositions()
