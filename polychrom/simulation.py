@@ -766,8 +766,8 @@ class Simulation(object):
 
         if np.isnan(newcoords).any():
             raise IntegrationFailError("Coordinates are NANs")
-        #if eK > self.eK_critical:
-        #    raise EKExceedsError("Ek={1} exceeds {0}".format(self.eK_critical, eK))
+        if eK > self.eK_critical and self.integrator_type.lower() != "brownian":
+            raise EKExceedsError("Ek={1} exceeds {0}".format(self.eK_critical, eK))
         if (np.isnan(eK)) or (np.isnan(eP)):
             raise IntegrationFailError("Energy is NAN)")
         if check_fail:
