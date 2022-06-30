@@ -61,7 +61,10 @@ from collections.abc import Iterable
 
 import numpy as np
 
-import simtk.openmm as openmm
+try:
+    import openmm
+except Exception:
+    import simtk.openmm as openmm
 import simtk.unit
 
 
