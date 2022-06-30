@@ -13,14 +13,14 @@ import openmm
 import os
 from polychrom.hdf5_format import HDF5Reporter
 
-N=10000
+N = 10000
 
 reporter = HDF5Reporter(folder="trajectory", max_data_length=5, overwrite=True)
 sim = simulation.Simulation(
-    platform="CUDA", 
+    platform="CUDA",
     integrator="variableLangevin",
     error_tol=0.003,
-    GPU="0",
+    GPU="1",
     collision_rate=0.03,
     N=N,
     save_decimals=2,
@@ -32,7 +32,7 @@ polymer = starting_conformations.grow_cubic(10000, 100)
 
 sim.set_data(polymer, center=True)  # loads a polymer, puts a center of mass at zero
 
-#sim.add_force(forces.spherical_confinement(sim, density=0.85, k=1))
+sim.add_force(forces.spherical_confinement(sim, density=0.85, k=1))
 
 sim.add_force(
     forcekits.polymer_chains(
@@ -63,7 +63,7 @@ sim.add_force(
 
 
 for _ in range(10):  # Do 10 blocks
-    sim.do_block(100)  # Of 100 timesteps each. Data is saved automatically. 
+    sim.do_block(100)  # Of 100 timesteps each. Data is saved automatically.
 sim.print_stats()  # In the end, print very simple statistics
 
 reporter.dump_data()  # always need to run in the end to dump the block cache to the disk
