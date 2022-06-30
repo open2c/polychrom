@@ -101,9 +101,9 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1, percent_func=lambda x: 1 / 
     min_cutoff : float, optional
         Apply the "smart" reduction of contacts only when cutoff
         is less than this value
-    percent_func : callable, optional 
+    percent_func : callable, optional
         Function that calculates fraction of monomers to use, as a function of cutoff
-        Default is 1/cutoff 
+        Default is 1/cutoff
 
     Returns
     -------
@@ -141,8 +141,8 @@ def generate_bins(N, start=4, bins_per_order_magn=10):
 def contact_scaling(data, bins0=None, cutoff=1.1, integrate=False, ring=False):
     """
     Returns contact probability scaling for a given polymer conformation
-    Contact between monomers X and X+1 is counted as s=1 
-    
+    Contact between monomers X and X+1 is counted as s=1
+
 
     Parameters
     ----------
@@ -168,7 +168,7 @@ def contact_scaling(data, bins0=None, cutoff=1.1, integrate=False, ring=False):
     -------
     (mids, contact probabilities) where "mids" contains
     geometric means of bin start/end
-    
+
 
     """
     data = np.asarray(data)
@@ -195,7 +195,7 @@ def contact_scaling(data, bins0=None, cutoff=1.1, integrate=False, ring=False):
     if ring:
         possible = np.diff(N * bins0)
     else:
-        possible = np.diff(N * bins0 + 0.5 * bins0 - 0.5 * (bins0 ** 2))
+        possible = np.diff(N * bins0 + 0.5 * bins0 - 0.5 * (bins0**2))
 
     connumbers = connumbers / possible
 
@@ -203,32 +203,30 @@ def contact_scaling(data, bins0=None, cutoff=1.1, integrate=False, ring=False):
     return a, connumbers
 
 
-
 def slope_contact_scaling(mids, cp, sigma=2):
-    
-    smooth=lambda x: gaussian_filter1d(x, sigma)
-    
-    # P(s) has to be smoothed in logspace, and both P and s have to be smoothed. 
+
+    smooth = lambda x: gaussian_filter1d(x, sigma)
+
+    # P(s) has to be smoothed in logspace, and both P and s have to be smoothed.
     # It is discussed in detail here
     # https://gist.github.com/mimakaev/4becf1310ba6ee07f6b91e511c531e73
-    
+
     # Values sigma=1.5-2 look reasonable for reasonable simulations
-    
-    slope = np.diff(smooth(np.log(cp))) / np.diff(
-            smooth(np.log(mids)))
-    
+
+    slope = np.diff(smooth(np.log(cp))) / np.diff(smooth(np.log(mids)))
+
     return mids[1:], slope
 
 
 def Rg2_scaling(data, bins=None, ring=False):
     """Calculates average gyration radius of subchains a function of s
-    
+
     Parameters
     ----------
-    
+
     data: Nx3 array
     bins: subchain lengths at which to calculate Rg
-    ring: treat polymer as a ring (default: False) 
+    ring: treat polymer as a ring (default: False)
     """
 
     data = np.asarray(data, float)
@@ -241,7 +239,7 @@ def Rg2_scaling(data, bins=None, ring=False):
         bins = generate_bins(N)
 
     coms = np.cumsum(data, 0)  # cumulative sum of locations to calculate COM
-    coms2 = np.cumsum(data ** 2, 0)  # cumulative sum of locations^2 to calculate RG
+    coms2 = np.cumsum(data**2, 0)  # cumulative sum of locations^2 to calculate RG
 
     def radius_gyration(len2):
         data
@@ -295,9 +293,7 @@ def R2_scaling(data, bins=None, ring=False):
     for i in range(len(bins)):
         length = bins[i]
         if ring:
-            rads[i] = np.mean(
-                (np.sum((data[:, :N] - data[:, length : length + N]) ** 2, 0))
-            )
+            rads[i] = np.mean((np.sum((data[:, :N] - data[:, length : length + N]) ** 2, 0)))
         else:
             rads[i] = np.mean((np.sum((data[:, :-length] - data[:, length:]) ** 2, 0)))
     return np.array(bins), rads
@@ -314,7 +310,7 @@ def Rg2(data):
 
 def Rg2_matrix(data):
     """
-    Uses dynamic programming and vectorizing to calculate Rg for each subchain of the polymer. 
+    Uses dynamic programming and vectorizing to calculate Rg for each subchain of the polymer.
     Returns a matrix for which an element [i,j] is Rg of a subchain from i to j including  i and j
     """
 
@@ -324,7 +320,7 @@ def Rg2_matrix(data):
     data = np.concatenate([[[0, 0, 0]], data])
 
     coms = np.cumsum(data, 0)  # cumulative sum of locations to calculate COM
-    coms2 = np.cumsum(data ** 2, 0)  # cumulative sum of locations^2 to calculate RG
+    coms2 = np.cumsum(data**2, 0)  # cumulative sum of locations^2 to calculate RG
 
     dists = np.abs(np.arange(N)[:, None] - np.arange(N)[None, :]) + 1
     coms2d = (-coms2[:-1, None, :] + coms2[None, 1::, :]) / dists[:, :, None]
@@ -347,14 +343,14 @@ def ndarray_groupby_aggregate(
     value_agg=lambda x: x.sum(),
 ):
     """
-    A version of pd.groupby that is aware of numpy arrays as values of columns 
-    
+    A version of pd.groupby that is aware of numpy arrays as values of columns
+
     * aggregates columns ndarray_cols using ndarray_agg aggregator,
     * aggregates value_cols using value_agg aggregator,
     * takes the first element in sample_cols,
     * aggregates over aggregate_cols
-    
-    It has presets for sum, mean and nanmean. 
+
+    It has presets for sum, mean and nanmean.
     """
 
     if preset == "sum":
@@ -374,10 +370,7 @@ def ndarray_groupby_aggregate(
         """
         average_arrs = pd.Series(
             index=ndarray_cols,
-            data=[
-                ndarray_agg([np.asarray(j) for j in in_df[i].values])
-                for i in ndarray_cols
-            ],
+            data=[ndarray_agg([np.asarray(j) for j in in_df[i].values]) for i in ndarray_cols],
         )
         average_values = value_agg(in_df[value_cols])
         sample_values = in_df[sample_cols].iloc[0]
@@ -399,23 +392,23 @@ def streaming_ndarray_agg(
 ):
     """
     Takes in_stream of dataframes
-    
-    Applies ndarray-aware groupby-sum or groupby-mean: treats ndarray_cols as numpy arrays, 
-    value_cols as normal values, for sample_cols takes the first element. 
-    
-    Does groupby over aggregate_cols 
-    
-    if add_count_col is True, adds column "count", if it's a string - adds column with add_count_col name     
 
-    if divide_by_counts is True, divides result by column "count". 
+    Applies ndarray-aware groupby-sum or groupby-mean: treats ndarray_cols as numpy arrays,
+    value_cols as normal values, for sample_cols takes the first element.
+
+    Does groupby over aggregate_cols
+
+    if add_count_col is True, adds column "count", if it's a string - adds column with add_count_col name
+
+    if divide_by_counts is True, divides result by column "count".
     If it's a string, divides by divide_by_count column
-    
-    This function can be used for automatically aggregating P(s), R(s) etc. 
+
+    This function can be used for automatically aggregating P(s), R(s) etc.
     for a set of conformations that is so large that all P(s) won't fit in RAM,
-    and when averaging needs to be done over so many parameters 
+    and when averaging needs to be done over so many parameters
     that for-loops are not an issue. Examples may include simulations in which sweep
-    over many parameters has been performed. 
-    
+    over many parameters has been performed.
+
     """
     value_cols_orig = [i for i in value_cols]
     ndarray_cols, value_cols = list(ndarray_cols), list(value_cols)
@@ -467,11 +460,11 @@ def streaming_ndarray_agg(
 
 def kabsch_msd(P, Q):
     """
-    Calculates MSD between two vectors using Kabash alcorithm 
-    Borrowed from https://github.com/charnley/rmsd  with some changes 
-    
-    rmsd is licenced with  a 2-clause BSD licence 
-    
+    Calculates MSD between two vectors using Kabash alcorithm
+    Borrowed from https://github.com/charnley/rmsd  with some changes
+
+    rmsd is licenced with  a 2-clause BSD licence
+
     Copyright (c) 2013, Jimmy Charnley Kromann <jimmy@charnley.dk> & Lars Bratholm
     All rights reserved.
 
@@ -494,7 +487,7 @@ def kabsch_msd(P, Q):
     ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-    
+
     """
     P = P - np.mean(P, axis=0)
     Q = Q - np.mean(Q, axis=0)
@@ -556,57 +549,57 @@ def getLinkingNumber(data1, data2, simplify=True, randomOffset=True, verbose=Fal
 
 
 def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_size=None):
-    
+
     """
     Analysis of the territoriality of polymer chains from simulations, using the cis/trans ratio.
     Cis signal is computed for the marked chain ('chain_id') as amount of contacts of the chain with itself
-    Trans signal is the total amount of trans contacts for the marked chain with other chains from 'chains' 
+    Trans signal is the total amount of trans contacts for the marked chain with other chains from 'chains'
     (and with all the replicas for 'pbc_box'=True)
-    
+
     """
     if data.shape[1] != 3:
         raise ValueError("Incorrect polymer data shape. Must be Nx3.")
 
     if np.isnan(data).any():
         raise RuntimeError("Data contains NANs")
-        
+
     N = len(data)
-    
+
     if pbc_box == True:
         if box_size is None:
             raise ValueError("Box size is not given")
         else:
             data_scaled = np.mod(data, box_size)
-            
+
     else:
         box_size = None
         data_scaled = np.copy(data)
-        
+
     if chains is None:
         chains = [[0, N]]
         chain_id = 0
 
     chain_start = chains[chain_id][0]
     chain_end = chains[chain_id][1]
-    
+
     # all contact pairs available in the scaled data
     tree = cKDTree(data_scaled, boxsize=box_size)
     pairs = tree.query_pairs(cutoff, output_type="ndarray")
-    
+
     # total number of contacts of the marked chain:
-    # each contact is counted twice if both monomers belong to the marked chain and 
+    # each contact is counted twice if both monomers belong to the marked chain and
     # only once if just one of the monomers in the pair belong to the marked chain
-    all_signal = len(pairs[pairs<chain_end])-len(pairs[pairs<chain_start])
-    
+    all_signal = len(pairs[pairs < chain_end]) - len(pairs[pairs < chain_start])
+
     # contact pairs of the marked chain with itself
     tree = cKDTree(data[chain_start:chain_end], boxsize=None)
     pairs = tree.query_pairs(cutoff, output_type="ndarray")
-    
+
     # doubled number of contacts of the marked chain with itself (i.e. cis signal)
-    cis_signal = 2*len(pairs)
-    
+    cis_signal = 2 * len(pairs)
+
     assert all_signal >= cis_signal
-    
+
     trans_signal = all_signal - cis_signal
-        
+
     return cis_signal, trans_signal

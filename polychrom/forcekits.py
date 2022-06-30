@@ -21,7 +21,6 @@ import numpy as np
 from . import forces
 
 
-
 def polymer_chains(
     sim_object,
     chains=[(0, None, False)],
@@ -50,10 +49,10 @@ def polymer_chains(
     except_bonds : bool
         If True then do not calculate non-bonded forces between the
         particles connected by a bond. True by default.
-        
+
     extra_bonds : None or list
-        [(i,j)] list of extra bonds. Same for extra_triplets. 
-    
+        [(i,j)] list of extra bonds. Same for extra_triplets.
+
     override_checks: bool
         If True then do not check that all monomers are a member of exactly
         one chain. False by default. Note that overriding checks does not
@@ -113,9 +112,7 @@ def polymer_chains(
         if except_bonds:
             exc = list(set([tuple(i) for i in np.sort(np.array(bonds), axis=1)]))
             if hasattr(nb_force, "addException"):
-                print(
-                    "Exclude neighbouring chain particles from {}".format(nb_force.name)
-                )
+                print("Exclude neighbouring chain particles from {}".format(nb_force.name))
                 for pair in exc:
                     nb_force.addException(int(pair[0]), int(pair[1]), 0, 0, 0, True)
 
@@ -123,12 +120,10 @@ def polymer_chains(
 
             # The built-in LJ nonbonded force uses "exclusions" instead of "exceptions"
             elif hasattr(nb_force, "addExclusion"):
-                print(
-                    "Exclude neighbouring chain particles from {}".format(nb_force.name)
-                )
+                print("Exclude neighbouring chain particles from {}".format(nb_force.name))
                 nb_force.createExclusionsFromBonds([(int(b[0]), int(b[1])) for b in bonds], int(except_bonds))
-                    # for pair in exc:
-                    #     nb_force.addExclusion(int(pair[0]), int(pair[1]))
+                # for pair in exc:
+                #     nb_force.addExclusion(int(pair[0]), int(pair[1]))
                 num_exc = nb_force.getNumExclusions()
 
             print("Number of exceptions:", num_exc)

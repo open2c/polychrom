@@ -118,9 +118,7 @@ def create_random_walk(step_size, N):
     return np.vstack([x, y, z]).T
 
 
-def create_constrained_random_walk(
-    N, constraint_f, starting_point=(0, 0, 0), step_size=1.0
-):
+def create_constrained_random_walk(N, constraint_f, starting_point=(0, 0, 0), step_size=1.0):
     """
     Creates a constrained freely joined chain of length N with step step_size.
     Each step of a random walk is tested with the constraint function and is
