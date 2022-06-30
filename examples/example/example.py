@@ -7,10 +7,10 @@ In this simulation, a simple polymer chain of 10,000 monomers is
 
 
 import os, sys
-sys.path.append("/home/dkannan/git-remotes/polychrom/")
 import polychrom
 from polychrom import simulation, starting_conformations, forces, forcekits
 import openmm
+import os
 from polychrom.hdf5_format import HDF5Reporter
 
 N=10000
