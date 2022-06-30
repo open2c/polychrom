@@ -24,6 +24,7 @@ jobs:
         run: |
           conda install -c omnia openmm  
           conda install pip 
+          pip install -U cython
           pip install -r requirements.txt 
           pip install -e . 
       - name: Test with pytest
