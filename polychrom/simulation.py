@@ -217,6 +217,8 @@ class Simulation(object):
             Using one decimal is safe most of the time, and reduces storage to 40% of int32.
             NOTE that using periodic boundary conditions will make storage advantage less.
 
+        reporters: list, optional 
+            List of reporters to use in the simulation.
 
         """
         default_args = {
