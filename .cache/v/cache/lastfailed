@@ -1,0 +1,6 @@
+{
+  "tests/test_contactmaps.py": true, 
+  "tests/test_forces.py": true, 
+  "tests/test_io.py": true, 
+  "tests/test_polymer_analyses.py": true
+}
