@@ -119,7 +119,7 @@ def create_random_walk(step_size, N):
 
 
 def create_constrained_random_walk(
-    N, constraint_f, starting_point=(0, 0, 0), step_size=1.0
+    N, constraint_f, starting_point=(0, 0, 0), step_size=1.0, polar_fixed=None
 ):
     """
     Creates a constrained freely joined chain of length N with step step_size.
@@ -139,30 +139,63 @@ def create_constrained_random_walk(
         The starting point of a random walk.
     step_size: float
         The size of a step of the random walk.
-
+    polar_fixed: float, optional
+        If specified, the random_walk is forced to fix the polar angle at polar_fixed.
+        Note that if used together with a constraint, the walk generation can get stuck in an infinite loop.
     """
 
     i = 1
     j = N
+    n_reps = 0
     out = np.full((N, 3), np.nan)
     out[0] = starting_point
 
     while i < N:
         if j == N:
             theta, u = _random_points_sphere(N).T
+            if polar_fixed is not None:
+                u = np.cos(polar_fixed) * np.ones(len(u))
             dx = step_size * np.sqrt(1.0 - u * u) * np.cos(theta)
             dy = step_size * np.sqrt(1.0 - u * u) * np.sin(theta)
             dz = step_size * u
             d = np.vstack([dx, dy, dz]).T
+            n_reps += 1
             j = 0
+        # TODO: check that this runs correct both for i == 1 and otherwise
+        if polar_fixed is not None and i > 1:
+            past_displacement = out[i - 1] - out[i - 2]
 
-        new_p = out[i - 1] + d[j]
+            vec_to_rot = d[j]
+            rot_axis = np.cross(past_displacement, np.array([0, 0, 1]))
+            rot_axis = rot_axis / np.linalg.norm(rot_axis)
+            rot_angle = -np.arccos(
+                np.dot(past_displacement, np.array([0, 0, 1]))
+                / np.linalg.norm(past_displacement)
+            )
+            np.linalg.norm(rot_axis)
+            next_displacement = (
+                vec_to_rot * np.cos(rot_angle)
+                + np.cross(rot_axis, vec_to_rot) * np.sin(rot_angle)
+                + rot_axis * np.dot(rot_axis, vec_to_rot) * (1 - np.cos(rot_angle))
+            )
+            new_p = out[i - 1] + next_displacement
+        else:
+            new_p = out[i - 1] + d[j]
 
         if constraint_f(new_p):
             out[i] = new_p
             i += 1
 
         j += 1
+        if n_reps > 2:
+            print(i, j)
+            if i != 1:
+                i -= 1
+                n_reps = 0
+            else:
+                raise RuntimeError(
+                    "The walk-generation cannot take the first step! Have another look at the constraints and initial condition"
+                )
 
     return out
 
