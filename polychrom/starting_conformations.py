@@ -155,6 +155,7 @@ def create_constrained_random_walk(
         if j == N:
             theta, u = _random_points_sphere(N).T
             if polar_fixed is not None:
+                # fixes the polar angle in uniform distribution on the sphere
                 u = np.cos(polar_fixed) * np.ones(len(u))
             dx = step_size * np.sqrt(1.0 - u * u) * np.cos(theta)
             dy = step_size * np.sqrt(1.0 - u * u) * np.sin(theta)
@@ -162,8 +163,10 @@ def create_constrained_random_walk(
             d = np.vstack([dx, dy, dz]).T
             n_reps += 1
             j = 0
-        # TODO: check that this runs correct both for i == 1 and otherwise
         if polar_fixed is not None and i > 1:
+            # Rotate the generated point to a coordinate system with the previous
+            # displacement pointing along the z-axis
+
             past_displacement = out[i - 1] - out[i - 2]
 
             vec_to_rot = d[j]
@@ -173,12 +176,14 @@ def create_constrained_random_walk(
                 np.dot(past_displacement, np.array([0, 0, 1]))
                 / np.linalg.norm(past_displacement)
             )
-            np.linalg.norm(rot_axis)
+            # Rotating with the Rodriques' rotation formula
+            # https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
             next_displacement = (
                 vec_to_rot * np.cos(rot_angle)
                 + np.cross(rot_axis, vec_to_rot) * np.sin(rot_angle)
                 + rot_axis * np.dot(rot_axis, vec_to_rot) * (1 - np.cos(rot_angle))
             )
+            # Add the rotated point
             new_p = out[i - 1] + next_displacement
         else:
             new_p = out[i - 1] + d[j]
@@ -190,9 +195,11 @@ def create_constrained_random_walk(
         j += 1
         if n_reps > 2:
             if i != 1:
+                # Backtracking if no moves are possible
                 i -= 1
                 n_reps = 0
             else:
+                # If the first point is reached, there is nothing to do
                 raise RuntimeError(
                     "The walk-generation cannot take the first step! Have another look at the constraints and initial condition"
                 )
