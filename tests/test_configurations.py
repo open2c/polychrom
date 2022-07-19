@@ -66,7 +66,7 @@ class Correct_outputtest(unittest.TestCase):
         increments = [polymer[i + 1] - polymer[i] for i in range(len(polymer) - 1)]
 
         self.assertTrue(
-            np.all(np.isclose(np.linalg.norm(increments, axis=1), 2.8)),
+            np.all(np.isclose(np.linalg.norm(increments, axis=1), self.step)),
             "Steps with default input are not as specified",
         )
 
@@ -163,6 +163,34 @@ class New_addition_test(unittest.TestCase):
         self.assertTrue(
             np.all(np.isclose(angles, self.polar_fixed)),
             "The angles are not correct",
+        )
+
+    def test_for_right_length_noconstraint(self):
+        def alwaystrue(new_p):
+            return True
+
+        polymer = starting_conformations.create_constrained_random_walk(
+            self.N, alwaystrue, step_size=self.step, polar_fixed=self.polar_fixed
+        )
+        increments = [polymer[i + 1] - polymer[i] for i in range(len(polymer) - 1)]
+
+        self.assertTrue(
+            np.all(np.isclose(np.linalg.norm(increments, axis=1), self.step)),
+            "Steps with default input are not as specified",
+        )
+
+    def test_for_right_length_constraint(self):
+        def confined(new_p):
+            return np.linalg.norm(new_p) < self.confinement
+
+        polymer = starting_conformations.create_constrained_random_walk(
+            self.N, confined, step_size=self.step, polar_fixed=self.polar_fixed
+        )
+        increments = [polymer[i + 1] - polymer[i] for i in range(len(polymer) - 1)]
+
+        self.assertTrue(
+            np.all(np.isclose(np.linalg.norm(increments, axis=1), self.step)),
+            "Steps with default input are not as specified",
         )
 
 
