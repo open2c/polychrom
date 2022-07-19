@@ -141,7 +141,8 @@ def create_constrained_random_walk(
         The size of a step of the random walk.
     polar_fixed: float, optional
         If specified, the random_walk is forced to fix the polar angle at polar_fixed.
-        Note that if used together with a constraint, the walk generation can get stuck in an infinite loop.
+        The implementation includes backtracking if no steps were possible, but if seriously overconstrained,
+        the algorithm can get stuck in an infinite loop.
     """
 
     i = 1
@@ -188,7 +189,6 @@ def create_constrained_random_walk(
 
         j += 1
         if n_reps > 2:
-            print(i, j)
             if i != 1:
                 i -= 1
                 n_reps = 0
