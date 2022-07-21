@@ -20,11 +20,12 @@ runs_per_gpu = total_runs // 4
 
 def run_sim(gpuid, run_number, timestep=170, ntimesteps=200000, blocksize=100):
     """ Run a single simulation on GPU i."""
-    ids = np.load('compartment_identities.npy')[:-1]
+    ids = np.load('data/ABidentities_blobel2021_chr2_35Mb_60Mb.npy')
     N=len(ids)
+    #0 is cold, 1 is hot
     D = np.ones((N, 3))
-    D[ids==1, :] = 0.18
-    D[ids==-1, :] = 1.8
+    D[ids==0, :] = 0.5
+    D[ids==1, :] = 1.5
     density = 0.224
     r = (3 * N / (4 * 3.141592 * density)) ** (1/3)
     print(f"Radius of confinement: {r}")
@@ -42,7 +43,7 @@ def run_sim(gpuid, run_number, timestep=170, ntimesteps=200000, blocksize=100):
     particleD = unit.Quantity(D, kT/(friction * mass))
     integrator = ActiveBrownianIntegrator(timestep, collision_rate, particleD)
     gpuid = f"{gpuid}"
-    traj = f"/net/dau/home/dkannan/simulations/comps_10x/runs200000_100/run{run_number}"
+    traj = f"/net/levsha/share/deepti/simulations/chr2_blobel_AB/comps_3x/runs200000_100/run{run_number}"
     Path(traj).mkdir(parents=True, exist_ok=True)
     reporter = HDF5Reporter(folder=traj, max_data_length=100, overwrite=True)
     sim = simulation.Simulation(
