@@ -18,14 +18,15 @@ from pathlib import Path
 total_runs = 200
 runs_per_gpu = total_runs // 4
 
-def run_sim(gpuid, run_number, timestep=170, ntimesteps=200000, blocksize=100):
+def run_sim(gpuid, run_number, activity_ratio, timestep=170, ntimesteps=200000, blocksize=100):
     """ Run a single simulation on GPU i."""
-    ids = np.load('data/ABidentities_blobel2021_chr2_35Mb_60Mb.npy')
+    ids = np.load('/net/levsha/share/deepti/data/ABidentities_blobel2021_chr2_35Mb_60Mb.npy')
     N=len(ids)
     #0 is cold, 1 is hot
     D = np.ones((N, 3))
-    D[ids==0, :] = 0.5
-    D[ids==1, :] = 1.5
+    Ddiff = (activity_ratio - 1) / (activity_ratio + 1)
+    D[ids==0, :] = 1.0 - Ddiff
+    D[ids==1, :] = 1.0 + Ddiff
     density = 0.224
     r = (3 * N / (4 * 3.141592 * density)) ** (1/3)
     print(f"Radius of confinement: {r}")
@@ -43,7 +44,7 @@ def run_sim(gpuid, run_number, timestep=170, ntimesteps=200000, blocksize=100):
     particleD = unit.Quantity(D, kT/(friction * mass))
     integrator = ActiveBrownianIntegrator(timestep, collision_rate, particleD)
     gpuid = f"{gpuid}"
-    traj = f"/net/levsha/share/deepti/simulations/chr2_blobel_AB/comps_3x/runs200000_100/run{run_number}"
+    traj = f"/net/levsha/share/deepti/simulations/chr2_blobel_AB/comps_{activity_ratio}x/runs200000_100/run{run_number}"
     Path(traj).mkdir(parents=True, exist_ok=True)
     reporter = HDF5Reporter(folder=traj, max_data_length=100, overwrite=True)
     sim = simulation.Simulation(
@@ -99,5 +100,6 @@ if __name__ == '__main__':
     gpuid = int(sys.argv[1])
     #run_number = int(sys.argv[2])
     #run_sim(gpuid, run_number)
-    for i in range(gpuid*runs_per_gpu, (gpuid + 1)*runs_per_gpu):
-        run_sim(gpuid, i)
+    for act_ratio in [10, 19, 25 + 2/3, 39]:
+        for i in range(gpuid*runs_per_gpu, (gpuid + 1)*runs_per_gpu):
+            run_sim(gpuid, i, act_ratio)
