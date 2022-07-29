@@ -13,11 +13,11 @@ import openmm
 import os
 from polychrom.hdf5_format import HDF5Reporter
 
-N=10000
+N = 10000
 
 reporter = HDF5Reporter(folder="trajectory", max_data_length=5, overwrite=True)
 sim = simulation.Simulation(
-    platform="CUDA", 
+    platform="CUDA",
     integrator="variableLangevin",
     error_tol=0.003,
     GPU="1",
@@ -63,7 +63,7 @@ sim.add_force(
 
 
 for _ in range(10):  # Do 10 blocks
-    sim.do_block(100)  # Of 100 timesteps each. Data is saved automatically. 
+    sim.do_block(100)  # Of 100 timesteps each. Data is saved automatically.
 sim.print_stats()  # In the end, print very simple statistics
 
 reporter.dump_data()  # always need to run in the end to dump the block cache to the disk

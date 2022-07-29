@@ -89,6 +89,7 @@ import warnings
 
 
 from collections.abc import Iterable
+
 try:
     import openmm
 except Exception:
@@ -107,12 +108,13 @@ VER_DATE = "2022-03-13"
 if hasattr(openmm, "__version__"):
     ver_cur = openmm.__version__
     if ver_cur < VER_LATEST:
-        warnings.warn(f"\n WARNING: you have OpenMM {ver_cur}; {VER_LATEST} is the latest as of {VER_DATE}, "
-                  "Upgrade is recommended.")
+        warnings.warn(
+            f"\n WARNING: you have OpenMM {ver_cur}; {VER_LATEST} is the latest as of {VER_DATE}, "
+            "Upgrade is recommended."
+        )
         print("to upgrade openmm, run --->  conda install -c conda-forge openmm")
         print("Ideally in a new conda environment")
-    
-    
+
 
 class IntegrationFailError(Exception):
     pass
@@ -124,26 +126,26 @@ class EKExceedsError(Exception):
 
 class Simulation(object):
     """
-    This is a base class for creating a Simulation and interacting with it. All 
-    general simulation parameters are defined in the constructor. 
+    This is a base class for creating a Simulation and interacting with it. All
+    general simulation parameters are defined in the constructor.
     Forces are defined in :py:mod:`polychrom.forces` module, and are added
-    using :py:meth:`polychrom.simulation.Simulation.add_force` method. 
+    using :py:meth:`polychrom.simulation.Simulation.add_force` method.
     """
 
     def __init__(self, **kwargs):
         """
-        All numbers here are floats. Units specified in a parameter. 
+        All numbers here are floats. Units specified in a parameter.
 
         Parameters
         ----------
-        
+
         N : int
-            number of particles 
-        
+            number of particles
+
         error_tol : float, optional
             Error tolerance parameter for variableLangevin integrator
             Values of around 0.01 are reasonable for a "nice" simulation
-            (i.e. simulation with soft forces etc). 
+            (i.e. simulation with soft forces etc).
             Simulations with strong forces may need 0.001 or less
             OpenMM manual recommends 0.001, but our forces tend to be "softer" than theirs
 
@@ -152,11 +154,11 @@ class Simulation(object):
             Ignored for variableLangevin integrator. Value of 70-80 are appropriate
 
         collision_rate : number
-            collision rate in inverse picoseconds. values of 0.01 or 0.05 are often used. 
+            collision rate in inverse picoseconds. values of 0.01 or 0.05 are often used.
             Consult with lab members on values.
 
-            In brief, equilibrium simulations likely do not care about the exact dynamics 
-            you're using, and therefore can be simulated in a "ballistic" dynamics with 
+            In brief, equilibrium simulations likely do not care about the exact dynamics
+            you're using, and therefore can be simulated in a "ballistic" dynamics with
             col_rate of around 0.001-0.01.
 
             Dynamical simulations and active simulations may be more sensitive to col_rate,
@@ -170,13 +172,13 @@ class Simulation(object):
             If intending to use PBC, then set PBCbox to (x,y,z) where x,y,z are dimensions
             of the bounding box for PBC
 
-        GPU : GPU index as a string ("0" for first, "1" for second etc.) 
+        GPU : GPU index as a string ("0" for first, "1" for second etc.)
             Machines with 1 GPU automatically select their GPU.
 
         integrator : "langevin", "variableLangevin", "verlet", "variableVerlet",
                      "brownian", optional Integrator to use
                      (see Openmm class reference)
-                     
+
         mass : number or np.array
             Particle mass (default 100 amu)
 
@@ -192,29 +194,31 @@ class Simulation(object):
             forces have the scale of 1 nm.
 
         max_Ek: float, optional
-            raise error if kinetic energy in (kT/particle) exceeds this value 
+            raise error if kinetic energy in (kT/particle) exceeds this value
 
         platform : string, optional
-            Platform to use: 
+            Platform to use:
             CUDA (preferred fast GPU platform)
             OpenCL (maybe slower GPU platofrm, does not need CUDA installed)
-            CPU (medium speed parallelized CPU platform) 
+            CPU (medium speed parallelized CPU platform)
             reference (slow CPU platform for debug)
 
         verbose : bool, optional
             Shout out loud about every change.
-        
+
         precision: str, optional (not recommended to change)
-            mixed is optimal for most situations. 
-            If you are using double precision, it will be slower by a factor of 10 or so. 
-            
-        save_decimals: int or False, optional 
-            Round to this number of decimals before saving. ``False`` is no rounding.  
+            mixed is optimal for most situations.
+            If you are using double precision, it will be slower by a factor of 10 or so.
+
+        save_decimals: int or False, optional
+            Round to this number of decimals before saving. ``False`` is no rounding.
             Default is 2. It gives maximum error of 0.005, which is nearly always harmless
             but saves up to 40% of storage space (0.6 of the original)
-            Using one decimal is safe most of the time, and reduces storage to 40% of int32. 
-            NOTE that using periodic boundary conditions will make storage advantage less. 
-            
+            Using one decimal is safe most of the time, and reduces storage to 40% of int32.
+            NOTE that using periodic boundary conditions will make storage advantage less.
+
+        reporters: list, optional 
+            List of reporters to use in the simulation.
 
         """
         default_args = {
@@ -341,8 +345,8 @@ class Simulation(object):
         self.conlen = 1.0 * simtk.unit.nanometer * self.length_scale
 
         self.kbondScalingFactor = float(
-            (2 * self.kT / self.conlen ** 2)
-            / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer ** 2)
+            (2 * self.kT / self.conlen**2)
+            / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer**2)
         )
 
         self.system = openmm.System()
@@ -370,7 +374,7 @@ class Simulation(object):
         return np.asarray(self.data / simtk.unit.nanometer, dtype=np.float32)
 
     def get_scaled_data(self):
-        """Returns data, scaled back to PBC box """
+        """Returns data, scaled back to PBC box"""
         if not self.PBC:
             return self.get_data()
         alldata = self.get_data()
@@ -387,12 +391,16 @@ class Simulation(object):
         ----------
 
         data : Nx3 array-like
+<<<<<<< HEAD
             Array of positions 
+=======
+            Array of positions
+>>>>>>> 27e69558fe949f5cc1756e7f6d71d4f32f7933e5
 
         center : bool or "zero", optional
             Move center of mass to zero before starting the simulation
             if center == "zero", then center the data such as all positions are positive and start at zero
-            
+
         random_offset: float or None
             add random offset to each particle
             Recommended for integer starting conformations and in general
@@ -400,7 +408,7 @@ class Simulation(object):
         report : bool, optional
             If set to False, will not report this action to reporters.
 
-         """
+        """
 
         data = np.asarray(data, dtype="float")
         if len(data) != self.N:
@@ -437,8 +445,8 @@ class Simulation(object):
             self.init_positions()
 
     def set_velocities(self, v):
-        """ Set initial velocities of particles. 
-        
+        """Set initial velocities of particles.
+
         Parameters
         ----------
         v : (N, 3) array-like
@@ -447,7 +455,9 @@ class Simulation(object):
 
         v = np.asarray(v, dtype="float")
         if len(v) != self.N:
-            raise ValueError(f"length of velocity array, {len(v)} does not match N, {self.N}")
+            raise ValueError(
+                f"length of velocity array, {len(v)} does not match N, {self.N}"
+            )
 
         if v.shape[1] != 3:
             raise ValueError(
@@ -457,7 +467,9 @@ class Simulation(object):
             )
         if np.isnan(v).any():
             raise ValueError("Data contains NANs")
-        self.velocities = simtk.unit.Quantity(v, simtk.unit.nanometer/simtk.unit.picosecond)
+        self.velocities = simtk.unit.Quantity(
+            v, simtk.unit.nanometer / simtk.unit.picosecond
+        )
         if hasattr(self, "context"):
             self.init_velocities()
 
@@ -474,17 +486,17 @@ class Simulation(object):
 
     def dist(self, i, j):
         """
-        Calculates distance between particles i and j. 
-        
-        Added for convenience, and not for production code. Not for use in large for-loops. 
+        Calculates distance between particles i and j.
+
+        Added for convenience, and not for production code. Not for use in large for-loops.
         """
         data = self.get_data()
         dif = data[i] - data[j]
-        return np.sqrt(sum(dif ** 2))
+        return np.sqrt(sum(dif**2))
 
     def add_force(self, force):
         """
-        Adds a force or a forcekit to the system. 
+        Adds a force or a forcekit to the system.
         """
         if isinstance(force, Iterable):
             for f in force:
@@ -506,16 +518,16 @@ class Simulation(object):
         Then applies all the forces in the forcedict.
         Forces should not be modified after that, unless you do it carefully
         (see openmm reference).
-        
-        This method is called automatically when you run energy minimization, 
-        or run your first block. On rare occasions, you would need to run it manually, 
-        but then you probably know what you're doing. 
-        
+
+        This method is called automatically when you run energy minimization,
+        or run your first block. On rare occasions, you would need to run it manually,
+        but then you probably know what you're doing.
+
         One example when this method is used is a loop extrusion code (extrusion_3d.ipynb).
-        In that case, you restart a simulation, but don't do energy minimization. 
-        However, before doing the first block, you just need to advance the integrator. 
-        This requires manually creating context/etc which would be normally done by 
-        the do_block method.  
+        In that case, you restart a simulation, but don't do energy minimization.
+        However, before doing the first block, you just need to advance the integrator.
+        This requires manually creating context/etc which would be normally done by
+        the do_block method.
         """
 
         if self.forces_applied:
@@ -553,12 +565,12 @@ class Simulation(object):
         self.forces_applied = True
 
     def initialize(self, **kwargs):
-        """ Initialize, particles, velocities for the first time.
+        """Initialize, particles, velocities for the first time.
         Only need to use this function if your system has no forces (free Brownian particles).
         Otherwise _apply_force() will execute these lines to add particles to the system,
         initialize their positions/velocities, initialize the context.
         """
-        
+
         self.masses = np.zeros(self.N, dtype=float) + self.kwargs["mass"]
         for mass in self.masses:
             self.system.addParticle(mass)
@@ -596,7 +608,7 @@ class Simulation(object):
     def init_positions(self):
         """Sends particle coordinates to OpenMM system.
         If system has exploded, this is
-         used in the code to reset coordinates. """
+         used in the code to reset coordinates."""
 
         try:
             self.context
@@ -615,7 +627,7 @@ class Simulation(object):
     def reinitialize(self):
         """Reinitializes the OpenMM context object.
         This should be called if low-level parameters,
-        such as parameters of forces, have changed        
+        such as parameters of forces, have changed
         """
 
         self.context.reinitialize()
@@ -625,55 +637,55 @@ class Simulation(object):
     def local_energy_minimization(
         self, tolerance=0.3, maxIterations=0, random_offset=0.02
     ):
-        """        
+        """
         A wrapper to the build-in OpenMM Local Energy Minimization
-        
-        See caveat below 
+
+        See caveat below
 
         Parameters
         ----------
-        
-        tolerance: float 
-            It is something like a value of force below which 
-            the minimizer is trying to minimize energy to.             
-            see openmm documentation for description 
-            
-            Value of 0.3 seems to be fine for most normal forces. 
-            
+
+        tolerance: float
+            It is something like a value of force below which
+            the minimizer is trying to minimize energy to.
+            see openmm documentation for description
+
+            Value of 0.3 seems to be fine for most normal forces.
+
         maxIterations: int
             Maximum # of iterations for minimization to do.
             default: 0 means there is no limit
-            
-            This is relevant especially if your simulation does not have a 
-            well-defined energy minimum (e.g. you want to simulate a collapse of a chain 
-            in some potential). In that case, if you don't limit energy minimization, 
-            it will attempt to do a whole simulation for you. In that case, setting 
-            a limit to the # of iterations will just stop energy minimization manually when 
-            it reaches this # of iterations. 
-            
-        random_offset: float 
-            A random offset to introduce after energy minimization. 
-            Should ideally make your forces have realistic values. 
-            
+
+            This is relevant especially if your simulation does not have a
+            well-defined energy minimum (e.g. you want to simulate a collapse of a chain
+            in some potential). In that case, if you don't limit energy minimization,
+            it will attempt to do a whole simulation for you. In that case, setting
+            a limit to the # of iterations will just stop energy minimization manually when
+            it reaches this # of iterations.
+
+        random_offset: float
+            A random offset to introduce after energy minimization.
+            Should ideally make your forces have realistic values.
+
             For example, if your stiffest force is polymer bond force
             with "wiggle_dist" of 0.05, setting this to 0.02 will make
-            separation between monomers realistic, and therefore will 
-            make force values realistic. 
-            
-            See why do we need it in the caveat below. 
-            
-            
+            separation between monomers realistic, and therefore will
+            make force values realistic.
+
+            See why do we need it in the caveat below.
+
+
         Caveat
         ------
-        
-        If using variable langevin integrator after minimization, a big error may 
-        happen in the first timestep. The reason is that enregy minimization 
+
+        If using variable langevin integrator after minimization, a big error may
+        happen in the first timestep. The reason is that enregy minimization
         makes all the forces basically 0. Variable langevin integrator measures
-        the forces and assumes that they are all small - so it makes the timestep 
-        very large, and at the first timestep it overshoots completely and energy goes up a lot. 
-        
-        The workaround for now is to randomize positions after energy minimization 
-        
+        the forces and assumes that they are all small - so it makes the timestep
+        very large, and at the first timestep it overshoots completely and energy goes up a lot.
+
+        The workaround for now is to randomize positions after energy minimization
+
         """
 
         logging.info("Performing local energy minimization")
@@ -773,8 +785,8 @@ class Simulation(object):
 
         if np.isnan(newcoords).any():
             raise IntegrationFailError("Coordinates are NANs")
-        #if eK > self.eK_critical:
-        #    raise EKExceedsError("Ek={1} exceeds {0}".format(self.eK_critical, eK))
+        if eK > self.eK_critical and self.integrator_type.lower() != "brownian":
+            raise EKExceedsError("Ek={1} exceeds {0}".format(self.eK_critical, eK))
         if (np.isnan(eK)) or (np.isnan(eP)):
             raise IntegrationFailError("Energy is NAN)")
         if check_fail:
@@ -837,15 +849,15 @@ class Simulation(object):
         mass = self.system.getParticleMass(1)
         vkT = np.array(vel / simtk.unit.sqrt(self.kT / mass), dtype=float)
         self.velocs = vkT
-        EkPerParticle = 0.5 * np.sum(vkT ** 2, axis=1)
+        EkPerParticle = 0.5 * np.sum(vkT**2, axis=1)
 
         cm = np.mean(pos, axis=0)
         centredPos = pos - cm[None, :]
-        dists = np.sqrt(np.sum(centredPos ** 2, axis=1))
+        dists = np.sqrt(np.sum(centredPos**2, axis=1))
         per95 = np.percentile(dists, 95)
-        den = (0.95 * self.N) / ((4.0 * np.pi * per95 ** 3) / 3)
+        den = (0.95 * self.N) / ((4.0 * np.pi * per95**3) / 3)
         per5 = np.percentile(dists, 5)
-        den5 = (0.05 * self.N) / ((4.0 * np.pi * per5 ** 3) / 3)
+        den5 = (0.05 * self.N) / ((4.0 * np.pi * per5**3) / 3)
         x, y, z = pos[:, 0], pos[:, 1], pos[:, 2]
         minmedmax = lambda x: (x.min(), np.median(x), x.mean(), x.max())
 
