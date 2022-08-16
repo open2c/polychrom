@@ -120,7 +120,11 @@ def create_random_walk(step_size, N):
 
 
 def create_constrained_random_walk(
-    N: int, constraint_f: Callable, starting_point=(0, 0, 0), step_size=1.0, polar_fixed=None
+    N: int,
+    constraint_f: Callable[[tuple[float, float, float]], bool],
+    starting_point=(0, 0, 0),
+    step_size=1.0,
+    polar_fixed=None,
 ) -> bool:
     """
     Creates a constrained freely joined chain of length N with step step_size.
