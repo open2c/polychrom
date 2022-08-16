@@ -1,4 +1,4 @@
-import unittest
+import pytest
 import numpy as np
 from polychrom import starting_conformations
 
@@ -50,89 +50,68 @@ def Jun_30_2022_create_constrained_random_walk(
     return out
 
 
-class Correct_outputtest(unittest.TestCase):
-    def setUp(self):
-        self.N = 1000
-        self.step = 2.8
-        self.confinement = 10
+N, step, confinement, polar_fixed = 1000, 2.8, 10, np.pi / 2
 
+
+class Correct_outputtest:
     def test_for_correct_run_all_allowed(self):
         def alwaystrue(new_p):
             return True
 
         polymer = starting_conformations.create_constrained_random_walk(
-            self.N, alwaystrue, step_size=self.step
+            N, alwaystrue, step_size=step
         )
         increments = [polymer[i + 1] - polymer[i] for i in range(len(polymer) - 1)]
 
         self.assertTrue(
-            np.all(np.isclose(np.linalg.norm(increments, axis=1), self.step)),
+            np.all(np.isclose(np.linalg.norm(increments, axis=1), step)),
             "Steps with default input are not as specified",
         )
 
     def test_for_correct_run_confined(self):
         def confined(new_p):
-            return np.linalg.norm(new_p) < self.confinement
+            return np.linalg.norm(new_p) < confinement
 
-        polymer = starting_conformations.create_constrained_random_walk(
-            self.N, confined
-        )
+        polymer = starting_conformations.create_constrained_random_walk(N, confined)
         increments = [polymer[i + 1] - polymer[i] for i in range(len(polymer) - 1)]
 
-        self.assertTrue(
-            np.all(np.sqrt(np.sum(polymer**2, 1)) < self.confinement),
-            "The conformation went outside the allowed region",
-        )
+        # Check that the conformation does not go outside the allowed region
+        assert np.all(np.sqrt(np.sum(polymer**2, 1)) < confinement)
 
 
-class Same_output_as_old_codetest(unittest.TestCase):
-    def setUp(self):
-        self.N = 1000
-        self.step = 2.8
-        self.confinement = 10
-
+class Same_output_as_old_codetest:
     def test_for_same_output_with_allTrueconstraint_as_Jun_30_2022(self):
         def alwaystrue(new_p):
             return True
 
         np.random.seed(42)
-        p_old = Jun_30_2022_create_constrained_random_walk(self.N, alwaystrue)
+        p_old = Jun_30_2022_create_constrained_random_walk(N, alwaystrue)
         np.random.seed(42)
-        p_new = starting_conformations.create_constrained_random_walk(
-            self.N, alwaystrue
-        )
-        self.assertTrue(
-            np.all(p_old == p_new),
-            "The output was different for all true constraint function",
-        )
+        p_new = starting_conformations.create_constrained_random_walk(N, alwaystrue)
+
+        # Check that the output is not different compared to old random walk starting conf for all true constraint function
+        assert np.all(p_old == p_new)
 
     def test_for_same_output_with_sphericalconstraint_as_Jun_30_2022(self):
         def confined(new_p):
-            return np.linalg.norm(new_p) < self.confinement
+            return np.linalg.norm(new_p) < confinement
 
         np.random.seed(42)
-        p_old = Jun_30_2022_create_constrained_random_walk(self.N, confined)
+        p_old = Jun_30_2022_create_constrained_random_walk(N, confined)
         np.random.seed(42)
-        p_new = starting_conformations.create_constrained_random_walk(self.N, confined)
-        self.assertTrue(
-            np.all(p_old == p_new),
-            "The output was different for all spherical constraint function",
-        )
+        p_new = starting_conformations.create_constrained_random_walk(N, confined)
+
+        # Check that output is not different for all spherical constraint function
+        assert np.all(p_old == p_new)
 
 
-class New_addition_test(unittest.TestCase):
-    def setUp(self):
-        self.N = 1000
-        self.step = 2.8
-        self.confinement = 10
-        self.polar_fixed = np.pi / 2
-
+class New_addition_test:
     def test_for_correct_angle_fixing_always_true(self):
         def alwaystrue(new_p):
             return True
 
         polymer = starting_conformations.create_constrained_random_walk(
-            self.N, alwaystrue, polar_fixed=self.polar_fixed
+            N, alwaystrue, polar_fixed=polar_fixed
         )
         angles = np.arccos(
             [
@@ -141,17 +120,15 @@ class New_addition_test(unittest.TestCase):
             ]
         )
 
-        self.assertTrue(
-            np.all(np.isclose(angles, self.polar_fixed)),
-            "The angles are not correct",
-        )
+        # Check that the angles are correct
+        assert np.all(np.isclose(angles, polar_fixed))
 
     def test_for_correct_angle_fixing_with_confinement(self):
         def confined(new_p):
-            return np.linalg.norm(new_p) < self.confinement
+            return np.linalg.norm(new_p) < confinement
 
         polymer = starting_conformations.create_constrained_random_walk(
-            self.N, confined, polar_fixed=self.polar_fixed
+            N, confined, polar_fixed=polar_fixed
         )
         angles = np.arccos(
             [
@@ -160,39 +137,29 @@ class New_addition_test(unittest.TestCase):
             ]
         )
 
-        self.assertTrue(
-            np.all(np.isclose(angles, self.polar_fixed)),
-            "The angles are not correct",
-        )
+        # Check that the angles are correct
+        assert np.all(np.isclose(angles, polar_fixed))
 
     def test_for_right_length_noconstraint(self):
         def alwaystrue(new_p):
             return True
 
         polymer = starting_conformations.create_constrained_random_walk(
-            self.N, alwaystrue, step_size=self.step, polar_fixed=self.polar_fixed
+            N, alwaystrue, step_size=step, polar_fixed=polar_fixed
         )
         increments = [polymer[i + 1] - polymer[i] for i in range(len(polymer) - 1)]
 
-        self.assertTrue(
-            np.all(np.isclose(np.linalg.norm(increments, axis=1), self.step)),
-            "Steps with default input are not as specified",
-        )
+        # Check that steps with default input are as specified
+        assert np.all(np.isclose(np.linalg.norm(increments, axis=1), step))
 
     def test_for_right_length_constraint(self):
         def confined(new_p):
-            return np.linalg.norm(new_p) < self.confinement
+            return np.linalg.norm(new_p) < confinement
 
         polymer = starting_conformations.create_constrained_random_walk(
-            self.N, confined, step_size=self.step, polar_fixed=self.polar_fixed
+            N, confined, step_size=step, polar_fixed=polar_fixed
         )
         increments = [polymer[i + 1] - polymer[i] for i in range(len(polymer) - 1)]
 
-        self.assertTrue(
-            np.all(np.isclose(np.linalg.norm(increments, axis=1), self.step)),
-            "Steps with default input are not as specified",
-        )
-
-
-if __name__ == "__main__":
-    unittest.main()
+        # Check that steps with default input are as specified
+        assert np.all(np.isclose(np.linalg.norm(increments, axis=1), step))

@@ -1,5 +1,6 @@
 import warnings
 from math import sqrt, sin, cos
+from collections.abc import Callable
 
 import numpy as np
 
@@ -119,8 +120,8 @@ def create_random_walk(step_size, N):
 
 
 def create_constrained_random_walk(
-    N, constraint_f, starting_point=(0, 0, 0), step_size=1.0, polar_fixed=None
-):
+    N: int, constraint_f: Callable, starting_point=(0, 0, 0), step_size=1.0, polar_fixed=None
+) -> bool:
     """
     Creates a constrained freely joined chain of length N with step step_size.
     Each step of a random walk is tested with the constraint function and is
@@ -131,7 +132,7 @@ def create_constrained_random_walk(
     ----------
     N : int
         The number of steps
-    constraint_f : function((float, float, float))
+    constraint_f : callable
         The constraint function.
         Must accept a tuple of 3 floats with the tentative position of a particle
         and return True if the new position is accepted and False is it is forbidden.
@@ -173,8 +174,7 @@ def create_constrained_random_walk(
             rot_axis = np.cross(past_displacement, np.array([0, 0, 1]))
             rot_axis = rot_axis / np.linalg.norm(rot_axis)
             rot_angle = -np.arccos(
-                np.dot(past_displacement, np.array([0, 0, 1]))
-                / np.linalg.norm(past_displacement)
+                np.dot(past_displacement, np.array([0, 0, 1])) / np.linalg.norm(past_displacement)
             )
             # Rotating with the Rodriques' rotation formula
             # https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
@@ -201,7 +201,8 @@ def create_constrained_random_walk(
             else:
                 # If the first point is reached, there is nothing to do
                 raise RuntimeError(
-                    "The walk-generation cannot take the first step! Have another look at the constraints and initial condition"
+                    "The walk-generation cannot take the first step! Have another look at the"
+                    " constraints and initial condition"
                 )
 
     return out
