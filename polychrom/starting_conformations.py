@@ -1,7 +1,7 @@
 import warnings
 from math import sqrt, sin, cos
 from collections.abc import Callable
-
+from typing import Tuple
 import numpy as np
 
 
@@ -121,7 +121,7 @@ def create_random_walk(step_size, N):
 
 def create_constrained_random_walk(
     N: int,
-    constraint_f: Callable[[tuple[float, float, float]], bool],
+    constraint_f: Callable[[Tuple[float, float, float]], bool],
     starting_point=(0, 0, 0),
     step_size=1.0,
     polar_fixed=None,
