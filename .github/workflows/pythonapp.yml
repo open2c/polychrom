@@ -8,13 +8,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Python 3.7
+      - name: Set up Python 3.9
         uses: actions/setup-python@v1
         with:
-          python-version: 3.7
+          python-version: 3.9
       - uses: s-weigand/setup-conda@v1
         with:
-          python-version: 3.7
+          python-version: 3.9
           activate-conda: true
       - run: conda --version
       - run: which python
@@ -22,7 +22,7 @@ jobs:
       - run: ls -la
       - name: Install dependencies
         run: |
-          conda install -c omnia openmm  
+          conda install -c conda-forge openmm
           conda install pip 
           pip install -r requirements.txt 
           pip install -e . 
