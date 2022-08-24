@@ -24,6 +24,7 @@ jobs:
         run: |
           conda install -c conda-forge openmm
           conda install pip 
+          pip install cython
           pip install -r requirements.txt 
           pip install -e . 
       - name: Test with pytest
