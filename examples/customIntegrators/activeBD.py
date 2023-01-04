@@ -1,16 +1,8 @@
 """
-Polymer simulations with custom integrators
--------------------------------------------
+Polymer simulations with ActiveBrownianIntegrator
+-------------------------------------------------
 
-This is a sample python script to run a polychrom simulation with the custom integrators in 
-polychrom.contrib.integrators. The first example involves defining a diffusion coefficient
-for each monomer and integrating the overdamped Langevin equation with the `ActiveBrownianIntegrator'.
-TODO: test example
-
-The second example illustrates how to drive the polymer with correlated active forces. To define
-these correlated excitations, we assign each monomer an identity ("charge"): +, 0, or -. Monomers
-of the same charge are correlated, whereas monomers of opposing charges are anti-correlated. Neutral
-monomers do not experience correlated active forces.
+This is a sample python script to run a polychrom simulation with the `ActiveBrownianIntegrator' custom integrator in polychrom.contrib.integrators. This integrator is used to simulate a polymer where each mononmer has a different effective temperature and thus a different diffusion coefficient :math:`D_i = k_B T_i / \xi`. Here, we consider an example where there are just two types of monomers, active (A) and inactive (B), where :math:`D_A > D_B` and the user chooses the ratio :math:`D_A / D_B`.
 
 """
 import time
@@ -31,8 +23,27 @@ ids = np.ones(N) #aray of 1s and 0s assigning type A and type B comonomers
 ids[int(N/2):] = 0
 
 def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, ntimesteps=200000, blocksize=100):
-    """ Run a single simulation on GPU i of a hetero-polymer with A monomers and B monomers. A monomers
-    have a larger diffusion coefficient than B monomers, with an activity ratio of D_A / D_B."""
+    """ Run a single simulation on a GPU of a hetero-polymer with A monomers and B monomers. A monomers
+    have a larger diffusion coefficient than B monomers, with an activity ratio of D_A / D_B.
+    
+    Parameters
+    ----------
+    gpuid : int
+        which GPU to use. If on Mirny Lab machine, should be 0, 1, 2, or 3.
+    N : int
+        number of monomers in chain
+    ids : array-like (N,)
+        monomer types. 1 for active (A), 0 for inactive (B)
+    activity_ratio : float
+        ratio of diffusion coefficient of A monomers to diffusion coefficient of B monomers
+    timestep : int
+        timestep to feed the Brownian integrator (in femtoseconds)
+    ntimesteps : int
+        number of timesteps to run the simulation for
+    blocksize : int
+        number of time steps in a block
+    
+    """
     if len(ids) != N:
         raise ValueError("The array of monomer identities must have length equal to the total number of monomers.")
     D = np.ones((N, 3)) #Dx, Dy, Dz --> we assume the diffusion coefficient in each spatial dimension is the same
@@ -78,9 +89,6 @@ def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, ntimestep
         forcekits.polymer_chains(
             sim,
             chains=[(0, None, False)],
-            # By default the library assumes you have one polymer chain
-            # If you want to make it a ring, or more than one chain, use self.setChains
-            # self.setChains([(0,50,True),(50,None,False)]) will set a 50-monomer ring and a chain from monomer 50 to the end
             bond_force_func=forces.harmonic_bonds,
             bond_force_kwargs={
                 "bondLength": 1.0,
