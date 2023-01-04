@@ -1,10 +1,10 @@
-"""
+r"""
 Polymer simulations with ActiveBrownianIntegrator
 -------------------------------------------------
 
 This is a sample python script to run a polychrom simulation with the `ActiveBrownianIntegrator' custom integrator in polychrom.contrib.integrators. This integrator is used to simulate a polymer where each mononmer has a different effective temperature and thus a different diffusion coefficient :math:`D_i = k_B T_i / \xi`. Here, we consider an example where there are just two types of monomers, active (A) and inactive (B), where :math:`D_A > D_B` and the user chooses the ratio :math:`D_A / D_B`.
-
 """
+
 import time
 import numpy as np
 import os, sys
@@ -22,7 +22,7 @@ ids = np.ones(N) #aray of 1s and 0s assigning type A and type B comonomers
 #1 is A, 0 is B
 ids[int(N/2):] = 0
 
-def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, ntimesteps=200000, blocksize=100):
+def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, ntimesteps=10, blocksize=100):
     """ Run a single simulation on a GPU of a hetero-polymer with A monomers and B monomers. A monomers
     have a larger diffusion coefficient than B monomers, with an activity ratio of D_A / D_B.
     
@@ -39,7 +39,7 @@ def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, ntimestep
     timestep : int
         timestep to feed the Brownian integrator (in femtoseconds)
     ntimesteps : int
-        number of timesteps to run the simulation for
+        number of blocks to run the simulation for. For a chain of 1000 monomers, need ~100000 blocks of 100 timesteps to equilibrate.
     blocksize : int
         number of time steps in a block
     
@@ -70,7 +70,7 @@ def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, ntimestep
     reporter = HDF5Reporter(folder="active_inactive", max_data_length=100, overwrite=True)
     sim = simulation.Simulation(
         platform="CUDA", 
-        integrator=integrator,
+        integrator=(integrator, "brownian"),
         timestep=timestep,
         temperature=temperature,
         GPU=gpuid,
