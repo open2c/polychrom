@@ -3,6 +3,10 @@ Polymer simulations with ActiveBrownianIntegrator
 -------------------------------------------------
 
 This is a sample python script to run a polychrom simulation with the `ActiveBrownianIntegrator' custom integrator in polychrom.contrib.integrators. This integrator is used to simulate a polymer where each mononmer has a different effective temperature and thus a different diffusion coefficient :math:`D_i = k_B T_i / \xi`. Here, we consider an example where there are just two types of monomers, active (A) and inactive (B), where :math:`D_A > D_B` and the user chooses the ratio :math:`D_A / D_B`.
+
+Run this script using
+>>> python activeBD.py [gpuid] [activity_ratio]
+
 """
 
 import time
@@ -22,7 +26,7 @@ ids = np.ones(N) #aray of 1s and 0s assigning type A and type B comonomers
 #1 is A, 0 is B
 ids[int(N/2):] = 0
 
-def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, ntimesteps=10, blocksize=100):
+def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, nblocks=10, blocksize=100):
     """ Run a single simulation on a GPU of a hetero-polymer with A monomers and B monomers. A monomers
     have a larger diffusion coefficient than B monomers, with an activity ratio of D_A / D_B.
     
@@ -38,8 +42,9 @@ def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, ntimestep
         ratio of diffusion coefficient of A monomers to diffusion coefficient of B monomers
     timestep : int
         timestep to feed the Brownian integrator (in femtoseconds)
-    ntimesteps : int
-        number of blocks to run the simulation for. For a chain of 1000 monomers, need ~100000 blocks of 100 timesteps to equilibrate.
+    nblocks : int
+        number of blocks to run the simulation for. For a chain of 1000 monomers, need ~100000 blocks of 
+        100 timesteps to equilibrate.
     blocksize : int
         number of time steps in a block
     
@@ -105,7 +110,7 @@ def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, ntimestep
         )
     )
     tic = time.perf_counter()
-    for _ in range(ntimesteps):  # Do 10 blocks
+    for _ in range(nblocks):  # Do 10 blocks
         sim.do_block(blocksize)  # Of 100 timesteps each. Data is saved automatically. 
     toc = time.perf_counter()
     print(f'Ran simulation in {(toc - tic):0.4f}s')
