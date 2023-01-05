@@ -75,6 +75,8 @@ def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, nblocks=1
     reporter = HDF5Reporter(folder="active_inactive", max_data_length=100, overwrite=True)
     sim = simulation.Simulation(
         platform="CUDA", 
+        #for custom integrators, feed a tuple with the integrator class reference and a string specifying type,
+        # e.g. "brownian", "variableLangevin", "variableVerlet", or simply "UserDefined" if none of the above.
         integrator=(integrator, "brownian"),
         timestep=timestep,
         temperature=temperature,
@@ -120,5 +122,5 @@ def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, nblocks=1
 
 if __name__ == '__main__':
     gpuid = int(sys.argv[1])
-    activity_ratio = int(sys.argv[1])
+    activity_ratio = int(sys.argv[2])
     run_monomer_diffusion(gpuid, N, ids, activity_ratio)

@@ -17,7 +17,7 @@ import numpy as np
 import os, sys
 import polychrom
 from polychrom import simulation, starting_conformations, forces, forcekits
-from polychrom.integrators import ActiveBrownianIntegrator, CorrelatedNoiseIntegrator
+from polychrom.contrib.integrators import CorrelatedNoiseIntegrator
 import openmm
 from polychrom.hdf5_format import HDF5Reporter
 from simtk import unit
@@ -32,7 +32,7 @@ rhos[0, 20:40] = 0.0
 rhos[0, 60:80] = 0.0
 
 def compute_Pearson_correlation_matrix(rhomat):
-    """ Return the N x N Pearson correlation matrix that results from correlating same type monomers.
+    r""" Return the N x N Pearson correlation matrix that results from correlating same type monomers.
     
     Parameters
     ----------
@@ -54,9 +54,8 @@ def compute_Pearson_correlation_matrix(rhomat):
     where :math:`\vec{f}_d` represents all deterministic forces and :math:`\vec{\eta}_i(t)` is a mean-zero 
     Gaussian random velocity field with `:math:`\langle \eta_{ik} \eta_{jl} \rangle = 
     2\sqrt{D_i}\sqrt{D_j}C_{ij}\delta_{kl}`. :math:`k, l` index the spatial components of the noise
-    vector, and :math:`i, j` index the monomers.
-   
-    """
+    vector, and :math:`i, j` index the monomers. """
+
     N = rhomat.shape[1]
     rho = rhomat[rhomat > 0][0]
     idmat = rhomat / rho
@@ -65,7 +64,7 @@ def compute_Pearson_correlation_matrix(rhomat):
     corr[np.diag_indices(N)] = 1.0
     return corr
 
-def run_correlatd_diffusion(gpuid, N, rhos, timestep=170, nblocks=10000, blocksize=100):
+def run_correlated_diffusion(gpuid, N, rhos, timestep=170, nblocks=10, blocksize=100):
     """ Run a single simulation on a GPU of a hetero-polymer with monomers of type +, -, or 0.
     Same type monomers are positively correlated while opposite type monomers are anticorrelated.
     
@@ -80,7 +79,7 @@ def run_correlatd_diffusion(gpuid, N, rhos, timestep=170, nblocks=10000, blocksi
     timestep : int
         timestep to feed the Brownian integrator (in femtoseconds)
     nblocks : int
-        number of blocks to run the simulation for. For a chain of 1000 monomers, need ~100000 blocks of 
+        number of blocks to run the simulation for. For a chain of 100 monomers, need ~10000 blocks of 
         100 timesteps to equilibrate.
     blocksize : int
         number of time steps in a block
@@ -107,7 +106,9 @@ def run_correlatd_diffusion(gpuid, N, rhos, timestep=170, nblocks=10000, blocksi
     reporter = HDF5Reporter(folder="correlations", max_data_length=100, overwrite=True)
     sim = simulation.Simulation(
         platform="CUDA", 
-        integrator=integrator,
+        #for custom integrators, feed a tuple with the integrator class reference and a string specifying type,
+        # e.g. "brownian", "variableLangevin", "variableVerlet", or simply "UserDefined" if none of the above.
+        integrator=(integrator, "brownian"),
         timestep=timestep,
         temperature=temperature,
         GPU=gpuid,
@@ -152,4 +153,4 @@ def run_correlatd_diffusion(gpuid, N, rhos, timestep=170, nblocks=10000, blocksi
 
 if __name__ == '__main__':
     gpuid = int(sys.argv[1])
-    run_monomer_diffusion(gpuid, N, rhos)
+    run_correlated_diffusion(gpuid, N, rhos)
