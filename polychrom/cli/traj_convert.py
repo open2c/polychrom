@@ -96,7 +96,7 @@ from polychrom.polymerutils import load
 def _find_matches(pat, filenames):
     """
     Matches pattern to each filename in a list, and returns those that matched.
-    Enforces only one match per file. 
+    Enforces only one match per file.
     """
     result = {}
     for filename in filenames:
@@ -126,7 +126,9 @@ def _find_matches(pat, filenames):
     help="empty trajectories: 'copy', 'copy-limit' (enforce file limit), 'raise', 'ignore'",
 )
 @click.option(
-    "--dry-run", is_flag=True, help="do not perform any file operations",
+    "--dry-run",
+    is_flag=True,
+    help="do not perform any file operations",
 )
 @click.option(
     "--block-pattern",
@@ -211,23 +213,23 @@ def trajcopy(
     **kwargs,
 ):
     """
-    A function that copies a HDF5 trajectory with several possible features. 
-    
-    --  It can convert from old-style to new-style trajectories 
-    
+    A function that copies a HDF5 trajectory with several possible features.
+
+    --  It can convert from old-style to new-style trajectories
+
     --  It by default rounds it to 2 decimal digits (which has space savings)
-    
+
     --  It can "thin" the trajectory by skipping every Nth file (--skip_files)
-    
-    --  It can integrade information from "extra" files 
+
+    --  It can integrade information from "extra" files
     (by default it assumes that there is a file named "SMC<X>.dat" for each "block<x>.dat",
     and that this file is a pickle. This is saved to "lef_positions" key, and this is optional).
 
     If you have several files like that, you can repeat "--extra-pattern" and other 3 arguments
-    several times.     
-    
-    An example command to replace each subfolder in a folder, and take every second file (4x space saving): 
-    
+    several times.
+
+    An example command to replace each subfolder in a folder, and take every second file (4x space saving):
+
     for i in *; do traj_convert.py --round-to 1 --skip-files 2 --allow-nonconsecutive --replace  $i `mktemp -d` ; done
     """
 

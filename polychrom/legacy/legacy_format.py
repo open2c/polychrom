@@ -4,9 +4,7 @@ import os
 
 class LegacyReporter(object):
     def __init__(self, folder):
-        """
-        
-        """
+        """ """
         if not os.path.exists(folder):
             os.mkdir(folder)
         if len(os.listdir(folder)) != 0:

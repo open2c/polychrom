@@ -6,7 +6,7 @@ import numpy as np
 
 
 def test_basic_simulation_and_hdf5(tmp_path):
-    data = polychrom.starting_conformations.create_random_walk(1,100)
+    data = polychrom.starting_conformations.create_random_walk(1, 100)
 
     """
     Here we created a hdf5Reporter attached to a foler test, and we are saving 5 blocks per file 

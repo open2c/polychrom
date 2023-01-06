@@ -17,7 +17,7 @@ def minimizing_repulsive_Force(sim_object):
     Adds a special force which could be use for very efficient resolution of crossings
     Use this force to perform (local) energy minimization if your monomers are all "on top of each other"
     E.g. if you start your simulations with fractional brownyan motion with h < 0.4
-    Then switch to a normal force, and re-do energy minimization. 
+    Then switch to a normal force, and re-do energy minimization.
     """
     radius = sim_object.conlen * 1.3
 
@@ -53,9 +53,9 @@ def fix_particles_Z_coordinate(
     useOtherAxis : "x","y" or "z", optional
         Apply the same in the other dimension
     gap: float or None
-        if gap is not None, then the force creates a gap of the width "gap" 
-        (+- 0.5 * gap) during which the force is not acting. The force starts acting 
-        after the particle moved 0.5 * gap. 
+        if gap is not None, then the force creates a gap of the width "gap"
+        (+- 0.5 * gap) during which the force is not acting. The force starts acting
+        after the particle moved 0.5 * gap.
     """
 
     if not len(particles) == len(zCoordinates):
@@ -237,7 +237,7 @@ def lennard_jones_force(
     sigmaRep, sigmaAttr: float, optional
         Radius of particles in the LJ force. For advanced fine-tuning.
 
-     """
+    """
     sim_object.metadata["LennardJonesForce"] = repr(
         {
             "cutoff": cutoff,
@@ -379,8 +379,7 @@ def gravity(sim_object, k=0.1, cutoff=None):
 
 
 def exclude_sphere(sim_object, r=5, position=(0, 0, 0)):
-    """Excludes particles from a sphere of radius r at certain position.
-    """
+    """Excludes particles from a sphere of radius r at certain position."""
 
     spherForce = openmm.CustomExternalForce(
         "step(EXaa-r) * EXkb * (sqrt((r-EXaa)*(r-EXaa) + EXt*EXt) - EXt) ;"
@@ -407,7 +406,7 @@ def exclude_sphere(sim_object, r=5, position=(0, 0, 0)):
 def attraction_to_the_core(sim_object, k, r0, coreParticles=[]):
 
     """Attracts a subset of particles to the core,
-     repells the rest from the core"""
+    repells the rest from the core"""
 
     attractForce = openmm.CustomExternalForce(
         " COREk * ((COREr - CORErn) ^ 2)  ; " "COREr = sqrt(x^2 + y^2 + COREtt^2)"
@@ -633,10 +632,10 @@ def old_energy_minimization(
 
 
 def check_connectivity(sim_object, newcoords=None, maxBondSizeMultipler=10):
-    """ checks connectivity of all harmonic (& abslim) bonds
-        can be passed to doBlock as a checkFunction, in which case it will also trigger re-initialization
-        to modify the maximum bond size multipler, pass this function to doBlock as, 
-        e.g. doBlock( 100,checkFunctions = [lambda x:a.checkConnectivity(x,6)])
+    """checks connectivity of all harmonic (& abslim) bonds
+    can be passed to doBlock as a checkFunction, in which case it will also trigger re-initialization
+    to modify the maximum bond size multipler, pass this function to doBlock as,
+    e.g. doBlock( 100,checkFunctions = [lambda x:a.checkConnectivity(x,6)])
     """
 
     if not hasattr(sim_object, "bondLengths"):
