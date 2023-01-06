@@ -207,7 +207,7 @@ class Simulation(object):
             Shout out loud about every change.
 
         precision: str, optional (not recommended to change)
-            mixed is optimal for most situations.
+            single is the default now, because mixed is much slower on 3080 and other new GPUs 
             If you are using double precision, it will be slower by a factor of 10 or so.
 
         save_decimals: int or False, optional
@@ -231,7 +231,7 @@ class Simulation(object):
             "mass": 100,
             "reporters": [],
             "max_Ek": 10,
-            "precision": "mixed",
+            "precision": "single",
             "save_decimals": 2,
             "verbose": False,
         }
