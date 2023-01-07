@@ -12,16 +12,19 @@ Run this script using
 >>> python corr_noise.py [gpuid]
 
 """
+import os
+import sys
 import time
-import numpy as np
-import os, sys
-import polychrom
-from polychrom import simulation, starting_conformations, forces, forcekits
-from polychrom.contrib.integrators import CorrelatedNoiseIntegrator
-import openmm
-from polychrom.hdf5_format import HDF5Reporter
-from simtk import unit
 from pathlib import Path
+
+import numpy as np
+import openmm
+from simtk import unit
+
+import polychrom
+from polychrom import forcekits, forces, simulation, starting_conformations
+from polychrom.contrib.integrators import CorrelatedNoiseIntegrator
+from polychrom.hdf5_format import HDF5Reporter
 
 N = 100  # 100 monomers
 

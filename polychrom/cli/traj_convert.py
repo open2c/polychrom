@@ -80,15 +80,17 @@ for i in */*; do traj_convert.py --empty-policy ignore --verbose --input-style n
 
 """
 
-import os
-import sys
-import shutil
-import click
-import pickle
 import glob
+import os
+import pickle
 import re
-import pandas as pd
+import shutil
+import sys
+
+import click
 import numpy as np
+import pandas as pd
+
 from polychrom.hdf5_format import HDF5Reporter, list_URIs, load_URI
 from polychrom.polymerutils import load
 

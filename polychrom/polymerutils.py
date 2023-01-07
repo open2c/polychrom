@@ -27,16 +27,18 @@ A typical workflow with the new-style trajectories should be:
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
-import six
-import numpy as np
+
+import glob
+import io
 import os
 
-from . import hdf5_format
-from polychrom.hdf5_format import load_URI
 import joblib
-import glob
+import numpy as np
+import six
 
-import io
+from polychrom.hdf5_format import load_URI
+
+from . import hdf5_format
 
 
 def load(filename):

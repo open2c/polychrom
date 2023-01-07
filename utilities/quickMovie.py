@@ -1,5 +1,7 @@
+import os
+import sys
+
 from openmmlib import pymol_show
-import sys, os
 
 if len(sys.argv) != 5:
     print("---------wrong arguments---------")

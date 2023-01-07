@@ -1,7 +1,7 @@
 import warnings
-from math import sqrt, sin, cos
-from typing import Callable
-from typing import Tuple
+from math import cos, sin, sqrt
+from typing import Callable, Tuple
+
 import numpy as np
 
 

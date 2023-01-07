@@ -1,6 +1,7 @@
-import polychrom
-from polychrom import simulation, starting_conformations, forces, forcekits
 import numpy as np
+
+import polychrom
+from polychrom import forcekits, forces, simulation, starting_conformations
 
 
 def test_harmonic_bond_force():

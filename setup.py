@@ -1,12 +1,13 @@
-import os, re, io
-
-from setuptools import find_packages
+import io
+import os
+import re
 from distutils.core import setup
 from distutils.extension import Extension
-from Cython.Distutils import build_ext
-from Cython.Build import cythonize
 
 import numpy
+from Cython.Build import cythonize
+from Cython.Distutils import build_ext
+from setuptools import find_packages
 
 cmdclass = {}
 

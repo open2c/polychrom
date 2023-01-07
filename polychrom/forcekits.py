@@ -18,6 +18,7 @@ one force for another without duplicating code.
 """
 
 import numpy as np
+
 from . import forces
 
 

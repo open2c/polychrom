@@ -1,6 +1,5 @@
-import simtk.openmm as openmm
 import numpy as np
-
+import simtk.openmm as openmm
 
 """
 This is a collection of old forces that are likely no longer used 

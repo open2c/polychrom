@@ -1,7 +1,8 @@
 import numpy as np
+
 import polychrom
-import polychrom.starting_conformations
 import polychrom.polymer_analyses as polymer_analyses
+import polychrom.starting_conformations
 
 
 def test_smart_contacts():
@@ -53,8 +54,10 @@ def _testMutualSimplify():
 
 
 def test_scalings():
-    import polychrom.starting_conformations, polychrom.polymer_analyses
     import numpy as np
+
+    import polychrom.polymer_analyses
+    import polychrom.starting_conformations
 
     datas = [polychrom.starting_conformations.create_random_walk(1, 80) for _ in range(100)]
 

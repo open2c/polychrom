@@ -1,8 +1,11 @@
 #!/usr/bin/env python
-import os, tempfile, sys
-import numpy as np
-import joblib
+import os
+import sys
+import tempfile
 import textwrap
+
+import joblib
+import numpy as np
 
 if len(sys.argv) < 2:
     print(

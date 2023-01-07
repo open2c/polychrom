@@ -60,8 +60,9 @@ to be the diameter of the monomer = 1 nm.
 """
 
 
-from simtk import unit
 import numpy as np
+from simtk import unit
+
 
 class SimulationParams(object):
     """

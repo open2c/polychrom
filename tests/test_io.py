@@ -1,8 +1,11 @@
+import numpy as np
+
+import polychrom.forcekits
+import polychrom.forces
+import polychrom.polymerutils
 import polychrom.starting_conformations
-import polychrom.forces, polychrom.forcekits, polychrom.polymerutils
 from polychrom.hdf5_format import HDF5Reporter, list_URIs, load_URI
 from polychrom.simulation import Simulation
-import numpy as np
 
 
 def test_basic_simulation_and_hdf5(tmp_path):

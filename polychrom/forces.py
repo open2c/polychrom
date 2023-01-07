@@ -54,9 +54,9 @@ One of the best examples of optimizing complex forces using polynomials is in
 
 """
 
+import itertools
 import re
 import warnings
-import itertools
 from collections.abc import Iterable
 
 import numpy as np
@@ -65,6 +65,7 @@ try:
     import openmm
 except Exception:
     import simtk.openmm as openmm
+
 import simtk.unit
 
 

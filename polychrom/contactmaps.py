@@ -48,14 +48,15 @@ because it is a little bit faster.
 
 """
 
-import numpy as np
-import random
 import ctypes
 import multiprocessing as mp
-from contextlib import closing
-from . import polymerutils
+import random
 import warnings
-from . import polymer_analyses
+from contextlib import closing
+
+import numpy as np
+
+from . import polymer_analyses, polymerutils
 
 
 def indexing(smaller, larger, M):

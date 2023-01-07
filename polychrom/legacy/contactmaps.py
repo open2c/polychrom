@@ -6,19 +6,20 @@ This file contains a bunch of method to work on contact maps of a Hi-C data.
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
+
 import os
+import sys
+import time
 import traceback
+import warnings
+from math import sqrt
 
 import numpy as np
-
-from math import sqrt
-import sys
-from polychrom.polymerutils import load
-import warnings
-import polychrom.polymerutils as polymerutils
-import time
 from scipy.spatial import ckdtree
+
+import polychrom.polymerutils as polymerutils
 from polychrom.polymer_analyses import calculate_contacts as giveContacts
+from polychrom.polymerutils import load
 
 
 def rescalePoints(points, bins):

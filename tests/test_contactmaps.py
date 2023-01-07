@@ -1,13 +1,14 @@
 import numpy as np
+
 import polychrom.polymer_analyses as polymer_analyses
 from polychrom.contactmaps import (
     averageContacts,
     averageContactsSimple,
-    monomerResolutionContactMap,
     binnedContactMap,
+    monomerResolutionContactMap,
 )
-from polychrom.legacy.contactmaps import averagePureContactMap as cmapPureMap
 from polychrom.legacy.contactmaps import averageBinnedContactMap as cmapBinnedMap
+from polychrom.legacy.contactmaps import averagePureContactMap as cmapPureMap
 
 
 class DummyContactMap(object):

@@ -7,12 +7,14 @@ Note that the limit of pymol is 100k monomers, therefore interpolateData is
 useful to collapse the 200k-long simulation into a 100k-long conformation.
 """
 import os
-import tempfile
-import subprocess
-import textwrap
-import numpy as np
 import shutil
+import subprocess
+import tempfile
+import textwrap
+
+import numpy as np
 from scipy.interpolate.fitpack2 import InterpolatedUnivariateSpline
+
 from . import polymerutils
 
 

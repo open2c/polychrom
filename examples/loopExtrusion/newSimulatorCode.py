@@ -1,17 +1,15 @@
-import pickle
 import os
+import pickle
 import time
-import numpy as np
-from openmmlib import polymerutils
-from openmmlib.polymerutils import scanBlocks
-from openmmlib.openmmlib import Simulation
-from openmmlib.polymerutils import grow_rw
 
+import numpy as np
 import pyximport
+from openmmlib import polymerutils
+from openmmlib.openmmlib import Simulation
+from openmmlib.polymerutils import grow_rw, scanBlocks
 
 pyximport.install()
 from smcTranslocator import smcTranslocatorDirectional
-
 
 # -------defining parameters----------
 #  -- basic loop extrusion parameters

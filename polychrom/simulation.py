@@ -79,25 +79,25 @@ the hdf5 reporter. This all can be viewed in the example script.
 
 
 from __future__ import absolute_import, division, print_function
-import numpy as np
-import sys
-import os
-import time
-import tempfile
+
 import logging
+import os
+import sys
+import tempfile
+import time
 import warnings
-
-
 from collections.abc import Iterable
+
+import numpy as np
 
 try:
     import openmm
 except Exception:
     import simtk.openmm as openmm
+
 import simtk.unit
 
 from polychrom import forces
-
 
 logging.basicConfig(level=logging.INFO)
 

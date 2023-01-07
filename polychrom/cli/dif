@@ -23,12 +23,15 @@ you likely have mixed enough to reach some kind of equilibrium (and if you haven
 reached equilibrium). 
 """
 from __future__ import absolute_import, division, print_function
+
+import os
 import sys
-import numpy as np 
+
+import numpy as np
 import scipy.optimize
-from polychrom.polymerutils import load, fetch_block
+
 from polychrom.polymer_analyses import kabsch_msd
-import os 
+from polychrom.polymerutils import fetch_block, load
 
 filename = sys.argv[1]
 try:

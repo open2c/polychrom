@@ -31,10 +31,10 @@ The default integrator used in polychrom is a Langevin integrator with variable 
 
 """
 import numpy as np
-from simtk import unit
 import openmm as mm
 from openmmtools import utils
 from openmmtools.integrators import PrettyPrintableIntegrator
+from simtk import unit
 
 
 class ActiveBrownianIntegrator(utils.RestorableOpenMMObject, PrettyPrintableIntegrator, mm.CustomIntegrator):

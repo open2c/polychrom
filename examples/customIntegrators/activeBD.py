@@ -9,16 +9,19 @@ Run this script using
 
 """
 
+import os
+import sys
 import time
-import numpy as np
-import os, sys
-import polychrom
-from polychrom import simulation, starting_conformations, forces, forcekits
-from polychrom.contrib.integrators import ActiveBrownianIntegrator
-import openmm
-from polychrom.hdf5_format import HDF5Reporter
-from simtk import unit
 from pathlib import Path
+
+import numpy as np
+import openmm
+from simtk import unit
+
+import polychrom
+from polychrom import forcekits, forces, simulation, starting_conformations
+from polychrom.contrib.integrators import ActiveBrownianIntegrator
+from polychrom.hdf5_format import HDF5Reporter
 
 N = 1000  # 1000 monomers
 ids = np.ones(N)  # aray of 1s and 0s assigning type A and type B comonomers

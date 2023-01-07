@@ -1,23 +1,21 @@
+import os
+import pickle
+
 import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from mirnylib.genome import Genome
+from mirnylib.h5dict import h5dict
+from mirnylib.numutils import coarsegrain, completeIC, zoomArray
+from mirnylib.plotting import nicePlot
+from mirnylib.systemutils import setExceptionHook
+from openmmlib import contactmaps, polymerutils
+from openmmlib.contactmapManager import averageContacts
 
 # matplotlib.use("Agg")
 
-from mirnylib.plotting import nicePlot
-import os
-import pickle
-from openmmlib import contactmaps
-from mirnylib.numutils import zoomArray
-from openmmlib import polymerutils
 
-import matplotlib.pyplot as plt
-import numpy as np
-from mirnylib.h5dict import h5dict
-from mirnylib.genome import Genome
-from mirnylib.numutils import completeIC, coarsegrain
-from mirnylib.systemutils import setExceptionHook
-from openmmlib.contactmapManager import averageContacts
-import pandas as pd
-from mirnylib.numutils import coarsegrain
 
 setExceptionHook()
 
@@ -33,8 +31,8 @@ class simulator(object):
         import pyximport
 
         pyximport.install()
-        from smcTranslocatorDirectional import smcTranslocator
         import numpy as np
+        from smcTranslocatorDirectional import smcTranslocator
 
         N = len(forw)
         birthArray = np.zeros(N, dtype=np.double) + 0.1

@@ -64,11 +64,12 @@ This URI will fetch block #42 from a file blocks_1-50.h5, which contains blocks 
 Also, to make it easy to load both old-style filenames and new-style URIs, there is a function :py:func:`polychrom.polymerutils.fetch_block`. fetch_block will autodetermine the type of a trajectory folder. So it will fetch both `/path/to/the/trajectory/block42.dat` and  `/path/to/the/trajectory/blocks_x-y.h5::42` automatically 
 
 """
-import numpy as np
-import warnings
-import h5py
 import glob
 import os
+import warnings
+
+import h5py
+import numpy as np
 
 DEFAULT_OPTS = {"compression_opts": 9, "compression": "gzip"}
 

@@ -3,26 +3,25 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-import os
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
 import ctypes
-from mirnylib.plotting import nicePlot
 import multiprocessing as mp
+import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import pyximport
-
+from mirnylib.plotting import nicePlot
 from openmmlib import polymerutils
-
 from openmmlib.polymerutils import scanBlocks
 
 pyximport.install()
-from mirnylib.h5dict import h5dict
-from mirnylib.systemutils import fmap, setExceptionHook
-from mirnylib.numutils import coarsegrain, completeIC
-from mirnylib.numutils import zoomArray
-from contextlib import closing
 import sys
+from contextlib import closing
+
+from mirnylib.h5dict import h5dict
+from mirnylib.numutils import coarsegrain, completeIC, zoomArray
+from mirnylib.systemutils import fmap, setExceptionHook
 from smcTranslocator import smcTranslocatorDirectional
 
 filename = "/net/levsha/share/nezar/ctcf_sites/GM12878.ctcf_narrowPeak.loj.encodeMotif.rad21.txt"
@@ -245,9 +244,10 @@ def calculateAverageLoop():
 
 
 def doPolymerSimulation(steps, dens, stiff, folder):
+    import time
+
     from openmmlib.openmmlib import Simulation
     from openmmlib.polymerutils import grow_rw
-    import time
 
     SMCTran = initModel()
 
