@@ -2,11 +2,21 @@ r"""
 Polymer simulations with CorrelatedNoiseIntegrator
 --------------------------------------------------
 
-This is a sample python script to run a polychrom simulation with the `CorrelatedNoiseIntegrator' custom integrator in polychrom.contrib.integrators. This integrator is used to simulate a polymer where the Brownian forces acting on distinct monomers could be correlated in direction. In addition, as in `ActiveBrownianIntegrator`, each monomer can have a different diffusion coefficient :math:`D_i = k_B T_i / \xi`. 
+This is a sample python script to run a polychrom simulation with the `CorrelatedNoiseIntegrator' custom integrator
+in polychrom.contrib.integrators. This integrator is used to simulate a polymer where the Brownian forces acting on
+distinct monomers could be correlated in direction. In addition, as in `ActiveBrownianIntegrator`, each monomer can
+have a different diffusion coefficient :math:`D_i = k_B T_i / \xi`.
 
-To define the correlations, we define a set of k attributes that specify the monomer's identity, such as charge, methylation status, etc. For each attribute, all monomers are assigned type 1, type -1, or type 0. The integrator defines a procedure by which type 1 monomers are correlated with one another with correlation coefficient :math:`\rho`, type -1 monomers are correlated with one another with coefficient :math:`\rho`, but type 1 and type -1 monomers are anticorrelated with coefficient :math:`-\rho`. Type 0 monomers do not experience correlated fluctuations.
+To define the correlations, we define a set of k attributes that specify the monomer's identity, such as charge,
+methylation status, etc. For each attribute, all monomers are assigned type 1, type -1, or type 0. The integrator
+defines a procedure by which type 1 monomers are correlated with one another with correlation coefficient
+:math:`\rho`, type -1 monomers are correlated with one another with coefficient :math:`\rho`, but type 1 and type -1
+monomers are anticorrelated with coefficient :math:`-\rho`. Type 0 monomers do not experience correlated fluctuations.
 
-Here, we consider a simple example with just 1 feature (say, "charge"), and set all monomer diffusion coefficients to be the same. Thus, all same-charge monomers will be correlated with correlation coefficient 0.5 and opposing charge monomers are anticorrelated with coefficient -0.5. To visualize the Pearson correlation matrix of the N-dimensional Gaussian noise that drives the polymer, use the `compute_Pearson_correlation_matrix()` function.
+Here, we consider a simple example with just 1 feature (say, "charge"), and set all monomer diffusion coefficients to
+be the same. Thus, all same-charge monomers will be correlated with correlation coefficient 0.5 and opposing charge
+monomers are anticorrelated with coefficient -0.5. To visualize the Pearson correlation matrix of the N-dimensional
+Gaussian noise that drives the polymer, use the `compute_Pearson_correlation_matrix()` function.
 
 Run this script using
 >>> python corr_noise.py [gpuid]
@@ -142,7 +152,7 @@ def run_correlated_diffusion(gpuid, N, rhos, timestep=170, nblocks=10, blocksize
             nonbonded_force_func=forces.polynomial_repulsive,
             nonbonded_force_kwargs={
                 "trunc": 3.0,  # this will let chains cross sometimes
-                #'trunc':10.0, # this will resolve chain crossings and will not let chain cross anymore
+                # 'trunc':10.0, # this will resolve chain crossings and will not let chain cross anymore
             },
             except_bonds=True,
         )

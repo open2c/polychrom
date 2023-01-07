@@ -1,6 +1,5 @@
 """
-A set of utilities for performing loop extrusion simulations. 
-
+A set of utilities for performing loop extrusion simulations.
 """
 
 

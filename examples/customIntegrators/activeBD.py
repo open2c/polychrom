@@ -2,7 +2,11 @@ r"""
 Polymer simulations with ActiveBrownianIntegrator
 -------------------------------------------------
 
-This is a sample python script to run a polychrom simulation with the `ActiveBrownianIntegrator' custom integrator in polychrom.contrib.integrators. This integrator is used to simulate a polymer where each mononmer has a different effective temperature and thus a different diffusion coefficient :math:`D_i = k_B T_i / \xi`. Here, we consider an example where there are just two types of monomers, active (A) and inactive (B), where :math:`D_A > D_B` and the user chooses the ratio :math:`D_A / D_B`.
+This is a sample python script to run a polychrom simulation with the `ActiveBrownianIntegrator' custom integrator in
+polychrom.contrib.integrators. This integrator is used to simulate a polymer where each mononmer has a different
+effective temperature and thus a different diffusion coefficient :math:`D_i = k_B T_i / \xi`. Here, we consider an
+example where there are just two types of monomers, active (A) and inactive (B), where :math:`D_A > D_B` and the user
+chooses the ratio :math:`D_A / D_B`.
 
 Run this script using
 >>> python activeBD.py [gpuid] [activity_ratio]
@@ -110,7 +114,7 @@ def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, nblocks=1
             nonbonded_force_func=forces.polynomial_repulsive,
             nonbonded_force_kwargs={
                 "trunc": 3.0,  # this will let chains cross sometimes
-                #'trunc':10.0, # this will resolve chain crossings and will not let chain cross anymore
+                # 'trunc':10.0, # this will resolve chain crossings and will not let chain cross anymore
             },
             except_bonds=True,
         )

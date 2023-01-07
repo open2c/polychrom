@@ -3,3 +3,7 @@ line-length = 120
 
 [tool.isort]
 profile = "black"
+
+[build-system]
+requires = ["setuptools", "setuptools-scm", "cython"]
+build-backend = "setuptools.build_meta"

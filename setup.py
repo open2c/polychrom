@@ -1,13 +1,11 @@
 import io
 import os
 import re
-from distutils.core import setup
-from distutils.extension import Extension
-
-import numpy
 from Cython.Build import cythonize
 from Cython.Distutils import build_ext
 from setuptools import find_packages
+from distutils.core import setup
+from distutils.extension import Extension
 
 cmdclass = {}
 
@@ -63,6 +61,7 @@ setup(
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     packages=find_packages(),
+    setup_requires=["cython"],
     entry_points={
         "console_scripts": [
             "polychrom = polychrom.cli:cli",

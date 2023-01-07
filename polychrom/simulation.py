@@ -2,18 +2,18 @@
 Creating a simulation: Simulation class
 =======================================
 
-Both initialization and running the simulation is done by interacting with an instance 
-of :py:class:`polychrom.simulation.Simulation` class.  
+Both initialization and running the simulation is done by interacting with an instance
+of :py:class:`polychrom.simulation.Simulation` class.
 
 Overall parameters
 ------------------
 
-Overall technical parameters of a simulation are generally initialized in the constructor of the 
-Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This includes 
+Overall technical parameters of a simulation are generally initialized in the constructor of the
+Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This includes
 
 **Techcnical parameters not affecting the output of simulations**
 
-* Platform (cuda (usually), opencl, or CPU (slow)) 
+* Platform (cuda (usually), opencl, or CPU (slow))
 * GPU index
 * reporter (where to save results): see :py:mod`polychrom.hdf5_reporter`
 
@@ -21,62 +21,66 @@ Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This inc
 
 * number of particles
 * integrator (we usually use variable Langevin) + error tolerance of integrator
-* collision rate 
+* collision rate
 * Whether to use periodic boundary conditions (PBC)
 * timestep (if using non-variable integrator)
 
 **Parameters that are changed rarely, but may be useful**
 
-* particle mass, temperature and length scale 
-* kinetic energy at which to raise an error 
+* particle mass, temperature and length scale
+* kinetic energy at which to raise an error
 * OpenMM precision
-* Rounding before saving (default is to 0.01) 
+* Rounding before saving (default is to 0.01)
 
-Starting conformation is loaded using :meth:`polychrom.simulation.Simulation.set_data` method. 
+Starting conformation is loaded using :meth:`polychrom.simulation.Simulation.set_data` method.
 Many tools for creating starting conformations are in :mod:`polychrom.starting_conformations`
 
-Adding forces 
+Adding forces
 -------------
 
-**Forces** define the main aspects of a given simulation. Polymer connectivity, confinement, crosslinks, tethering monomers, etc. 
-are all defined as different forces acting on the particles. 
+**Forces** define the main aspects of a given simulation. Polymer connectivity, confinement, crosslinks,
+tethering monomers, etc. are all defined as different forces acting on the particles.
 
-Typicall used forces are listed in :py:mod:`polychrom.forces` module. Forces out of there can be added using :py:meth:`polychrom.simulation.Simulation.add_force` method. 
+Typicall used forces are listed in :py:mod:`polychrom.forces` module. Forces out of there can be added using
+:py:meth:`polychrom.simulation.Simulation.add_force` method.
 
-Forces and their parameters are an essential part of nearly any polymer simulations. Some forces have just a few paramters (e.g. spherical confinement just needs a radius), while other forces may have lots of parameters and can define complex structures. For example, harmonidBondForce with a specially-created bond list was used to create a backbone-plectoneme conformation in Caulobacter simulations (Le et al, Science 2013). Same harmonic bonds that change over time are used to simulate loop extrusion as in (Fudenberg, 2016). 
+Forces and their parameters are an essential part of nearly any polymer simulations. Some forces have just a few
+paramters (e.g. spherical confinement just needs a radius), while other forces may have lots of parameters and can
+define complex structures. For example, harmonidBondForce with a specially-created bond list was used to create a
+backbone-plectoneme conformation in Caulobacter simulations (Le et al, Science 2013). Same harmonic bonds that change
+over time are used to simulate loop extrusion as in (Fudenberg, 2016).
 
-Some forces need to be added together. Those include forces defining polymer connectivity. Those forces are combined 
-into **forcekits**. Forcekits are defined in :py:mod:`polychrom.forcekits` module. The only example 
-of a forcekit for now is defining polymer connectivity using bonds, polymer stiffness, and inter-monomer interaction 
-("nonbonded force"). 
+Some forces need to be added together. Those include forces defining polymer connectivity. Those forces are combined
+into **forcekits**. Forcekits are defined in :py:mod:`polychrom.forcekits` module. The only example
+of a forcekit for now is defining polymer connectivity using bonds, polymer stiffness, and inter-monomer interaction
+("nonbonded force").
 
-Some forces were written for openmm-polymer library and were not fully ported/tested into the polychrom library. 
-Those forces reside in :py:mod:`polychrom.legacy.forces` module. Some of them can be used as is, and some of them 
-would need to be copied to your code and potentially conformed to the new style of defining forces. This includes 
-accepting simulation object as a parameter, and having a ``.name`` attribute. 
+Some forces were written for openmm-polymer library and were not fully ported/tested into the polychrom library.
+Those forces reside in :py:mod:`polychrom.legacy.forces` module. Some of them can be used as is, and some of them
+would need to be copied to your code and potentially conformed to the new style of defining forces. This includes
+accepting simulation object as a parameter, and having a ``.name`` attribute.
 
 
 Defining your own forces
 ------------------------
 
-Each force in :py:mod:`polychrom.forces` is a simple function that wraps creation of an openmm force object. 
-Users can create new forces in the script defining their simulation and add them using add_force method. 
-Good examples of forces are in :py:mod:`polychrom.forces` - all but harmonic bond force use custom forces, 
-and provide explanations of why particular energy function was chosen. Description of the module :py:mod:`polychrom.forces` 
-has some important information about adding new forces. 
+Each force in :py:mod:`polychrom.forces` is a simple function that wraps creation of an openmm force object. Users
+can create new forces in the script defining their simulation and add them using add_force method. Good examples of
+forces are in :py:mod:`polychrom.forces` - all but harmonic bond force use custom forces, and provide explanations of
+why particular energy function was chosen. Description of the module :py:mod:`polychrom.forces` has some important
+information about adding new forces.
 
 
 
-Running a simulation 
+Running a simulation
 --------------------
 
-To run a simulation, you call :py:meth:`polychrom.simulation.Simulation.doBlock` method in a loop. 
-Unless specified otherwise, this would save a conformation into a defined reporter. Terminating a 
-simulation is not necessary; however, terminating a reporter using reporter.dump_data() is needed for 
-the hdf5 reporter. This all can be viewed in the example script. 
+To run a simulation, you call :py:meth:`polychrom.simulation.Simulation.doBlock` method in a loop.
+Unless specified otherwise, this would save a conformation into a defined reporter. Terminating a
+simulation is not necessary; however, terminating a reporter using reporter.dump_data() is needed for
+the hdf5 reporter. This all can be viewed in the example script.
 
 """
-
 
 from __future__ import absolute_import, division, print_function
 
@@ -87,7 +91,7 @@ import tempfile
 import time
 import warnings
 from collections.abc import Iterable
-
+from typing import Optional, Dict
 import numpy as np
 
 try:
@@ -317,17 +321,17 @@ class Simulation(object):
             self.integrator_type = integrator_type
             kwargs["integrator"] = "user_defined"
 
-        self.N = kwargs["N"]
+        self.N: int = kwargs["N"]
 
-        self.verbose = kwargs["verbose"]
+        self.verbose: bool = kwargs["verbose"]
         self.reporters = kwargs["reporters"]
-        self.forces_applied = False
-        self.length_scale = kwargs["length_scale"]
-        self.eK_critical = kwargs["max_Ek"]  # Max allowed kinetic energy
+        self.forces_applied: bool = False
+        self.length_scale: float = kwargs["length_scale"]
+        self.eK_critical: float = kwargs["max_Ek"]  # Max allowed kinetic energy
 
-        self.step = 0
-        self.block = 0
-        self.time = 0
+        self.step: int = 0
+        self.block: int = 0
+        self.time: float = 0
 
         self.nm = simtk.unit.nanometer
 
@@ -342,28 +346,28 @@ class Simulation(object):
             (2 * self.kT / self.conlen**2) / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer**2)
         )
 
-        self.system = openmm.System()
+        self.system: openmm.System = openmm.System()
 
         # adding PBC
-        self.PBC = False
+        self.PBC: bool = False
         if kwargs["PBCbox"]:
             self.PBC = True
-            PBCbox = np.array(kwargs["PBCbox"])
+            pbc_box = np.array(kwargs["PBCbox"])
             self.system.setDefaultPeriodicBoxVectors(
-                [float(PBCbox[0]), 0.0, 0.0],
-                [0.0, float(PBCbox[1]), 0.0],
-                [0.0, 0.0, float(PBCbox[2])],
+                [float(pbc_box[0]), 0.0, 0.0],
+                [0.0, float(pbc_box[1]), 0.0],
+                [0.0, 0.0, float(pbc_box[2])],
             )
 
         self.force_dict = {}  # Dictionary to store forces
 
         # saving arguments - not trying to save reporters because they are not serializable
-        kwCopy = {i: j for i, j in kwargs.items() if i != "reporters"}
+        kw_copy = {i: j for i, j in kwargs.items() if i != "reporters"}
         for reporter in self.reporters:
-            reporter.report("initArgs", kwCopy)
+            reporter.report("initArgs", kw_copy)
 
     def get_data(self):
-        "Returns an Nx3 array of positions"
+        """Returns an Nx3 array of positions"""
         return np.asarray(self.data / simtk.unit.nanometer, dtype=np.float32)
 
     def get_scaled_data(self):
@@ -373,9 +377,9 @@ class Simulation(object):
         alldata = self.get_data()
         boxsize = np.array(self.kwargs["PBCbox"])
         mults = np.floor(alldata / boxsize[None, :])
-        toRet = alldata - mults * boxsize[None, :]
-        assert toRet.min() >= 0
-        return toRet
+        to_ret = alldata - mults * boxsize[None, :]
+        assert to_ret.min() >= 0
+        return to_ret
 
     def set_data(self, data, center=False, random_offset=1e-5, report=True):
         """Sets particle positions
@@ -555,13 +559,8 @@ class Simulation(object):
         Parameters
         ----------
         temperature: temperature to set velocities (default: temerature of the simulation)
-        v: (N,) array-like
-            Vector of initial velocities for the N particles. If None, velocities are chosen
-            from a Boltzmann distribution at a given temperature.
         """
-        try:
-            self.context
-        except:
+        if not hasattr(self, "context"):
             raise ValueError("No context, cannot set velocs." "Initialize context before that")
 
         if hasattr(self, "velocities"):
@@ -576,14 +575,11 @@ class Simulation(object):
         """Sends particle coordinates to OpenMM system.
         If system has exploded, this is
          used in the code to reset coordinates."""
-
-        try:
-            self.context
-        except:
+        if not hasattr(self, "context"):
             raise ValueError("No context, cannot set positions." " Initialize context before that")
         self.context.setPositions(self.data)
-        eP = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
-        logging.info("Particles loaded. Potential energy is %lf" % eP)
+        e_p = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
+        logging.info("Particles loaded. Potential energy is %lf" % e_p)
 
     def reinitialize(self):
         """Reinitializes the OpenMM context object.
@@ -634,8 +630,8 @@ class Simulation(object):
             See why do we need it in the caveat below.
 
 
-        Caveat
-        ------
+        NOTES
+        -----
 
         If using variable langevin integrator after minimization, a big error may
         happen in the first timestep. The reason is that enregy minimization
@@ -693,7 +689,16 @@ class Simulation(object):
         steps : int or None
             Number of timesteps to perform.
         increment : bool, optional
-            If true, will not increment self.block and self.steps counters
+            If true, will not increment `self.block` and `self.steps` counters
+        check_functions: list of functions, optional
+            List of functions to call every block. coordinates are passed to a function.
+            If a function returns False, simulation is stopped.
+        get_velocities: bool, default=False
+            If True, will return velocities
+        save: bool, defualt=True
+            If True, save results of this block
+        save_extras: dict
+            A dict of (key, value) with additional info to save
         """
 
         if not self.forces_applied:
@@ -798,7 +803,9 @@ class Simulation(object):
         per5 = np.percentile(dists, 5)
         den5 = (0.05 * self.N) / ((4.0 * np.pi * per5**3) / 3)
         x, y, z = pos[:, 0], pos[:, 1], pos[:, 2]
-        minmedmax = lambda x: (x.min(), np.median(x), x.mean(), x.max())
+
+        def minmedmax(value):
+            return value.min(), np.median(value), value.mean(), value.max()
 
         print("\n Statistics: number of particles: %d\n" % (self.N,))
         print("Statistics for particle position")

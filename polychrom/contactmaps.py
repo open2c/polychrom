@@ -3,20 +3,19 @@ Building contact maps
 =====================
 
 
-This module is the main workhorse of tools to calculate contactmaps, both from 
-polymer simulations and from other simulations (e.g. 1D simulations of loop 
-extrusion). All of the functions here are designed to be parallelized, and lots of 
-efforts were put into making this possible. 
+This module is the main workhorse of tools to calculate contactmaps, both from polymer simulations and from other
+simulations (e.g. 1D simulations of loop extrusion). All of the functions here are designed to be parallelized,
+and lots of efforts were put into making this possible.
 
-The reasons we need parallel contactmap code is the following: 
+The reasons we need parallel contactmap code is the following:
 
-* Calculating contact maps is slow, esp. at large contact radii, and benefits greatly 
+* Calculating contact maps is slow, esp. at large contact radii, and benefits greatly
   from parallelizing
 * Doing regular multiprocesing.map has limitations
-* It can only handle heataps up to some size, and transferring gigabyte-sized heatmaps between processes takes minutes 
-* It can only do as many heatmaps as fits in RAM, which on 20-core 128GB machine is no more than 5GB/heatmap 
+* It can only handle heataps up to some size, and transferring gigabyte-sized heatmaps between processes takes minutes
+* It can only do as many heatmaps as fits in RAM, which on 20-core 128GB machine is no more than 5GB/heatmap
 
-The structure of this class is as follows. 
+The structure of this class is as follows.
 
 On the outer level, it  provides three methods to average contactmaps:
 
@@ -24,27 +23,22 @@ On the outer level, it  provides three methods to average contactmaps:
 * :func:`binnedContactMap`,
 * :func:`monomerResolutionContactMapSubchains`.
 
-The first two create contact map from an
-entire file: either monomer-resolution or binned. The last one creates contact maps 
-from sub-chains in a file, starting at a given set of starting points. It is useful 
-when doing contact maps from several copies of a system in one simulation. 
+The first two create contact map from an entire file: either monomer-resolution or binned. The last one creates
+contact maps from sub-chains in a file, starting at a given set of starting points. It is useful when doing contact
+maps from several copies of a system in one simulation.
 
-The first two methods have a legacy implementation from the old library that is still 
-here to do the tests. 
+The first two methods have a legacy implementation from the old library that is still here to do the tests.
 
-On the middle level, it provides a method "averageContacts". This method accepts a 
-"contact iterator", and can be used to average contacts from both a set of filenames 
-and from a simulation of some kind (e.g. averaging positions of loop extruding 
-factors from a 1D loop extrusion simulation). All of the outer level functions (
-monomerResolutionContactMap for example) are implemented using this method. 
+On the middle level, it provides a method "averageContacts". This method accepts a "contact iterator", and can be
+used to average contacts from both a set of filenames and from a simulation of some kind (e.g. averaging positions of
+loop extruding factors from a 1D loop extrusion simulation). All of the outer level functions (
+monomerResolutionContactMap for example) are implemented using this method.
 
-On the lower level, there are internals of the "averageContacts" method and an 
-associated "worker" function. There is generally no need to understand the code of 
-those functions. There exists a reference implementation of both the worker and the 
-:func:`averageContacts` function,  :class:`simpleWorker` and :func:`averageContactsSimple`. They do
-all the things that "averageContacts" do, but on only one core. In fact, 
-"averageContacts" defaults to "averageContactsSimple" if requested to run on one core 
-because it is a little bit faster. 
+On the lower level, there are internals of the "averageContacts" method and an associated "worker" function. There is
+generally no need to understand the code of those functions. There exists a reference implementation of both the
+worker and the :func:`averageContacts` function,  :class:`simpleWorker` and :func:`averageContactsSimple`. They do
+all the things that "averageContacts" do, but on only one core. In fact, "averageContacts" defaults to
+"averageContactsSimple" if requested to run on one core because it is a little bit faster.
 
 """
 
@@ -172,7 +166,7 @@ def averageContactsSimple(contactIterator, inValues, N, **kwargs):
         contactIterator:
             an iterator. See descriptions of "filenameContactMap" class below for example and explanations
         inValues:
-            an array of values to pass to contactIterator. Would be an array of arrays of filenames or something like that.
+            an array of values to pass to contactIterator. Would be an array of arrays of filenames etc.
         N:
             Size of the resulting contactmap
 
@@ -356,7 +350,6 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
     if nproc == 1:
         return averageContactsSimple(contactIterator, inValues, N, **kwargs)
     contactBlock = kwargs.get("contactBlock", 5000000)
-    useFmap = kwargs.get("useFmap", False)
     classInitArgs = kwargs.get("classInitArgs", [])
     classInitKwargs = kwargs.get("classInitKwargs", {})
     contactProcessing = kwargs.get("contactProcessing", lambda x: x)
@@ -373,20 +366,8 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
         N,
     ]
 
-    if not useFmap:  # for mp.map we need initializer because shared memory cannot be pickled
-        # # or passed as an argument in inValues
-        with closing(mp.Pool(processes=nproc, initializer=init, initargs=argset)) as p:
-            p.map(worker, inValues)
-
-    # diffent strategy for a local map
-    # shared memory is just a global variable created by init()
-    else:
-        init(*argset)  # creating global variables here
-        if callable(useFmap):
-            fmap = useFmap
-        else:
-            from mirnylib.systemutils import fmap
-        fmap(worker, inValues, nproc=nproc)
+    with closing(mp.Pool(processes=nproc, initializer=init, initargs=argset)) as p:
+        p.map(worker, inValues)
 
     res = np.concatenate([tonumpyarray(i) for i in sharedArrays])
     del sharedArrays  # save memory

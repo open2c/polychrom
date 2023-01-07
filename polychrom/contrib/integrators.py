@@ -2,20 +2,23 @@ r"""
 Custom integrators to use with polychrom
 ----------------------------------------
 
-Here, we develop Brownian integrators capable of integrating
-the overdamped Langevin equation for a polymer driven by correlated active forces.
-The forces can vary in magnitude along the chain, such that each monomer has a different effective temperature :math:`T_i` or scalar activity :math:`A_i \propto k_B T_i`. In addition, the forces acting on distinct monomers can be correlated in direction. In that case, the equation of motion for the ith monomer of the polymer is
-    
+Here, we develop Brownian integrators capable of integrating the overdamped Langevin equation for a polymer driven by
+correlated active forces. The forces can vary in magnitude along the chain, such that each monomer has a different
+effective temperature :math:`T_i` or scalar activity :math:`A_i \propto k_B T_i`. In addition, the forces acting on
+distinct monomers can be correlated in direction. In that case, the equation of motion for the ith monomer of the
+polymer is
+
 .. math::
     \frac{dx(i, t)}{dt} =  \frac{1}{\xi}\vec{f}_{d} + \vec{\eta}_i(t)
-    
-where :math:`\vec{f}_d` represents all deterministic forces, :math:`\xi` is the friction coefficient, 
-and :math:`\vec{\eta}_i(t)` is a mean-zero 
-Gaussian random velocity field with `:math:`\langle \eta_{ik} \eta_{jl} \rangle = 
-2\sqrt{D_i}\sqrt{D_j}C_{ij}\delta_{kl}`. :math:`k, l` index the spatial components of the noise
-vector, and :math:`i, j` index the monomers. Here, :math:`D_i = k_B T_i / \xi` is the diffusion coefficient of the ith monomer, and :math:`C_{ij} \in [-1, 1]` is the Pearson correlation matrix.
 
-The ActiveBrownianIntegrator considers the case where :math:`C_{ij} = \delta_{ij}`, i.e. the random forces acting on distinct monomers are independent, but may vary in magnitude.
+where :math:`\vec{f}_d` represents all deterministic forces, :math:`\xi` is the friction coefficient,
+and :math:`\vec{\eta}_i(t)` is a mean-zero Gaussian random velocity field with `:math:`\langle \eta_{ik} \eta_{jl}
+\rangle = 2\sqrt{D_i}\sqrt{D_j}C_{ij}\delta_{kl}`. :math:`k, l` index the spatial components of the noise vector,
+and :math:`i, j` index the monomers. Here, :math:`D_i = k_B T_i / \xi` is the diffusion coefficient of the ith
+monomer, and :math:`C_{ij} \in [-1, 1]` is the Pearson correlation matrix.
+
+The ActiveBrownianIntegrator considers the case where :math:`C_{ij} = \delta_{ij}`, i.e. the random forces acting on
+distinct monomers are independent, but may vary in magnitude.
 
 The CorrelatedNoiseIntegrator considers the case where :math:`C_{ij}` is non-diagonal.
 
@@ -23,11 +26,22 @@ For examples on how to run simulations with these custom integrators, see exampl
 
 Notes
 -----
-The default integrator used in polychrom is a Langevin integrator with variable time stepping. This does not take the overdamped limit of the Langevin equation, i.e. all monomers have inertia and show ballistic dynamics on short time scales. The custom integrators below, in contrast, are Brownian integrators, since there this is a nonequilibrium system and there is no guarantee that underdamped and overdamped dynamics will lead to the same nonequilibrium steady state. However,
 
-- Brownian integrators are A LOT slower than Langevin integrators (i.e. require many more time steps. For example, a chain with 1000 monomers needs about 10^7 time steps to equilibrate).
-- Since monomers do not have inertia, their "velocity" is a meaningless quantity. Thus all monomer velocities should be initialized to zero using the Simulation class's `set_velocities()` function. Specify the integrator type as "brownian" so that the simulation code does not raise an error if the polymer's kinetic energy exceeds a threshold. 
-- Use a larger collision rate (2.0 works) for brownian integrators since dynamics are overdamped. (Langevin integrators use 0.1 or below).
+The default integrator used in polychrom is a Langevin integrator with variable time stepping. This does not take the
+overdamped limit of the Langevin equation, i.e. all monomers have inertia and show ballistic dynamics on short time
+scales. The custom integrators below, in contrast, are Brownian integrators, since there this is a nonequilibrium
+system and there is no guarantee that underdamped and overdamped dynamics will lead to the same nonequilibrium steady
+state. However,
+
+- Brownian integrators are A LOT slower than Langevin integrators (i.e. require many more time steps. For example,
+a chain with 1000 monomers needs about 10^7 time steps to equilibrate).
+
+- Since monomers do not have inertia, their "velocity" is a meaningless quantity. Thus all monomer velocities should
+be initialized to zero using the Simulation class's `set_velocities()` function. Specify the integrator type as
+"brownian" so that the simulation code does not raise an error if the polymer's kinetic energy exceeds a threshold.
+
+- Use a larger collision rate (2.0 works) for brownian integrators since dynamics are overdamped. (Langevin
+integrators use 0.1 or below).
 
 """
 import numpy as np

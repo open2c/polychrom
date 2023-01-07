@@ -1,27 +1,25 @@
 #!/usr/bin/env python
-"""
-This is a function that would convert trajectories from the old format "blockXXX.dat" + "SMCXXX.dat"
-to the new HDF5-based format. 
+"""This is a function that would convert trajectories from the old format "blockXXX.dat" + "SMCXXX.dat" to the new
+HDF5-based format.
 
-This glbal docstring has FAQ, general motivation, and examples. 
-To figure out how to use the function, either browse to the function below and read
-the click decorators, or just run "traj_convert.py --help". 
+This glbal docstring has FAQ, general motivation, and examples. To figure out how to use the function, either browse
+to the function below and read the click decorators, or just run "traj_convert.py --help".
 
 Installation
 ------------
 
-Copy the file traj_convert.py to your bin folder (e.g. ~/anaconda3/bin) 
+Copy the file traj_convert.py to your bin folder (e.g. ~/anaconda3/bin)
 
 Usage
 -----
 
-traj_convert.py --help  will print the usage. 
+traj_convert.py --help  will print the usage.
 
 Useful arguments to consider
 
 * --dry-run --verbose (do not modify anything, and print what you're doing)
-* --empty-policy copy  (for not inplace conversions, will copy non-polymer-simulations trajectories as is) 
-* --inplace --empty-policy ignore --verbose (once you run the script a few times, you can do the rest of conversions inplace, it's faster)
+* --empty-policy copy  (for not inplace conversions, will copy non-polymer-simulations trajectories as is)
+* --inplace --empty-policy ignore --verbose (once you run it a few times, you can do the rest inplace, it's faster)
 
 FAQ
 ---
@@ -29,54 +27,58 @@ FAQ
 Q: What happens to block numbers from old style trajectories?
 A: they are put in the data dict under "block" key, the same way HDF5 trajectories in polychrom do it
 
-Q: What happens to loop extrusion positions? 
-A: SMC12345.dat are automatically swept in under the key "lef_positions" and would be returned in a dict returned by polychrom.hdf5_format.load_URI
+Q: What happens to loop extrusion positions?
+A: SMC12345.dat are automatically swept in under the key "lef_positions"
+and would be returned in a dict returned by polychrom.hdf5_format.load_URI
 
-Q: What is the best way to save space? 
-A: Rounding to 1 digit (0.05 max error) would save 30-40%. Picking every second/5th/etc. file would save it by 2x/5x on top of that
+Q: What is the best way to save space?
+A: Rounding to 1 digit (0.05 max error) would save 30-40%.
+Picking every second/5th/etc. file would save it by 2x/5x on top of that
 
-Q: How to find how much do folders occupy? 
-A: `du -sch *`  ; alternatively `du -sc * | sort -n` if you want to sort the output by size. 
-`find . | wc -l` to find how many files 
+Q: How to find how much do folders occupy?
+A: `du -sch *`  ; alternatively `du -sc * | sort -n` if you want to sort the output by size.
+`find . | wc -l` to find how many files
 
 Default Behavior
 ----------------
 
-Defaults are fairly conservative, and would use little rounding (to 2 digits, 0.005 maximum error), 
+Defaults are fairly conservative, and would use little rounding (to 2 digits, 0.005 maximum error),
 would demand the trajectory to be consecutive, and would not do in-place conversions.
 
-Examples 
+Examples
 --------
 
-First, run "traj_convert.py --help" to see general usage. 
+First, run "traj_convert.py --help" to see general usage.
 
-All examples below are real-life examples showing how to convert many trajectories at once. 
-Examples below convert each sub-folder in a given folder, which is probably the most common usecase. 
+All examples below are real-life examples showing how to convert many trajectories at once.
+Examples below convert each sub-folder in a given folder, which is probably the most common usecase.
 
-For very critical data, it is recommended to not convert in place. The script below does this, 
+For very critical data, it is recommended to not convert in place. The script below does this,
 and converts each trajectory to a new-style, placed in a "../converted" folder with the same
-name. It rounds to 2 digits (max error 0.005) by default, which is very conservative. 
+name. It rounds to 2 digits (max error 0.005) by default, which is very conservative.
 It is recommended to round to 1 digit unless you specifically need bond lengths or angles
 to a high precision. Contactmaps are not affected by 1-digit rounding.
 
-(put this in a bash script, set -e will take care of not continuing on errors) 
+(put this in a bash script, set -e will take care of not continuing on errors)
 set - e
 for i in *; do traj_convert.py --empty-policy raise --verbose  "$i" "../converted/$i" ; done
 
-For less critical data, in-place conversion is acceptable. Example below converts every trajectory in-place, 
-and rounds to 1 digit, and also skips every second file. This gives ~4x space savings. 
-It sets empty-policy to "ignore" because conversion is in place. You will be notified of all the cases 
-of empty folders because of the --verbose flag. It will use a temporary folder to copy files to, and then would
-replace the original with the temporary folder. It also allows for missing blocks (e.g. block1.dat block2.dat block4.dat). 
+For less critical data, in-place conversion is acceptable. Example below converts every trajectory in-place,
+and rounds to 1 digit, and also skips every second file. This gives ~4x space savings. It sets empty-policy to
+"ignore" because conversion is in place. You will be notified of all the cases of empty folders because of the
+--verbose flag. It will use a temporary folder to copy files to, and then would replace the original with the
+temporary folder. It also allows for missing blocks (e.g. block1.dat block2.dat block4.dat).
 
-for i in *; do traj_convert.py --empty-policy ignore --verbose --round-to 1 --skip-files 2 --allow-nonconsecutive --replace  "$i" `mktemp -d` ; done
+for i in *; do traj_convert.py --empty-policy ignore --verbose --round-to 1 --skip-files 2 --allow-nonconsecutive
+--replace  "$i" `mktemp -d` ; done
 
 
-Input can be new-style trajectory as well. You would use that for thinning or rounding the data. For example, 
-the script below would round data to 0.05, and take every 5th file (10x space reduction). It also shows an example of iterating 
-through all sub-subdirectories, (not sub-directories), which is also a common data layout. 
+Input can be new-style trajectory as well. You would use that for thinning or rounding the data. For example,
+the script below would round data to 0.05, and take every 5th file (10x space reduction). It also shows an example of
+iterating through all sub-subdirectories, (not sub-directories), which is also a common data layout.
 
-for i in */*; do traj_convert.py --empty-policy ignore --verbose --input-style new --round-to 1 --skip-files 5 --allow-nonconsecutive --replace "$i" `mktemp -d` ; done
+for i in */*; do traj_convert.py --empty-policy ignore --verbose --input-style new --round-to 1 --skip-files 5
+--allow-nonconsecutive --replace "$i" `mktemp -d` ; done
 
 """
 

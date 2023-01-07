@@ -1,12 +1,16 @@
 import numpy as np
 import simtk.openmm as openmm
+import simtk.unit.nanometer as nm
+import simtk.unit as units
+import os
+import pickle
 
 """
-This is a collection of old forces that are likely no longer used 
-These were a part of openmmlib before April 2019, but were removed during spring cleaning. 
+This is a collection of old forces that are likely no longer used
+These were a part of openmmlib before April 2019, but were removed during spring cleaning.
 
-They should be importable and may or may not just work. It should not be difficult to make them compatible 
-with the new library. 
+They should be importable and may or may not just work. It should not be difficult to make them compatible
+with the new library.
 
 """
 
@@ -132,9 +136,9 @@ def lamina_attraction(sim_object, width=1, depth=1, r=None):
     if r is None:
         try:
             r = sim_object.sphericalConfinementRadius
-        except:
+        except Exception:
             raise ValueError("No spherical confinement radius defined" " yet. Apply spherical confinement first!")
-    if sim_object.verbose == True:
+    if sim_object.verbose:
         print("Lamina attraction added with r = %d" % r)
 
     laminaForce.addGlobalParameter("LAMaa", r * nm)
@@ -248,7 +252,7 @@ def lennard_jones_force(
             particleParameters[1] = sigmaRep
             particleParameters[2] = epsilonRep
 
-            if domains == True:
+            if domains:
                 if sim_object.domains[i] != 0:
                     particleParameters[1] = sigmaAttr
                     particleParameters[2] = epsilonAttr
@@ -317,7 +321,7 @@ def attractive_interaction(sim_object, i, j, epsilon, sigma=None, length=3):
     for t1 in range(int(np.ceil(i - length / 2)), int(np.ceil(i + (length - length / 2)))):
         for t2 in range(int(np.ceil(j - length / 2)), int(np.ceil(j + (length - length / 2)))):
             repulforce.addException(t1, t2, 0, sigma, epsilon, True)
-            if sim_object.verbose == True:
+            if sim_object.verbose:
                 print("Exception added between" " particles %d and %d" % (t1, t2))
 
     for tt in range(i - length, i + length):
@@ -355,7 +359,7 @@ def exclude_sphere(sim_object, r=5, position=(0, 0, 0)):
         spherForce.addParticle(i, [])
 
     sim_object.sphericalConfinementRadius = r
-    if sim_object.verbose == True:
+    if sim_object.verbose:
         print("Spherical confinement with radius = %lf" % r)
     # assigning parameters of the force
     spherForce.addGlobalParameter("EXkb", 2 * sim_object.kT / nm)
@@ -406,7 +410,7 @@ def create_walls(sim_object, left=None, right=None, k=0.5):
     else:
         right = 1.0 * nm * right
 
-    if sim_object.verbose == True:
+    if sim_object.verbose:
         print("left wall created at ", left / (1.0 * nm))
         print("right wall created at ", right / (1.0 * nm))
 
@@ -440,9 +444,9 @@ def spherical_well(sim_object, r=10, depth=1):
     if r is None:
         try:
             r = sim_object.sphericalConfinementRadius * 0.5
-        except:
+        except Exception:
             exit("No spherical confinement radius defined yet." " Apply spherical confinement first!")
-    if sim_object.verbose == True:
+    if sim_object.verbose:
         print("Well attraction added with r = %d" % r)
 
     # assigning parameters of the force
@@ -451,7 +455,7 @@ def spherical_well(sim_object, r=10, depth=1):
     extforce4.addGlobalParameter("WELLtt", 0.01 * nm)
 
 
-## from class "yeast simulation"
+# from class "yeast simulation"
 
 
 def add_nucleolus(sim_object, k=1, r=None):
@@ -466,7 +470,7 @@ def add_nucleolus(sim_object, k=1, r=None):
 
     sim_object.force_dict["NucleolusConfinement"] = extforce3
     # adding all the particles on which force acts
-    if sim_object.verbose == True:
+    if sim_object.verbose:
         print("NUCleolus confinement from radius = %lf" % r)
     # assigning parameters of the force
     extforce3.addGlobalParameter("NUCkb", k * sim_object.kT / nm)
@@ -492,22 +496,22 @@ def add_lamina_attraction(sim_object, width=1, depth=1, r=None, particles=None):
     if particles is None:
         for i in range(sim_object.N):
             extforce3.addParticle(i, [])
-            if sim_object.verbose == True:
+            if sim_object.verbose:
                 print("particle %d laminated! " % i)
 
     else:
         for i in particles:
             extforce3.addParticle(i, [])
-            if sim_object.verbose == True:
+            if sim_object.verbose:
                 print("particle %d laminated! " % i)
 
     if r is None:
         try:
             r = sim_object.sphericalConfinementRadius
-        except:
+        except Exception:
             exit("No spherical confinement radius defined yet." "Apply spherical confinement first!")
 
-    if sim_object.verbose == True:
+    if sim_object.verbose:
         print("Lamina attraction added with r = %d" % r)
 
     # assigning parameters of the force
@@ -588,13 +592,14 @@ def check_connectivity(sim_object, newcoords=None, maxBondSizeMultipler=10):
     if not hasattr(sim_object, "bondLengths"):
         raise ValueError("must use either harmonic or abs bonds to use checkConnectivty")
 
-    if newcoords == None:
+    if newcoords is None:
         newcoords = sim_object.get_data()
         printPositiveResult = True
     else:
         printPositiveResult = False
 
-    # sim_object.bondLengths is a list of lists (see above) [..., [int(i), int(j), float(distance), float(bondSize)], ...]
+    # sim_object.bondLengths is a list of lists (see above)
+    # [..., [int(i), int(j), float(distance), float(bondSize)], ...]
     bondArray = np.array(sim_object.bondLengths)
     bondDists = np.sqrt(
         np.sum(

@@ -109,6 +109,6 @@ def _test_Rg_scalings_vs_Rg_matrix():
 
 
 if __name__ == "__main__":
-    _test_Rg_scalings()
+    _test_Rg_scalings_vs_Rg_matrix()
     _testMutualSimplify()
     test_smart_contacts()

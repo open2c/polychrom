@@ -12,7 +12,7 @@ if len(sys.argv) < 2:
         textwrap.dedent(
             """
             Usage: show filename [start end pace]
-                 show filenum [start end pace] 
+                 show filenum [start end pace]
 
                  filenum is a number of files of the type block123.dat
 
@@ -49,7 +49,6 @@ def showData(data):
 
     # rescaling the data, so that bonds are of the order of 1. This is because rasmol spheres are of the fixed diameter.
     data /= meandist
-    diffs = data[:1] - data[1:]
 
     # writing the rasmol script. Spacefill controls radius of the sphere.
     rascript = tempfile.NamedTemporaryFile(mode="w")
@@ -70,7 +69,7 @@ def showData(data):
     # for speedup I just create a Nx4 array, where first three columns are coordinates, and fourth is the color
 
     def convertData(data, colors):
-        "Returns an somethingx4 array for each subchain"
+        """Returns an somethingx4 array for each subchain"""
         newData = np.zeros((len(data) * len(shifts) - (len(shifts) - 1), 4))
         for i in range(len(shifts)):
             # filling in the array like 0,5,10,15; then 1,6,11,16; then 2,7,12,17, etc.

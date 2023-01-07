@@ -1,11 +1,8 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 #                  Anton Goloborodko (golobor@mit.edu)
 
-"""
-This class is a collection of functions for showing data with pymol.
-Note that the limit of pymol is 100k monomers, therefore interpolateData is
-useful to collapse the 200k-long simulation into a 100k-long conformation.
-"""
+"""This class is a collection of functions for showing data with pymol. Note that the limit of pymol is 100k
+monomers, therefore interpolateData is useful to collapse the 200k-long simulation into a 100k-long conformation. """
 import os
 import shutil
 import subprocess
@@ -20,9 +17,8 @@ from . import polymerutils
 
 def interpolateData(data, targetN=90000, colorArrays=[]):
     """
-    Converts a polymer of any length to a smoothed chain with (hopefully)
-    fixed distance between neighboring monomers. Does it by cubic spline
-    interpolation as following.
+    Converts a polymer of any length to a smoothed chain with (hopefully) fixed distance between neighboring
+    monomers. Does it by cubic spline interpolation as following.
 
     1. Interpolate the data using cubic spline \n
     2. Evaluate cubic spline at targetN*10 values \n
@@ -308,7 +304,7 @@ def do_coloring(
     for i in spherePositions:
         out.write("select {0} and  {1}\n".format(name, getSelectionString(i, i)))
         out.write("show spheres, sele\n")
-        out.write("alter sele, vdw={1}\n".format(i, 1.5 * sphereRadius))
+        out.write("alter sele, vdw={0}\n".format(1.5 * sphereRadius))
         out.write("set sphere_color, {0}, sele \n".format(sphereColor))
 
     if showChain == "worm":
@@ -443,7 +439,6 @@ def new_coloring(
 
     tmpPdbFile = tempfile.NamedTemporaryFile(mode="w", suffix=".pdb")
     tmpPdbFilename = tmpPdbFile.name
-    pdbname = os.path.split(tmpPdbFilename)[-1]
     tmpPdbFile.close()
     polymerutils.save(data, tmpPdbFilename, mode="pdb", pdbGroups=pdbGroups)
 
@@ -452,8 +447,6 @@ def new_coloring(
 
     out = tempfile.NamedTemporaryFile(mode="w")
 
-    if returnScriptName is not None:
-        pdbname = returnScriptName
     out.write(presupport)
     out.write("hide all\n")
     out.write("bg white\n")
@@ -544,7 +537,7 @@ def show_chain(data, showGui=True, saveTo=None, showChain="worm", chains=None, s
     print(data.min())
 
     tmpPdbPath, pdbname = getTmpPath(suffix=".pdb")
-    if chains == None:
+    if chains is None:
         polymerutils.save(data, tmpPdbPath, mode="pdb")
     else:
         pdbArray = np.zeros(len(data))
@@ -637,7 +630,7 @@ def makeMoviePymol(
         for i in range(numFrames // rotationPeriod + 1):
             rotationCode += "util.mroll {0},{1},0\n".format(i * rotationPeriod + 1, (i + 1) * rotationPeriod)
 
-    if pymolScript == None:
+    if pymolScript is None:
         script += textwrap.dedent(
             """
 
@@ -667,7 +660,7 @@ def makeMoviePymol(
                 resolution[1],
                 numFrames,
                 rotationCode,
-                max(0, len(fileList) - fps * 2),
+                # max(0, len(fileList) - fps * 2),  # unused - why it was here
             )
         )
     else:
