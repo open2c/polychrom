@@ -52,9 +52,7 @@ def test_contactmaps():
     assert np.allclose(cmap1, cmap3)
 
     for n in [1, 4]:
-        cmap6 = monomerResolutionContactMap(
-            range(8), cutoff=1, loadFunction=lambda x: ars[x], n=n
-        )
+        cmap6 = monomerResolutionContactMap(range(8), cutoff=1, loadFunction=lambda x: ars[x], n=n)
         cmap5 = cmapPureMap(
             range(8),
             cutoff=1,

@@ -293,9 +293,7 @@ def R2_scaling(data, bins=None, ring=False):
     for i in range(len(bins)):
         length = bins[i]
         if ring:
-            rads[i] = np.mean(
-                (np.sum((data[:, :N] - data[:, length : length + N]) ** 2, 0))
-            )
+            rads[i] = np.mean((np.sum((data[:, :N] - data[:, length : length + N]) ** 2, 0)))
         else:
             rads[i] = np.mean((np.sum((data[:, :-length] - data[:, length:]) ** 2, 0)))
     return np.array(bins), rads
@@ -372,10 +370,7 @@ def ndarray_groupby_aggregate(
         """
         average_arrs = pd.Series(
             index=ndarray_cols,
-            data=[
-                ndarray_agg([np.asarray(j) for j in in_df[i].values])
-                for i in ndarray_cols
-            ],
+            data=[ndarray_agg([np.asarray(j) for j in in_df[i].values]) for i in ndarray_cols],
         )
         average_values = value_agg(in_df[value_cols])
         sample_values = in_df[sample_cols].iloc[0]
@@ -553,9 +548,7 @@ def getLinkingNumber(data1, data2, simplify=True, randomOffset=True, verbose=Fal
     return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)
 
 
-def calculate_cistrans(
-    data, chains, chain_id=0, cutoff=5, pbc_box=False, box_size=None
-):
+def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_size=None):
 
     """
     Analysis of the territoriality of polymer chains from simulations, using the cis/trans ratio.

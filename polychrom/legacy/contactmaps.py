@@ -184,9 +184,7 @@ def averageBinnedContactMap(
     Nbase = len(bins) - 1
 
     if Nbase > 10000:
-        warnings.warn(
-            UserWarning("very large contact map" " may be difficult to visualize")
-        )
+        warnings.warn(UserWarning("very large contact map" " may be difficult to visualize"))
 
     chromosomeStarts = np.cumsum(chainBinNums)
     chromosomeStarts = np.hstack((0, chromosomeStarts))
@@ -287,17 +285,10 @@ def averagePureContactMap(
 
                 if len(data) > 6000:
                     warnings.warn(
-                        UserWarning(
-                            "very large contact map"
-                            " may cause errors. these may be fixed with n=1 threads."
-                        )
+                        UserWarning("very large contact map" " may cause errors. these may be fixed with n=1 threads.")
                     )
                 if len(data) > 20000:
-                    warnings.warn(
-                        UserWarning(
-                            "very large contact map" " may be difficult to visualize."
-                        )
-                    )
+                    warnings.warn(UserWarning("very large contact map" " may be difficult to visualize."))
 
                 mysum = pureMap(data, cutoff)  # create a map
 

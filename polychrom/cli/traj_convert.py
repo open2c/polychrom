@@ -103,9 +103,7 @@ def _find_matches(pat, filenames):
         a = re.search(pat, filename)
         if a is not None:
             if len(a.groups()) != 1:
-                raise ValueError(
-                    "You should have one group in regex denoting the number of the file"
-                )
+                raise ValueError("You should have one group in regex denoting the number of the file")
             assert len(a.groups()) == 1
             gr = int(a.groups()[0])
             result[filename] = gr
@@ -176,12 +174,8 @@ def _find_matches(pat, filenames):
     help="allow blocks to be non-consecutive (1,2,3...)",
 )
 @click.option("--verbose", is_flag=True)
-@click.option(
-    "--round-to", default=2, show_default=True, help="round to this number of digits"
-)
-@click.option(
-    "--skip-files", default=1, show_default=True, help="save only every Nth file"
-)
+@click.option("--round-to", default=2, show_default=True, help="round to this number of digits")
+@click.option("--skip-files", default=1, show_default=True, help="save only every Nth file")
 @click.option(
     "--HDF5-blocks-per-file",
     default=100,
@@ -251,10 +245,7 @@ def trajcopy(
     if kwargs["input_style"] == "old":
         blocks = _find_matches(block_pattern, all_files)
     elif kwargs["input_style"] == "new":
-        blocks = {
-            i: j
-            for j, i in list_URIs(in_dir, empty_error=True, return_dict=True).items()
-        }
+        blocks = {i: j for j, i in list_URIs(in_dir, empty_error=True, return_dict=True).items()}
     else:
         raise ValueError("input-style should be 'old' or 'new'")
 
@@ -300,15 +291,11 @@ def trajcopy(
         assert len(extra_loader) == len(extra_require)
 
         # matching patterns for extra files, populating the dataframe
-        for val_pat, val_name, require in zip(
-            extra_pattern, extra_pattern_name, extra_require
-        ):
+        for val_pat, val_name, require in zip(extra_pattern, extra_pattern_name, extra_require):
             datas = _find_matches(val_pat, all_files)
             if require:
                 if len(datas) != len(blocks):
-                    raise ValueError(
-                        f"files missing for {val_name}: need {len(blocks)} found {len(datas)}"
-                    )
+                    raise ValueError(f"files missing for {val_name}: need {len(blocks)} found {len(datas)}")
             if len(datas) > 0:
                 datas = pd.Series(data=list(datas.keys()), index=list(datas.values()))
                 datas.name = val_name
@@ -327,9 +314,7 @@ def trajcopy(
         print(other[:: len(other) // 20 + 1])
         print("Verify that none of these should be converted using extra_pattern")
         print("If not, increase max_unmatched_files")
-        raise ValueError(
-            "Limit exceeded: {0} files did not match anything".format(len(other))
-        )
+        raise ValueError("Limit exceeded: {0} files did not match anything".format(len(other)))
 
     # creating the reporter
     if (len(blocks) > 0) and (not kwargs["dry_run"]):
@@ -361,9 +346,7 @@ def trajcopy(
                 cur["block"] = i
             elif kwargs["input_style"] == "new":
                 cur = load_URI(data)
-                cur["pos"] = np.round(
-                    np.asarray(cur["pos"], dtype=np.float32), kwargs["round_to"]
-                )
+                cur["pos"] = np.round(np.asarray(cur["pos"], dtype=np.float32), kwargs["round_to"])
 
             # adding "extra" data in the dict to save
             for name, ldr in zip(extra_pattern_name, extra_loader):

@@ -193,9 +193,7 @@ def averageContactsSimple(contactIterator, inValues, N, **kwargs):
     uniqueContacts = kwargs.get("uniqueContacts", False)
     contactProcessing = kwargs.get("contactProcessing", lambda x: x)
     finalSize = N * (N + 1) // 2
-    sharedArrays = [
-        np.zeros(finalSize, dtype=arrayDtype)
-    ]  # just an array, not a shared array here bc 1 core
+    sharedArrays = [np.zeros(finalSize, dtype=arrayDtype)]  # just an array, not a shared array here bc 1 core
     argset = list(sharedArrays) + [
         contactProcessing,
         classInitArgs,
@@ -228,9 +226,7 @@ def worker(x):
     sharedNumpy = list(map(tonumpyarray, sharedArrays__))  # shared numpy arrays
     allContacts = []
     contactSum = 0
-    myIterator = contactIterator__(
-        x, *classInitArgs__, **classInitKwargs__
-    )  # acquiring and initializing iterator
+    myIterator = contactIterator__(x, *classInitArgs__, **classInitKwargs__)  # acquiring and initializing iterator
     stopped = False
     while True:  # main event loop
         try:
@@ -246,9 +242,7 @@ def worker(x):
         except StopIteration:
             stopped = True
 
-        if (
-            contactSum > contactBlock__
-        ) or stopped:  # we aggregated enough contacts.  ready to dump them.
+        if (contactSum > contactBlock__) or stopped:  # we aggregated enough contacts.  ready to dump them.
             if len(allContacts) == 0:
                 return  # no contacts found at all - exiting (we must be stopped)
             contactSum = 0
@@ -258,30 +252,20 @@ def worker(x):
                 if stopped:  # contactProcessing killed all contacts? are we done?
                     return  # if yes, exiting
                 continue  # if not, going to the next bucket
-            ctrue = indexing(
-                contacts[:, 0], contacts[:, 1], N__
-            )  # converting to 1D contacts
+            ctrue = indexing(contacts[:, 0], contacts[:, 1], N__)  # converting to 1D contacts
             position, counts = np.unique(ctrue, return_counts=True)  # unique contacts
             assert position[0] >= 0
             assert position[-1] < N__ * (N__ + 1) // 2  # boundary check for contacts
-            chunks = np.array(
-                np.r_[0, np.cumsum(list(map(len, sharedArrays__)))], dtype=int
-            )
-            inds = np.searchsorted(
-                position, chunks
-            )  # assinging contacts to chunks here
+            chunks = np.array(np.r_[0, np.cumsum(list(map(len, sharedArrays__)))], dtype=int)
+            inds = np.searchsorted(position, chunks)  # assinging contacts to chunks here
             if inds[-1] != len(position):
                 raise ValueError  # last chunks boundary must be after all contacts)
             indszip = list(zip(inds[:-1], inds[1:]))  # extents of contact buckets
 
             indarray = list(range(len(sharedArrays__)))
-            random.shuffle(
-                indarray
-            )  # shuffled array of contactmap bucket indices we are going to work with
+            random.shuffle(indarray)  # shuffled array of contactmap bucket indices we are going to work with
             for j, (st, end) in enumerate(indszip):
-                position[st:end] -= chunks[
-                    j
-                ]  # pre-subtracting offsets now - not to do it when the lock is being held
+                position[st:end] -= chunks[j]  # pre-subtracting offsets now - not to do it when the lock is being held
 
             while len(indarray) > 0:  # continue until all contacts are put in buckets
                 for i in range(len(indarray)):  # going over all buckets
@@ -290,20 +274,12 @@ def worker(x):
                     if i == len(indarray):  # is this the last bucket?
                         lock.acquire()  # wait for it to be free, and work with it
                     else:
-                        if not lock.acquire(
-                            0
-                        ):  # not the last bucket? Try to acquire the lock
+                        if not lock.acquire(0):  # not the last bucket? Try to acquire the lock
                             continue  # if failed, move to the next bucket
-                    st, end = indszip[
-                        ind
-                    ]  # succeeded acquiring the lock? Then do things with our bucket
-                    sharedNumpy[ind][position[st:end]] += counts[
-                        st:end
-                    ]  # add to the current bucket
+                    st, end = indszip[ind]  # succeeded acquiring the lock? Then do things with our bucket
+                    sharedNumpy[ind][position[st:end]] += counts[st:end]  # add to the current bucket
                     lock.release()
-                    indarray.pop(
-                        i
-                    )  # remove the index of the bucket because it's finished
+                    indarray.pop(i)  # remove the index of the bucket because it's finished
                     break  # back to the main loop
             allContacts = []
             if stopped:
@@ -396,9 +372,7 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
         N,
     ]
 
-    if (
-        not useFmap
-    ):  # for mp.map we need initializer because shared memory cannot be pickled
+    if not useFmap:  # for mp.map we need initializer because shared memory cannot be pickled
         # # or passed as an argument in inValues
         with closing(mp.Pool(processes=nproc, initializer=init, initargs=argset)) as p:
             p.map(worker, inValues)
@@ -519,9 +493,7 @@ def binnedContactMap(
     Nbase = len(bins) - 1
 
     if Nbase > 25000:
-        warnings.warn(
-            UserWarning("very large contact map" " may be difficult to visualize")
-        )
+        warnings.warn(UserWarning("very large contact map" " may be difficult to visualize"))
 
     chromosomeStarts = np.cumsum(chainBinNums)
     chromosomeStarts = np.hstack((0, chromosomeStarts))

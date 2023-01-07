@@ -177,10 +177,7 @@ def create_constrained_random_walk(
             vec_to_rot = d[j]
             rot_axis = np.cross(past_displacement, np.array([0, 0, 1]))
             rot_axis = rot_axis / np.linalg.norm(rot_axis)
-            rot_angle = -np.arccos(
-                np.dot(past_displacement, np.array([0, 0, 1]))
-                / np.linalg.norm(past_displacement)
-            )
+            rot_angle = -np.arccos(np.dot(past_displacement, np.array([0, 0, 1])) / np.linalg.norm(past_displacement))
             # Rotating with the Rodriques' rotation formula
             # https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
             next_displacement = (

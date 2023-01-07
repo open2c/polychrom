@@ -167,9 +167,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
             raise ValueError("Not sure what to do with filename {0}".format(filename))
 
     elif mode == "pdb":
-        data = (
-            data - np.minimum(np.min(data, axis=0), np.zeros(3, float) - 100)[None, :]
-        )
+        data = data - np.minimum(np.min(data, axis=0), np.zeros(3, float) - 100)[None, :]
         retret = ""
 
         def add(st, n):
@@ -219,13 +217,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
 def rotation_matrix(rotate):
     """Calculates rotation matrix based on three rotation angles"""
     tx, ty, tz = rotate
-    Rx = np.array(
-        [[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]]
-    )
-    Ry = np.array(
-        [[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]]
-    )
-    Rz = np.array(
-        [[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]]
-    )
+    Rx = np.array([[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]])
+    Ry = np.array([[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]])
+    Rz = np.array([[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]])
     return np.dot(Rx, np.dot(Ry, Rz))

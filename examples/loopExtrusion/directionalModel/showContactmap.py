@@ -365,16 +365,8 @@ def showCmapNew():
                 if end > 75000:
                     continue
                 plt.xlim([st, end])
-                plt.savefig(
-                    os.path.join(
-                        "heatmaps", "{0}_st={1}_end={2}_r=2.png".format(fname, st, end)
-                    )
-                )
-                plt.savefig(
-                    os.path.join(
-                        "heatmaps", "{0}_st={1}_end={2}_r=2.pdf".format(fname, st, end)
-                    )
-                )
+                plt.savefig(os.path.join("heatmaps", "{0}_st={1}_end={2}_r=2.png".format(fname, st, end)))
+                plt.savefig(os.path.join("heatmaps", "{0}_st={1}_end={2}_r=2.pdf".format(fname, st, end)))
         plt.clf()
 
     plt.show()

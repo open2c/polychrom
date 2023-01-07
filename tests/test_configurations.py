@@ -3,9 +3,7 @@ import numpy as np
 from polychrom import starting_conformations
 
 
-def Jun_30_2022_create_constrained_random_walk(
-    N, constraint_f, starting_point=(0, 0, 0), step_size=1.0
-):
+def Jun_30_2022_create_constrained_random_walk(N, constraint_f, starting_point=(0, 0, 0), step_size=1.0):
     """
     Creates a constrained freely joined chain of length N with step step_size.
     Each step of a random walk is tested with the constraint function and is
@@ -58,9 +56,7 @@ class Correct_outputtest:
         def alwaystrue(new_p):
             return True
 
-        polymer = starting_conformations.create_constrained_random_walk(
-            N, alwaystrue, step_size=step
-        )
+        polymer = starting_conformations.create_constrained_random_walk(N, alwaystrue, step_size=step)
         increments = [polymer[i + 1] - polymer[i] for i in range(len(polymer) - 1)]
 
         self.assertTrue(
@@ -110,14 +106,9 @@ class New_addition_test:
         def alwaystrue(new_p):
             return True
 
-        polymer = starting_conformations.create_constrained_random_walk(
-            N, alwaystrue, polar_fixed=polar_fixed
-        )
+        polymer = starting_conformations.create_constrained_random_walk(N, alwaystrue, polar_fixed=polar_fixed)
         angles = np.arccos(
-            [
-                np.dot(polymer[i + 2] - polymer[i + 1], polymer[i + 1] - polymer[i])
-                for i in range(len(polymer) - 2)
-            ]
+            [np.dot(polymer[i + 2] - polymer[i + 1], polymer[i + 1] - polymer[i]) for i in range(len(polymer) - 2)]
         )
 
         # Check that the angles are correct
@@ -127,14 +118,9 @@ class New_addition_test:
         def confined(new_p):
             return np.linalg.norm(new_p) < confinement
 
-        polymer = starting_conformations.create_constrained_random_walk(
-            N, confined, polar_fixed=polar_fixed
-        )
+        polymer = starting_conformations.create_constrained_random_walk(N, confined, polar_fixed=polar_fixed)
         angles = np.arccos(
-            [
-                np.dot(polymer[i + 2] - polymer[i + 1], polymer[i + 1] - polymer[i])
-                for i in range(len(polymer) - 2)
-            ]
+            [np.dot(polymer[i + 2] - polymer[i + 1], polymer[i + 1] - polymer[i]) for i in range(len(polymer) - 2)]
         )
 
         # Check that the angles are correct

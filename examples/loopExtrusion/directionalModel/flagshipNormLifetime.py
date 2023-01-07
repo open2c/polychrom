@@ -70,9 +70,7 @@ def averageContacts(contactFunction, inValues, N, **kwargs):
 
     filenameChunks = [filenames[i::nproc] for i in range(nproc)]
 
-    with closing(
-        mp.Pool(processes=nproc, initializer=init, initargs=sharedARrays_)
-    ) as p:
+    with closing(mp.Pool(processes=nproc, initializer=init, initargs=sharedARrays_)) as p:
         p.map(worker, filenameChunks)
 
 
@@ -201,9 +199,7 @@ def displayHeatmap():
     hicdata = np.clip(hicdata, 0, np.percentile(hicdata, 99.99))
     hicdata /= np.mean(np.sum(hicdata, axis=1))
 
-    fmap(
-        doSim, range(30), n=20
-    )  # number of threads to use.  On a 20-core machine I use 20.
+    fmap(doSim, range(30), n=20)  # number of threads to use.  On a 20-core machine I use 20.
 
     arr = coarsegrain(arr, 20)
     arr = np.clip(arr, 0, np.percentile(arr, 99.9))
@@ -322,7 +318,5 @@ doPolymerSimulation(
     steps=5000,
     stiff=2,
     dens=0.2,
-    folder="flagshipLifetime{1}Mu{2}_try={0}".format(
-        sys.argv[1], sys.argv[2], sys.argv[3]
-    ),
+    folder="flagshipLifetime{1}Mu{2}_try={0}".format(sys.argv[1], sys.argv[2], sys.argv[3]),
 )

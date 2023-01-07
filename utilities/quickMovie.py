@@ -17,10 +17,7 @@ else:
 
 trajectoryPath = sys.argv[1]
 
-files = [
-    os.path.join(trajectoryPath, "block{0}.dat".format(i))
-    for i in range(int(sys.argv[3]), int(sys.argv[4]))
-]
+files = [os.path.join(trajectoryPath, "block{0}.dat".format(i)) for i in range(int(sys.argv[3]), int(sys.argv[4]))]
 
 pymol_show.makeMoviePymol(
     files,

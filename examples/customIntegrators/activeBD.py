@@ -27,9 +27,7 @@ ids = np.ones(N)  # aray of 1s and 0s assigning type A and type B comonomers
 ids[int(N / 2) :] = 0
 
 
-def run_monomer_diffusion(
-    gpuid, N, ids, activity_ratio, timestep=170, nblocks=10, blocksize=100
-):
+def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, nblocks=10, blocksize=100):
     """Run a single simulation on a GPU of a hetero-polymer with A monomers and B monomers. A monomers
     have a larger diffusion coefficient than B monomers, with an activity ratio of D_A / D_B.
 
@@ -53,12 +51,8 @@ def run_monomer_diffusion(
 
     """
     if len(ids) != N:
-        raise ValueError(
-            "The array of monomer identities must have length equal to the total number of monomers."
-        )
-    D = np.ones(
-        (N, 3)
-    )  # Dx, Dy, Dz --> we assume the diffusion coefficient in each spatial dimension is the same
+        raise ValueError("The array of monomer identities must have length equal to the total number of monomers.")
+    D = np.ones((N, 3))  # Dx, Dy, Dz --> we assume the diffusion coefficient in each spatial dimension is the same
     # by default set the average diffusion coefficient to be 1 kT/friction
     # let D_A = 1 + Ddiff and D_B = 1 - Ddiff such that D_A / D_B is the given activity_ratio
     Ddiff = (activity_ratio - 1) / (activity_ratio + 1)
@@ -79,9 +73,7 @@ def run_monomer_diffusion(
     particleD = unit.Quantity(D, kT / friction)
     integrator = ActiveBrownianIntegrator(timestep, collision_rate, particleD)
     gpuid = f"{gpuid}"
-    reporter = HDF5Reporter(
-        folder="active_inactive", max_data_length=100, overwrite=True
-    )
+    reporter = HDF5Reporter(folder="active_inactive", max_data_length=100, overwrite=True)
     sim = simulation.Simulation(
         platform="CUDA",
         # for custom integrators, feed a tuple with the integrator class reference and a string specifying type,
@@ -99,9 +91,7 @@ def run_monomer_diffusion(
 
     polymer = starting_conformations.grow_cubic(N, int(np.ceil(r)))
     sim.set_data(polymer, center=True)  # loads a polymer, puts a center of mass at zero
-    sim.set_velocities(
-        v=np.zeros((N, 3))
-    )  # initializes velocities of all monomers to zero (no inertia)
+    sim.set_velocities(v=np.zeros((N, 3)))  # initializes velocities of all monomers to zero (no inertia)
     sim.add_force(forces.spherical_confinement(sim, density=density, k=5.0))
     sim.add_force(
         forcekits.polymer_chains(

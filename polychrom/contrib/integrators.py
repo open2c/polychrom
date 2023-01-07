@@ -37,9 +37,7 @@ from openmmtools import utils
 from openmmtools.integrators import PrettyPrintableIntegrator
 
 
-class ActiveBrownianIntegrator(
-    utils.RestorableOpenMMObject, PrettyPrintableIntegrator, mm.CustomIntegrator
-):
+class ActiveBrownianIntegrator(utils.RestorableOpenMMObject, PrettyPrintableIntegrator, mm.CustomIntegrator):
     """Brownian dynamics integrator with monomer Diffusion coefficient that varies along the chain.
 
     Parameters
@@ -67,9 +65,7 @@ class ActiveBrownianIntegrator(
         self.addConstrainPositions()
 
 
-class CorrelatedNoiseIntegrator(
-    utils.RestorableOpenMMObject, PrettyPrintableIntegrator, mm.CustomIntegrator
-):
+class CorrelatedNoiseIntegrator(utils.RestorableOpenMMObject, PrettyPrintableIntegrator, mm.CustomIntegrator):
     """Brownian dynamics integrator with correlated active noise.
 
     To define the correlations, we define a set of k attributes that specify the monomer's identity, such
@@ -103,9 +99,7 @@ class CorrelatedNoiseIntegrator(
         self.addPerDofVariable("noise", 0)  # noise term in Langevin equation
         self.addPerDofVariable("D", 0)  # monomer diffusion coefficient
         self.addPerDofVariable("sigma", 0)  # standard deviation of noise
-        self.addGlobalVariable(
-            "ghostx", 0
-        )  # the ghost random variable used to correlate noise
+        self.addGlobalVariable("ghostx", 0)  # the ghost random variable used to correlate noise
         self.addGlobalVariable("ghosty", 0)
         self.addGlobalVariable("ghostz", 0)
         self.addPerDofVariable("maskx", 0)  # mask y and z directions

@@ -186,9 +186,7 @@ def list_URIs(folder, empty_error=True, read_error=True, return_dict=False):
     if not return_dict:
         return [i[1] for i in sorted(filenames.items(), key=lambda x: int(x[0]))]
     else:
-        return {
-            int(i[0]): i[1] for i in sorted(filenames.items(), key=lambda x: int(x[0]))
-        }
+        return {int(i[0]): i[1] for i in sorted(filenames.items(), key=lambda x: int(x[0]))}
 
 
 def load_URI(dset_path):
@@ -289,8 +287,7 @@ class HDF5Reporter(object):
                             os.remove(file_path)
                 else:
                     raise IOError(
-                        "Subfolder in traj folder; not deleting. Ensure folder is "
-                        "correct and delete manually. "
+                        "Subfolder in traj folder; not deleting. Ensure folder is " "correct and delete manually. "
                     )
 
         if check_exists:
@@ -298,9 +295,7 @@ class HDF5Reporter(object):
                 for the_file in os.listdir(folder):
                     for prefix in self.prefixes:
                         if the_file.startswith(prefix):
-                            raise RuntimeError(
-                                f"folder {folder} is not empty: set check_exists=False to ignore"
-                            )
+                            raise RuntimeError(f"folder {folder} is not empty: set check_exists=False to ignore")
 
     def continue_trajectory(self, continue_from=None, continue_max_delete=5):
         """
@@ -338,9 +333,7 @@ class HDF5Reporter(object):
         """
 
         uris = list_URIs(self.folder, return_dict=True)
-        uri_inds = np.array(
-            list(uris.keys())
-        )  # making a list of all URIs and filenames
+        uri_inds = np.array(list(uris.keys()))  # making a list of all URIs and filenames
         uri_vals = np.array(list(uris.values()))
         uri_fnames = np.array([i.split("::")[0] for i in uris.values()])
         if continue_from is None:
@@ -349,29 +342,21 @@ class HDF5Reporter(object):
         if int(continue_from) not in uris:
             raise ValueError(f"block {continue_from} not in folder")
 
-        ind = np.nonzero(uri_inds == continue_from)[0][
-            0
-        ]  # position of a starting block in arrays
+        ind = np.nonzero(uri_inds == continue_from)[0][0]  # position of a starting block in arrays
         newdata = load_URI(uri_vals[ind])
 
         todelete = np.nonzero(uri_inds >= continue_from)[0]
         if len(todelete) > continue_max_delete:
-            raise ValueError(
-                "Refusing to delete {uris_delete} blocks - set continue_max_delete accordingly"
-            )
+            raise ValueError("Refusing to delete {uris_delete} blocks - set continue_max_delete accordingly")
 
         fnames_delete = np.unique(uri_fnames[todelete])
         inds_tosave = np.nonzero((uri_fnames == uri_fnames[ind]) * (uri_inds <= ind))[0]
 
-        for (
-            saveind
-        ) in inds_tosave:  # we are saving some data and deleting the whole last file
+        for saveind in inds_tosave:  # we are saving some data and deleting the whole last file
             self.datas[uri_inds[saveind]] = load_URI(uri_vals[saveind])
         self.counter["data"] = ind + 1
 
-        files = os.listdir(
-            self.folder
-        )  # some heuristics to infer values of counters - not crucial but maybe useful
+        files = os.listdir(self.folder)  # some heuristics to infer values of counters - not crucial but maybe useful
         for prefix in self.prefixes:
             if prefix != "data":
                 myfiles = [i for i in files if i.startswith(prefix)]

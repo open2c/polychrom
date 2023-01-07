@@ -24,9 +24,7 @@ def minimizing_repulsive_Force(sim_object):
     nbCutOffDist = radius * 1.0
     repul_energy = "1000* REPe * (1-r/REPr)^2 "
 
-    sim_object.force_dict["Nonbonded_minimizing_Force"] = openmm.CustomNonbondedForce(
-        repul_energy
-    )
+    sim_object.force_dict["Nonbonded_minimizing_Force"] = openmm.CustomNonbondedForce(repul_energy)
     repulforceGr = sim_object.force_dict["Nonbonded_minimizing_Force"]
     repulforceGr.addGlobalParameter("REPe", sim_object.kT)
     repulforceGr.addGlobalParameter("REPr", sim_object.kT)
@@ -35,9 +33,7 @@ def minimizing_repulsive_Force(sim_object):
     repulforceGr.setCutoffDistance(nbCutOffDist)
 
 
-def fix_particles_Z_coordinate(
-    sim_object, particles, zCoordinates, k=0.3, useOtherAxis="z", mode="abs", gap=None
-):
+def fix_particles_Z_coordinate(sim_object, particles, zCoordinates, k=0.3, useOtherAxis="z", mode="abs", gap=None):
     """Limits position of a set of particles in z coordinate
 
     Parameters
@@ -63,14 +59,10 @@ def fix_particles_Z_coordinate(
         start, stop = tuple(zCoordinates)
         zCoordinates = []
         for par in particles:
-            zCoordinates.append(
-                start + float(stop - start) * (par / float(sim_object.N))
-            )
+            zCoordinates.append(start + float(stop - start) * (par / float(sim_object.N)))
 
     if (mode == "abs") and (gap is None):
-        zFixForce = openmm.CustomExternalForce(
-            "ZFIXk * (sqrt((%s - ZFIXr0)^2 + ZFIXa^2) - ZFIXa)" % (useOtherAxis,)
-        )
+        zFixForce = openmm.CustomExternalForce("ZFIXk * (sqrt((%s - ZFIXr0)^2 + ZFIXa^2) - ZFIXa)" % (useOtherAxis,))
         zFixForce.addGlobalParameter("ZFIXk", k * sim_object.kT / (sim_object.conlen))
     elif (mode == "abs") and (gap is not None):
         zFixForce = openmm.CustomExternalForce(
@@ -85,24 +77,17 @@ def fix_particles_Z_coordinate(
         zFixForce.addGlobalParameter("ZFIXgap", sim_object.conlen * gap)
 
     elif (mode == "quadratic") and (gap is None):
-        zFixForce = openmm.CustomExternalForce(
-            "ZFIXk * ((%s - ZFIXr0)^2)" % (useOtherAxis,)
-        )
-        zFixForce.addGlobalParameter(
-            "ZFIXk", k * sim_object.kT / (sim_object.conlen * sim_object.conlen)
-        )
+        zFixForce = openmm.CustomExternalForce("ZFIXk * ((%s - ZFIXr0)^2)" % (useOtherAxis,))
+        zFixForce.addGlobalParameter("ZFIXk", k * sim_object.kT / (sim_object.conlen * sim_object.conlen))
     elif (mode == "quadratic") and (gap is not None):
         zFixForce = openmm.CustomExternalForce(
             "ZFIXk * (step(%s - ZFIXr0 - ZFIXgap * 0.5) * "
             "(%s - ZFIXr0 - ZFIXgap * 0.5)^2 +  "
             "step(-%s + ZFIXr0 - ZFIXgap * 0.5) * "
-            "(-%s + ZFIXr0 - ZFIXgap * 0.5)^2)"
-            % (useOtherAxis, useOtherAxis, useOtherAxis, useOtherAxis)
+            "(-%s + ZFIXr0 - ZFIXgap * 0.5)^2)" % (useOtherAxis, useOtherAxis, useOtherAxis, useOtherAxis)
         )
 
-        zFixForce.addGlobalParameter(
-            "ZFIXk", k * sim_object.kT / (sim_object.conlen * sim_object.conlen)
-        )
+        zFixForce.addGlobalParameter("ZFIXk", k * sim_object.kT / (sim_object.conlen * sim_object.conlen))
         zFixForce.addGlobalParameter("ZFIXgap", sim_object.conlen * gap)
     else:
         raise RuntimeError("Not implemented")
@@ -132,9 +117,7 @@ def lamina_attraction(sim_object, width=1, depth=1, r=None):
         from previously defined spherical potential.
     """
 
-    sim_object.metadata["laminaAttraction"] = repr(
-        {"width": width, "depth": depth, "r": r}
-    )
+    sim_object.metadata["laminaAttraction"] = repr({"width": width, "depth": depth, "r": r})
     laminaForce = openmm.CustomExternalForce(
         "step(LAMr-LAMaa + LAMwidth) * step(LAMaa + LAMwidth - LAMr) "
         "* LAMdepth * (LAMr-LAMaa + LAMwidth) * (LAMaa + LAMwidth - LAMr) "
@@ -151,10 +134,7 @@ def lamina_attraction(sim_object, width=1, depth=1, r=None):
         try:
             r = sim_object.sphericalConfinementRadius
         except:
-            raise ValueError(
-                "No spherical confinement radius defined"
-                " yet. Apply spherical confinement first!"
-            )
+            raise ValueError("No spherical confinement radius defined" " yet. Apply spherical confinement first!")
     if sim_object.verbose == True:
         print("Lamina attraction added with r = %d" % r)
 
@@ -190,9 +170,7 @@ def useDomains(sim_object, domains=None, filename=None):
     if len(sim_object.domains) != sim_object.N:
         sim_object._exitProgram("Wrong domain lengths")
 
-    pickle.dump(
-        sim_object.domains, open(os.path.join(sim_object.folder, "domains.dat"), "wb")
-    )
+    pickle.dump(sim_object.domains, open(os.path.join(sim_object.folder, "domains.dat"), "wb"))
 
 
 def lennard_jones_force(
@@ -249,10 +227,7 @@ def lennard_jones_force(
     )
 
     if blindFraction > 0.99:
-        sim_object._exitProgram(
-            "why do you need this force without particles???"
-            " set blindFraction between 0 and 1"
-        )
+        sim_object._exitProgram("why do you need this force without particles???" " set blindFraction between 0 and 1")
     if (sigmaRep is None) and (sigmaAttr is None):
         sigmaAttr = sigmaRep = sim_object.conlen
     else:
@@ -331,9 +306,7 @@ def attractive_interaction(sim_object, i, j, epsilon, sigma=None, length=3):
     """
 
     if type(sim_object.force_dict["Nonbonded"]) != openmm.NonbondedForce:
-        sim_object.exit(
-            "Cannot add interactions" " without Lennard-Jones nonbonded force"
-        )
+        sim_object.exit("Cannot add interactions" " without Lennard-Jones nonbonded force")
 
     if sigma is None:
         sigma = 1.1 * sim_object.conlen
@@ -342,24 +315,16 @@ def attractive_interaction(sim_object, i, j, epsilon, sigma=None, length=3):
         print("!!!!!!!!!bond with %d and %d is out of range!!!!!" % (i, j))
         return
     repulforce = sim_object.force_dict["Nonbonded"]
-    for t1 in range(
-        int(np.ceil(i - length / 2)), int(np.ceil(i + (length - length / 2)))
-    ):
-        for t2 in range(
-            int(np.ceil(j - length / 2)), int(np.ceil(j + (length - length / 2)))
-        ):
+    for t1 in range(int(np.ceil(i - length / 2)), int(np.ceil(i + (length - length / 2)))):
+        for t2 in range(int(np.ceil(j - length / 2)), int(np.ceil(j + (length - length / 2)))):
             repulforce.addException(t1, t2, 0, sigma, epsilon, True)
             if sim_object.verbose == True:
                 print("Exception added between" " particles %d and %d" % (t1, t2))
 
     for tt in range(i - length, i + length):
-        repulforce.setParticleParameters(
-            tt, 0, sim_object.conlen, sim_object.epsilonRep
-        )
+        repulforce.setParticleParameters(tt, 0, sim_object.conlen, sim_object.epsilonRep)
     for tt in range(j - length, j + length):
-        repulforce.setParticleParameters(
-            tt, 0, sim_object.conlen, sim_object.epsilonRep
-        )
+        repulforce.setParticleParameters(tt, 0, sim_object.conlen, sim_object.epsilonRep)
 
 
 def gravity(sim_object, k=0.1, cutoff=None):
@@ -411,9 +376,7 @@ def attraction_to_the_core(sim_object, k, r0, coreParticles=[]):
     attractForce = openmm.CustomExternalForce(
         " COREk * ((COREr - CORErn) ^ 2)  ; " "COREr = sqrt(x^2 + y^2 + COREtt^2)"
     )
-    attractForce.addGlobalParameter(
-        "COREk", k * sim_object.kT / (sim_object.conlen * sim_object.conlen)
-    )
+    attractForce.addGlobalParameter("COREk", k * sim_object.kT / (sim_object.conlen * sim_object.conlen))
     attractForce.addGlobalParameter("CORErn", r0 * sim_object.conlen)
     attractForce.addGlobalParameter("COREtt", 0.001 * sim_object.conlen)
     sim_object.force_dict["CoreAttraction"] = attractForce
@@ -423,12 +386,9 @@ def attraction_to_the_core(sim_object, k, r0, coreParticles=[]):
     if r0 > 0.1:
 
         excludeForce = openmm.CustomExternalForce(
-            " CORE2k * ((CORE2r - CORE2rn) ^ 2) * step(CORE2rn - CORE2r) ;"
-            "CORE2r = sqrt(x^2 + y^2 + CORE2tt^2)"
+            " CORE2k * ((CORE2r - CORE2rn) ^ 2) * step(CORE2rn - CORE2r) ;" "CORE2r = sqrt(x^2 + y^2 + CORE2tt^2)"
         )
-        excludeForce.addGlobalParameter(
-            "CORE2k", k * sim_object.kT / (sim_object.conlen * sim_object.conlen)
-        )
+        excludeForce.addGlobalParameter("CORE2k", k * sim_object.kT / (sim_object.conlen * sim_object.conlen))
         excludeForce.addGlobalParameter("CORE2rn", r0 * sim_object.conlen)
         excludeForce.addGlobalParameter("CORE2tt", 0.001 * sim_object.conlen)
         sim_object.force_dict["CoreExclusion"] = excludeForce
@@ -482,10 +442,7 @@ def spherical_well(sim_object, r=10, depth=1):
         try:
             r = sim_object.sphericalConfinementRadius * 0.5
         except:
-            exit(
-                "No spherical confinement radius defined yet."
-                " Apply spherical confinement first!"
-            )
+            exit("No spherical confinement radius defined yet." " Apply spherical confinement first!")
     if sim_object.verbose == True:
         print("Well attraction added with r = %d" % r)
 
@@ -549,10 +506,7 @@ def add_lamina_attraction(sim_object, width=1, depth=1, r=None, particles=None):
         try:
             r = sim_object.sphericalConfinementRadius
         except:
-            exit(
-                "No spherical confinement radius defined yet."
-                "Apply spherical confinement first!"
-            )
+            exit("No spherical confinement radius defined yet." "Apply spherical confinement first!")
 
     if sim_object.verbose == True:
         print("Lamina attraction added with r = %d" % r)
@@ -567,9 +521,7 @@ def add_lamina_attraction(sim_object, width=1, depth=1, r=None, particles=None):
 # old energy minimization
 
 
-def old_energy_minimization(
-    sim_object, stepsPerIteration=100, maxIterations=1000, failNotConverged=True
-):
+def old_energy_minimization(sim_object, stepsPerIteration=100, maxIterations=1000, failNotConverged=True):
     """Runs system at smaller timestep and higher collision
     rate to resolve possible conflicts.
 
@@ -580,13 +532,9 @@ def old_energy_minimization(
     print("Performing energy minimization")
     sim_object._apply_forces()
     if (maxIterations is True) or (maxIterations is False):
-        raise ValueError(
-            "Please stop using the old notation and read the new energy minimization code"
-        )
+        raise ValueError("Please stop using the old notation and read the new energy minimization code")
     if (failNotConverged is not True) and (failNotConverged is not False):
-        raise ValueError(
-            "Please stop using the old notation and read the new energy minimization code"
-        )
+        raise ValueError("Please stop using the old notation and read the new energy minimization code")
 
     def_step = sim_object.integrator.getStepSize()
     def_fric = sim_object.integrator.getFriction()
@@ -639,9 +587,7 @@ def check_connectivity(sim_object, newcoords=None, maxBondSizeMultipler=10):
     """
 
     if not hasattr(sim_object, "bondLengths"):
-        raise ValueError(
-            "must use either harmonic or abs bonds to use checkConnectivty"
-        )
+        raise ValueError("must use either harmonic or abs bonds to use checkConnectivty")
 
     if newcoords == None:
         newcoords = sim_object.get_data()
@@ -653,11 +599,7 @@ def check_connectivity(sim_object, newcoords=None, maxBondSizeMultipler=10):
     bondArray = np.array(sim_object.bondLengths)
     bondDists = np.sqrt(
         np.sum(
-            (
-                newcoords[np.array(bondArray[:, 0], dtype=int)]
-                - newcoords[np.array(bondArray[:, 1], dtype=int)]
-            )
-            ** 2,
+            (newcoords[np.array(bondArray[:, 0], dtype=int)] - newcoords[np.array(bondArray[:, 1], dtype=int)]) ** 2,
             axis=1,
         )
     )

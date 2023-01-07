@@ -88,16 +88,12 @@ def run_correlated_diffusion(gpuid, N, rhos, timestep=170, nblocks=10, blocksize
 
     """
     if rhos.shape[1] != N:
-        raise ValueError(
-            "The array of monomer identities must have length equal to the total number of monomers."
-        )
+        raise ValueError("The array of monomer identities must have length equal to the total number of monomers.")
     # monomer density in confinement in units of monomers/volume
     density = 0.224
     r = (3 * N / (4 * 3.141592 * density)) ** (1 / 3)
     print(f"Radius of confinement: {r}")
-    D = np.ones(
-        (N, 3)
-    )  # Diffusion coefficients of N monomers in x,y,z spatial dimensions
+    D = np.ones((N, 3))  # Diffusion coefficients of N monomers in x,y,z spatial dimensions
     timestep = timestep
     # the monomer diffusion coefficient should be in units of kT / friction, where friction = mass*collision_rate
     collision_rate = 2.0

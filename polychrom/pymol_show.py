@@ -197,15 +197,11 @@ def do_coloring(
         if seg1 == seg2:
             return "resi {atom1}-{atom2} and segi {seg1}".format(**locals())
         elif np.abs(seg1 - seg2) == 1:
-            return "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(
-                **locals()
-            )
+            return "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(**locals())
 
         elif np.abs(seg1 - seg2) >= 2:
 
-            line = "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(
-                **locals()
-            )
+            line = "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(**locals())
             for i in range(seg1 + 1, seg2):
                 line = line + " or (segi {0})".format(i)
             return line
@@ -305,9 +301,7 @@ def do_coloring(
         elif (showChain == "none") or (not showChain):
             pass
         else:
-            raise ValueError(
-                "please select showChain to be 'worm' or 'spheres' or 'none'"
-            )
+            raise ValueError("please select showChain to be 'worm' or 'spheres' or 'none'")
 
     for i in spherePositions:
         out.write("select {0} and  {1}\n".format(name, getSelectionString(i, i)))
@@ -346,11 +340,7 @@ def do_coloring(
 
     sleep(0.5)
 
-    print(
-        os.system(
-            "pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename, miscArguments)
-        )
-    )
+    print(os.system("pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename, miscArguments)))
     return script
 
 
@@ -522,11 +512,7 @@ def new_coloring(
 
     sleep(0.5)
 
-    print(
-        os.system(
-            "pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename, miscArguments)
-        )
-    )
+    print(os.system("pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename, miscArguments)))
     return script
 
 
@@ -538,9 +524,7 @@ def getTmpPath(folder=None, **kwargs):
     return tmpPath, tmpFilename
 
 
-def show_chain(
-    data, showGui=True, saveTo=None, showChain="worm", chains=None, support="", **kwargs
-):
+def show_chain(data, showGui=True, saveTo=None, showChain="worm", chains=None, support="", **kwargs):
     """Shows a single rainbow-colored chain using PyMOL.
 
     Arguments:
@@ -600,11 +584,7 @@ def show_chain(
 
     tmpScript.flush()
 
-    os.system(
-        "pymol {0} {1} -u {2}".format(
-            tmpPdbPath, "" if showGui else "-c", tmpScript.name
-        )
-    )
+    os.system("pymol {0} {1} -u {2}".format(tmpPdbPath, "" if showGui else "-c", tmpScript.name))
     tmpScript.close()
 
 
@@ -653,9 +633,7 @@ def makeMoviePymol(
     rotationCode = ""
     if rotationPeriod > 0:
         for i in range(numFrames // rotationPeriod + 1):
-            rotationCode += "util.mroll {0},{1},0\n".format(
-                i * rotationPeriod + 1, (i + 1) * rotationPeriod
-            )
+            rotationCode += "util.mroll {0},{1},0\n".format(i * rotationPeriod + 1, (i + 1) * rotationPeriod)
 
     if pymolScript == None:
         script += textwrap.dedent(
@@ -701,9 +679,7 @@ def makeMoviePymol(
     os.system("cd {0}; pymol -c -u {1}; cd -".format(imgFolder, tmpScriptPath))
 
     _mencoder(imgFolder, fps, aviFilename)
-    shutil.move(
-        os.path.join(imgFolder, aviFilename), os.path.join(destFolder, aviFilename)
-    )
+    shutil.move(os.path.join(imgFolder, aviFilename), os.path.join(destFolder, aviFilename))
 
 
 def _mencoder(imgFolder, fps, aviFilename):
