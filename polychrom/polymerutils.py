@@ -42,19 +42,19 @@ import io
 def load(filename):
     """Universal load function for any type of data file It always returns just XYZ
     positions - use fetch_block or hdf5_format.load_URI for loading the whole metadata
-    
+
     Accepted file types
     -------------------
-    
+
     New-style URIs (HDF5 based storage)
-    
+
     Text files in openmm-polymer format
-    joblib files in openmm-polymer format 
-    
+    joblib files in openmm-polymer format
+
     Parameters
     ----------
-    
-    filename: str 
+
+    filename: str
         filename to load or a URI
 
     """
@@ -83,29 +83,29 @@ def load(filename):
 def fetch_block(folder, ind, full_output=False):
     """
     A more generic function to fetch block number "ind" from a trajectory in a folder
-    
-    
-    This function is useful both if you want to load both "old style" trajectories (block1.dat), 
+
+
+    This function is useful both if you want to load both "old style" trajectories (block1.dat),
     and "new style" trajectories ("blocks_1-50.h5")
-    
-    It will be used in files "show" 
-    
+
+    It will be used in files "show"
+
     Parameters
     ----------
-    
+
         folder: str, folder with a trajectory
 
-        ind: str or int, number of a block to fetch 
-        
+        ind: str or int, number of a block to fetch
+
         full_output: bool (default=False)
-            If set to true, outputs a dict with positions, eP, eK, time etc. 
+            If set to true, outputs a dict with positions, eP, eK, time etc.
             if False, outputs just the conformation
-            (relevant only for new-style URIs, so default is False) 
-    
+            (relevant only for new-style URIs, so default is False)
+
     Returns
     -------
-        data, Nx3 numpy array     
-        
+        data, Nx3 numpy array
+
         if full_output==True, then dict with data and metadata; XYZ is under key "pos"
     """
     blocksh5 = glob.glob(os.path.join(folder, "blocks*.h5"))
@@ -138,9 +138,9 @@ def fetch_block(folder, ind, full_output=False):
 def save(data, filename, mode="txt", pdbGroups=None):
     """
     Basically unchanged polymerutils.save function from openmm-polymer
-    
+
     It can save into txt or joblib formats used by old openmm-polymer
-    
+
     It is also very useful for saving files to PDB format to make them compatible
     with nglview, pymol_show and others
     """

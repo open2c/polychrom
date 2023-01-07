@@ -21,7 +21,6 @@ import numpy as np
 from . import forces
 
 
-
 def polymer_chains(
     sim_object,
     chains=[(0, None, False)],
@@ -50,10 +49,10 @@ def polymer_chains(
     except_bonds : bool
         If True then do not calculate non-bonded forces between the
         particles connected by a bond. True by default.
-        
+
     extra_bonds : None or list
-        [(i,j)] list of extra bonds. Same for extra_triplets. 
-    
+        [(i,j)] list of extra bonds. Same for extra_triplets.
+
     override_checks: bool
         If True then do not check that all monomers are a member of exactly
         one chain. False by default. Note that overriding checks does not
@@ -64,7 +63,11 @@ def polymer_chains(
 
     force_list = []
 
-    bonds = [] if ((extra_bonds is None) or len(extra_bonds) == 0) else [tuple(b) for b in extra_bonds]
+    bonds = (
+        []
+        if ((extra_bonds is None) or len(extra_bonds) == 0)
+        else [tuple(b) for b in extra_bonds]
+    )
     triplets = extra_triplets if extra_triplets else []
     newchains = []
 
@@ -126,9 +129,11 @@ def polymer_chains(
                 print(
                     "Exclude neighbouring chain particles from {}".format(nb_force.name)
                 )
-                nb_force.createExclusionsFromBonds([(int(b[0]), int(b[1])) for b in bonds], int(except_bonds))
-                    # for pair in exc:
-                    #     nb_force.addExclusion(int(pair[0]), int(pair[1]))
+                nb_force.createExclusionsFromBonds(
+                    [(int(b[0]), int(b[1])) for b in bonds], int(except_bonds)
+                )
+                # for pair in exc:
+                #     nb_force.addExclusion(int(pair[0]), int(pair[1]))
                 num_exc = nb_force.getNumExclusions()
 
             print("Number of exceptions:", num_exc)

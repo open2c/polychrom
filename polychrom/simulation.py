@@ -176,8 +176,9 @@ class Simulation(object):
             Machines with 1 GPU automatically select their GPU.
 
         integrator : "langevin", "variableLangevin", "verlet", "variableVerlet",
-                     "brownian", optional Integrator to use
-                     (see Openmm class reference)
+                     "brownian", or tuple containing Integrator from Openmm class reference and string
+                     defining integrator type. For user-defined integrators, specify type "brownian" to
+                     avoid checking if kinetic energy exceeds max_Ek.
 
         mass : number or np.array
             Particle mass (default 100 amu)
@@ -319,8 +320,9 @@ class Simulation(object):
                 )
         else:
             logging.info("Using the provided integrator object")
-            self.integrator = self.integrator_type
-            self.integrator_type = "UserDefined"
+            integrator, integrator_type = self.integrator_type
+            self.integrator = integrator
+            self.integrator_type = integrator_type
             kwargs["integrator"] = "user_defined"
 
         self.N = kwargs["N"]

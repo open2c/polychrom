@@ -219,7 +219,7 @@ for milkerCount in range(milkerInitsTotal):
 
     # ------------ initializing milker; adding bonds ---------
     # copied from addBond
-    kbond = a.kbondScalingFactor / (smcBondWiggleDist ** 2)
+    kbond = a.kbondScalingFactor / (smcBondWiggleDist**2)
     bondDist = smcBondDist * a.length_scale
 
     activeParams = {"length": bondDist, "k": kbond}

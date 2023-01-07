@@ -23,5 +23,7 @@ files = [
 ]
 
 pymol_show.makeMoviePymol(
-    files, moviepath, fps=20,
+    files,
+    moviepath,
+    fps=20,
 )
