@@ -1,5 +1,6 @@
-from polychrom.polymerutils import load, save
 import os
+
+from polychrom.polymerutils import load, save
 
 
 class LegacyReporter(object):

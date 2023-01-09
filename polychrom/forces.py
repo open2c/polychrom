@@ -1,23 +1,22 @@
 """
 
-Detailed description of forces in polychrom 
+Detailed description of forces in polychrom
 -------------------------------------------
 
-This module defines forces commonly used in polychrom. Most forces are implemented using 
-custom forces in openmm. The force equations were generally derived such that the force and the 
-first derivative both go to zero at the cutoff radius. 
+This module defines forces commonly used in polychrom. Most forces are implemented using custom forces in openmm. The
+force equations were generally derived such that the force and the first derivative both go to zero at the cutoff
+radius.
 
-Parametrization of bond forces 
+Parametrization of bond forces
 ******************************
 
-Most of the bond forces are parametrized using two parametrs: bondLength and bondWiggleDistance. 
-The parameter *bondLength* is length of the bond at rest, while *bondWiggleDistance* 
-is the estension of the bond at which energy reaches 1kT. 
+Most of the bond forces are parametrized using two parametrs: bondLength and bondWiggleDistance. The parameter
+*bondLength* is length of the bond at rest, while *bondWiggleDistance* is the estension of the bond at which energy
+reaches 1kT.
 
-Note that the actual standard deviation of the bond length is bondWiggleDistance/sqrt(2) 
-for a harmonic bond force, and is bondWiggleDistance*sqrt(2) for constant force bonds, 
-so if you are switching from harmonic bonds to constant force, you may choose to decrease 
-the wiggleDistance by a factor of 2. 
+Note that the actual standard deviation of the bond length is bondWiggleDistance/sqrt(2) for a harmonic bond force,
+and is bondWiggleDistance*sqrt(2) for constant force bonds, so if you are switching from harmonic bonds to constant
+force, you may choose to decrease the wiggleDistance by a factor of 2.
 
 
 
@@ -25,38 +24,39 @@ the wiggleDistance by a factor of 2.
 Note on energy equations
 ************************
 
-Energy  equations are passed as strings to one of the OpenMM customXXXForce class (e.g. customNonbondedForce). 
-Note two things. First, sub-equations are separated by semicolon, and are evaluated "bottom up", last equation first. 
-Second, equations seem much more scary than they actually are (see below). 
+Energy  equations are passed as strings to one of the OpenMM customXXXForce class (e.g. customNonbondedForce). Note
+two things. First, sub-equations are separated by semicolon, and are evaluated "bottom up", last equation first.
+Second, equations seem much more scary than they actually are (see below).
 
-All energy equations have to be continuous, and we strongly believe that the first derivative has to be continuous as well. 
-As a result, all equations were carefully crafted to be smooth functions. This makes things more complicated. For example, 
-a simple "k * abs(x-x0)" becomes "k * (sqrt((x-x0)^2 + a^2) - a)" where a is a small number (defined to be 0.01 for example). 
+All energy equations have to be continuous, and we strongly believe that the first derivative has to be continuous as
+well. As a result, all equations were carefully crafted to be smooth functions. This makes things more complicated.
+For example, a simple "k * abs(x-x0)" becomes "k * (sqrt((x-x0)^2 + a^2) - a)" where a is a small number (defined to
+be 0.01 for example).
 
-All energy equations have to be calculatable in single precision. Any rounding error will throw you off. For example, you 
-should never have sqrt(A - B) where A and B are expressions, and A >= B. Because by chance, due to rounding, you may and up
-with A slightly less than B, and you will receive NaN, and the whole simulation will blow up. Similarly, atan(very_large_number),
-while defined mathematically, could easily become NaN, because very_large_number may be larger than the largest allowable float. 
+All energy equations have to be calculatable in single precision. Any rounding error will throw you off. For example,
+you should never have sqrt(A - B) where A and B are expressions, and A >= B. Because by chance, due to rounding,
+you may and up with A slightly less than B, and you will receive NaN, and the whole simulation will blow up.
+Similarly, atan(very_large_number), while defined mathematically, could easily become NaN, because very_large_number
+may be larger than the largest allowable float.
 
-Note that basically all nonbonded forces were written before OpenMM introduced a switching function 
-http://docs.openmm.org/latest/api-python/generated/simtk.openmm.openmm.CustomNonbondedForce.html#simtk.openmm.openmm.CustomNonbondedForce
-Therefore, we always manually sticth the value and the first derivative of the force to be 0 at the cutoff distance. 
-For custom user-defined forces forces, it may be better to use switching function instead. 
-This does not apply to custom external forces, there stitching is still necessary. 
+Note that basically all nonbonded forces were written before OpenMM introduced a switching function
+http://docs.openmm.org/latest/api-python/generated/simtk.openmm.openmm.CustomNonbondedForce.html Therefore,
+we always manually sticth the value and the first derivative of the force to be 0 at the cutoff distance. For custom
+user-defined forces, it may be better to use switching function instead. This does not apply to custom
+external forces, there stitching is still necessary.
 
-Force equations don't have "if" statements, but it is possible to avoid them where they would be normally used. 
-For example,  "if a: b= b0 + c" can be replaced with  "b = b0 + c * delta(a)". 
-Similarly "f(r) if r < r0; 0 otherwise" is just "f(r) * step(r0 - r)". 
-These examples appear frequently in the forces that we have. One of the finest examples of crafting 
-complex forces with on-the-fly generation of force equation is in :py:func:`polychrom.forces.heteropolymer_SSW`. 
-One of the best examples of optimizing complex forces using polynomials is in 
-:py:func:`polychrom.forces.polynomial_repulsive`.
+Force equations don't have "if" statements, but it is possible to avoid them where they would be normally used. For
+example,  "if a: b= b0 + c" can be replaced with  "b = b0 + c * delta(a)". Similarly "f(r) if r < r0; 0 otherwise" is
+just "f(r) * step(r0 - r)". These examples appear frequently in the forces that we have. One of the finest examples
+of crafting complex forces with on-the-fly generation of force equation is in
+:py:func:`polychrom.forces.heteropolymer_SSW`. One of the best examples of optimizing complex forces using
+polynomials is in :py:func:`polychrom.forces.polynomial_repulsive`.
 
 """
 
+import itertools
 import re
 import warnings
-import itertools
 from collections.abc import Iterable
 
 import numpy as np
@@ -65,15 +65,15 @@ try:
     import openmm
 except Exception:
     import simtk.openmm as openmm
+
 import simtk.unit
 
 
 def _prepend_force_name_to_params(force):
     """
-    This function is called by :py:mod:`polychrom.simulation.Simulation.add_force` method.
-    It's goal is to avoid using the same names of global parameters defined in different forces.
-    To this end, it modifies names of parameters of each force to start with the force name,
-    which should be unique.
+    This function is called by :py:mod:`polychrom.simulation.Simulation.add_force` method. It's goal is to avoid
+    using the same names of global parameters defined in different forces. To this end, it modifies names of
+    parameters of each force to start with the force name, which should be unique.
     """
     if not hasattr(force, "getEnergyFunction"):
         return
@@ -95,9 +95,7 @@ def _check_bonds(bonds, N):
         for bond in set(bonds):
             bonds.remove(bond)
 
-        raise ValueError(
-            f"Bonds {bonds} are repeated. Set override_checks=True to override this check."
-        )
+        raise ValueError(f"Bonds {bonds} are repeated. Set override_checks=True to override this check.")
 
     # check that all monomers make at least one bond
     monomer_not_in_bond = ~np.zeros(N).astype(bool)
@@ -105,7 +103,8 @@ def _check_bonds(bonds, N):
     monomer_not_in_bond[bonds_arr.reshape(-1)] = False
     if monomer_not_in_bond.any():
         raise ValueError(
-            f"Monomers {np.where(monomer_not_in_bond)[0]} are not in any bonds. Set override_checks=True to override this check."
+            f"Monomers {np.where(monomer_not_in_bond)[0]} are not in any bonds."
+            "Set override_checks=True to override this check."
         )
 
     # check that no bonds of the form (i, i) exist
@@ -122,9 +121,7 @@ def _check_angle_bonds(triplets):
         for triplet in set(triplets):
             triplets.remove(triplet)
 
-        raise ValueError(
-            f"Triplets {triplets} are repeated. Set override_checks=True to override this check."
-        )
+        raise ValueError(f"Triplets {triplets} are repeated. Set override_checks=True to override this check.")
 
     # check that no triplet of the form (i, i, j) exists
     # check that no bonds of the form (i, i) exist
@@ -137,7 +134,8 @@ def _check_angle_bonds(triplets):
     if err_condition.any():
         index = np.where(err_condition)[0]
         raise ValueError(
-            f"Triplets {triplet_arr[index].tolist()} contain monomers with the same index. Set override_checks=True to override this check."
+            f"Triplets {triplet_arr[index].tolist()} contain monomers with the same index. "
+            "Set override_checks=True to override this check."
         )
 
 
@@ -204,9 +202,7 @@ def harmonic_bonds(
     force.name = name
 
     bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
-    bondWiggleDistance = (
-        _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
-    )
+    bondWiggleDistance = _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
 
     # using kbondScalingFactor because force accepts parameters with units
     kbond = sim_object.kbondScalingFactor / (bondWiggleDistance**2)
@@ -215,13 +211,10 @@ def harmonic_bonds(
     for bond_idx, (i, j) in enumerate(bonds):
         if (i >= sim_object.N) or (j >= sim_object.N):
             raise ValueError(
-                "\nCannot add bond with monomers %d,%d that"
-                "are beyound the polymer length %d" % (i, j, sim_object.N)
+                "\nCannot add bond with monomers %d,%d that" "are beyound the polymer length %d" % (i, j, sim_object.N)
             )
 
-        force.addBond(
-            int(i), int(j), float(bondLength[bond_idx]), float(kbond[bond_idx])
-        )
+        force.addBond(int(i), int(j), float(bondLength[bond_idx]), float(kbond[bond_idx]))
 
     return force
 
@@ -267,11 +260,7 @@ def constant_force_bonds(
     if not override_checks:
         _check_bonds(bonds, sim_object.N)
 
-    energy = (
-        f"(1. / wiggle) * univK * "
-        f"(sqrt((r-r0 * conlen)* "
-        f" (r - r0 * conlen) + a * a) - a)"
-    )
+    energy = "(1. / wiggle) * univK * (sqrt((r-r0 * conlen) * (r - r0 * conlen) + a * a) - a)"
     force = openmm.CustomBondForce(energy)
     force.name = name
 
@@ -282,15 +271,12 @@ def constant_force_bonds(
     force.addGlobalParameter("conlen", sim_object.conlen)
 
     bondLength = _to_array_1d(bondLength, len(bonds)) * sim_object.length_scale
-    bondWiggleDistance = (
-        _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
-    )
+    bondWiggleDistance = _to_array_1d(bondWiggleDistance, len(bonds)) * sim_object.length_scale
 
     for bond_idx, (i, j) in enumerate(bonds):
         if (i >= sim_object.N) or (j >= sim_object.N):
             raise ValueError(
-                "\nCannot add bond with monomers %d,%d that"
-                "are beyound the polymer length %d" % (i, j, sim_object.N)
+                "\nCannot add bond with monomers %d,%d that" "are beyound the polymer length %d" % (i, j, sim_object.N)
             )
 
         force.addBond(
@@ -302,9 +288,7 @@ def constant_force_bonds(
     return force
 
 
-def angle_force(
-    sim_object, triplets, k=1.5, theta_0=np.pi, name="angle", override_checks=False
-):
+def angle_force(sim_object, triplets, k=1.5, theta_0=np.pi, name="angle", override_checks=False):
     """Adds harmonic angle bonds. k specifies energy in kT at one radian
     If k is an array, it has to be of the length N.
     Xth value then specifies stiffness of the angle centered at
@@ -353,9 +337,7 @@ def angle_force(
     return force
 
 
-def polynomial_repulsive(
-    sim_object, trunc=3.0, radiusMult=1.0, name="polynomial_repulsive"
-):
+def polynomial_repulsive(sim_object, trunc=3.0, radiusMult=1.0, name="polynomial_repulsive"):
     """This is a simple polynomial repulsive potential. It has the value
     of `trunc` at zero, stays flat until 0.6-0.7 and then drops to zero
     together with its first derivative at r=1.0.
@@ -461,9 +443,7 @@ def smooth_square_well(
     force.addGlobalParameter("REPsigma", repulsionRadius * sim_object.conlen)
 
     force.addGlobalParameter("ATTRe", attractionEnergy * sim_object.kT)
-    force.addGlobalParameter(
-        "ATTRdelta", sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0
-    )
+    force.addGlobalParameter("ATTRdelta", sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0)
     # Coefficients for the minimum of x^12*(x*x-1)
     force.addGlobalParameter("emin12", 46656.0 / 823543.0)
     force.addGlobalParameter("rmin12", np.sqrt(6.0 / 7.0))
@@ -574,9 +554,7 @@ def selective_SSW(
 
     force.addGlobalParameter("ATTRe", attractionEnergy * sim_object.kT)
     force.addGlobalParameter("ATTReAdd", selectiveAttractionEnergy * sim_object.kT)
-    force.addGlobalParameter(
-        "ATTRdelta", sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0
-    )
+    force.addGlobalParameter("ATTRdelta", sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0)
 
     # Coefficients for x^12*(x*x-1)
     force.addGlobalParameter("emin12", 46656.0 / 823543.0)
@@ -697,13 +675,11 @@ def heteropolymer_SSW(
         "ATTReTot = ATTRe"
     )
     if len(indexpairs) > 0:
-        energy += (
-            " + ATTReAdd*(delta(type1-{0:d})*delta(type2-{1:d})" "*INT_{0:d}_{1:d}"
-        ).format(indexpairs[0][0], indexpairs[0][1])
+        energy += (" + ATTReAdd*(delta(type1-{0:d})*delta(type2-{1:d})" "*INT_{0:d}_{1:d}").format(
+            indexpairs[0][0], indexpairs[0][1]
+        )
         for i, j in indexpairs[1:]:
-            energy += "+delta(type1-{0:d})*delta(type2-{1:d})*INT_{0:d}_{1:d}".format(
-                i, j
-            )
+            energy += "+delta(type1-{0:d})*delta(type2-{1:d})*INT_{0:d}_{1:d}".format(i, j)
         energy += ")"
     energy += (
         ";"
@@ -729,18 +705,14 @@ def heteropolymer_SSW(
 
     force.addGlobalParameter("ATTRe", attractionEnergy * sim_object.kT)
     force.addGlobalParameter("ATTReAdd", selectiveAttractionEnergy * sim_object.kT)
-    force.addGlobalParameter(
-        "ATTRdelta", sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0
-    )
+    force.addGlobalParameter("ATTRdelta", sim_object.conlen * (attractionRadius - repulsionRadius) / 2.0)
 
     # Coefficients for x^12*(x*x-1)
     force.addGlobalParameter("emin12", 46656.0 / 823543.0)
     force.addGlobalParameter("rmin12", np.sqrt(6.0 / 7.0))
 
     for i, j in indexpairs:
-        force.addGlobalParameter(
-            "INT_{0:d}_{1:d}".format(i, j), interactionMatrix[i, j]
-        )
+        force.addGlobalParameter("INT_{0:d}_{1:d}".format(i, j), interactionMatrix[i, j])
 
     force.addPerParticleParameter("type")
     force.addPerParticleParameter("ExtraHard")
@@ -751,12 +723,10 @@ def heteropolymer_SSW(
     return force
 
 
-def cylindrical_confinement(
-    sim_object, r, bottom=None, k=0.1, top=9999, name="cylindrical_confinement"
-):
+def cylindrical_confinement(sim_object, r, bottom=None, k=0.1, top=9999, name="cylindrical_confinement"):
     """As it says."""
 
-    if bottom == True:
+    if bottom:
         warnings.warn(DeprecationWarning("Use bottom=0 instead of bottom = True! "))
         bottom = 0
 
@@ -771,8 +741,7 @@ def cylindrical_confinement(
         )
     else:
         force = openmm.CustomExternalForce(
-            "kt * k * step(dr) * (sqrt(dr*dr + t*t) - t);"
-            "dr = sqrt(x^2 + y^2 + tt^2) - r + 10*t"
+            "kt * k * step(dr) * (sqrt(dr*dr + t*t) - t);" "dr = sqrt(x^2 + y^2 + tt^2) - r + 10*t"
         )
     force.name = name
 
@@ -838,7 +807,7 @@ def spherical_confinement(
     if r == "density":
         r = (3 * sim_object.N / (4 * 3.141592 * density)) ** (1 / 3.0)
 
-    if sim_object.verbose == True:
+    if sim_object.verbose:
         print("Spherical confinement with radius = %lf" % r)
     # assigning parameters of the force
     force.addGlobalParameter("kb", k * sim_object.kT / simtk.unit.nanometer)
@@ -851,15 +820,13 @@ def spherical_confinement(
     force.addGlobalParameter("y0", center[1] * simtk.unit.nanometer)
     force.addGlobalParameter("z0", center[2] * simtk.unit.nanometer)
 
-    ## TODO: move 'r' elsewhere?..
+    # TODO: move 'r' elsewhere?..
     sim_object.sphericalConfinementRadius = r
 
     return force
 
 
-def spherical_well(
-    sim_object, particles, r, center=[0, 0, 0], width=1, depth=1, name="spherical_well"
-):
+def spherical_well(sim_object, particles, r, center=[0, 0, 0], width=1, depth=1, name="spherical_well"):
     """
     A spherical potential well, suited for example to simulate attraction to a lamina.
 
@@ -904,9 +871,7 @@ def spherical_well(
     return force
 
 
-def tether_particles(
-    sim_object, particles, *, pbc=False, k=30, positions="current", name="Tethers"
-):
+def tether_particles(sim_object, particles, *, pbc=False, k=30, positions="current", name="Tethers"):
     """tethers particles in the 'particles' array.
     Increase k to tether them stronger, but watch the system!
 
@@ -927,7 +892,10 @@ def tether_particles(
     """
 
     if pbc:
-        energy = "kx * periodicdistance(x, 0, 0, x0, 0, 0)^2 + ky * periodicdistance(0, y, 0, 0, y0, 0)^2 + kz * periodicdistance(0, 0, z, 0, 0, z0)^2"
+        energy = (
+            "kx * periodicdistance(x, 0, 0, x0, 0, 0)^2 + ky * periodicdistance(0, y, 0, 0, y0, 0)^2 "
+            "+ kz * periodicdistance(0, 0, z, 0, 0, z0)^2"
+        )
     else:
         energy = "kx * (x - x0)^2 + ky * (y - y0)^2 + kz * (z - z0)^2"
 
@@ -964,7 +932,7 @@ def tether_particles(
     for i, pos in zip(particles, positions):
         i = int(i)
         force.addParticle(i, list(pos))
-        if sim_object.verbose == True:
+        if sim_object.verbose:
             print("particle %d tethered! " % i)
 
     return force
@@ -984,18 +952,14 @@ def pull_force(sim_object, particles, force_vecs, name="Pull"):
     force.addPerParticleParameter("fy")
     force.addPerParticleParameter("fz")
 
-    for num, force_vec in itertools.zip_longest(
-        particles, force_vecs, fillvalue=force_vecs[-1]
-    ):
+    for num, force_vec in itertools.zip_longest(particles, force_vecs, fillvalue=force_vecs[-1]):
         force_vec = [float(f) * (sim_object.kT / sim_object.conlen) for f in force_vec]
         force.addParticle(int(num), force_vec)
 
     return force
 
 
-def grosberg_polymer_bonds(
-    sim_object, bonds, k=30, name="grosberg_polymer", override_checks=False
-):
+def grosberg_polymer_bonds(sim_object, bonds, k=30, name="grosberg_polymer", override_checks=False):
     """Adds FENE bonds according to Halverson-Grosberg paper.
     (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
      nonconcatenated ring polymers in a melt. I. Statics."
@@ -1023,16 +987,13 @@ def grosberg_polymer_bonds(
     force = openmm.CustomBondForce(equation)
     force.name = name
 
-    force.addGlobalParameter(
-        "k", k * sim_object.kT / (sim_object.conlen * sim_object.conlen)
-    )
+    force.addGlobalParameter("k", k * sim_object.kT / (sim_object.conlen * sim_object.conlen))
     force.addGlobalParameter("r0", sim_object.conlen * 1.5)
 
     for bond_idx, (i, j) in enumerate(bonds):
         if (i >= sim_object.N) or (j >= sim_object.N):
             raise ValueError(
-                "\nCannot add bond with monomers %d,%d that"
-                "are beyound the polymer length %d" % (i, j, sim_object.N)
+                "\nCannot add bond with monomers %d,%d that" "are beyound the polymer length %d" % (i, j, sim_object.N)
             )
 
         force.addBond(int(i), int(j))
@@ -1040,9 +1001,7 @@ def grosberg_polymer_bonds(
     return force
 
 
-def grosberg_angle(
-    sim_object, triplets, k=1.5, name="grosberg_angle", override_checks=False
-):
+def grosberg_angle(sim_object, triplets, k=1.5, name="grosberg_angle", override_checks=False):
     """
     Adds stiffness according to the Grosberg paper.
     (Halverson, Jonathan D., et al. "Molecular dynamics simulation study of
@@ -1104,10 +1063,9 @@ def grosberg_repulsive_force(
     ----------
 
     trunc : None, float or N-array of floats
-        "transparency" values for each particular particle,
-        which correspond to the truncation values in kT for the grosberg repulsion energy between a pair of such particles.
-        Value of 1.5 yields frequent passing,
-        3 - average passing, 5 - rare passing.
+        "transparency" values for each particular particle, which correspond to the truncation
+        values in kT for the grosberg repulsion energy between a pair of such particles.
+        Value of 1.5 yields frequent passing, 3 - average passing, 5 - rare passing.
     radiusMult : float (optional)
         Multiplier for the size of the force. To make scale the energy larger, set to be more than 1.
     trunc_function : str (optional)

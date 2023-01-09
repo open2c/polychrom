@@ -1,6 +1,7 @@
-import polychrom
-from polychrom import simulation, starting_conformations, forces, forcekits
 import numpy as np
+
+import polychrom
+from polychrom import forcekits, forces, simulation, starting_conformations
 
 
 def test_harmonic_bond_force():
@@ -30,9 +31,7 @@ def test_harmonic_bond_force():
 
             data = np.concatenate([particles, particles2])
 
-            sim.set_data(
-                data, center=False
-            )  # loads a polymer, puts a center of mass at zero
+            sim.set_data(data, center=False)  # loads a polymer, puts a center of mass at zero
             sim.add_force(forces.harmonic_bonds(sim, bonds, bondLength=dist))
             res = sim.do_block(0)
             pot = res["potentialEnergy"] * 2  # only one bond per pair

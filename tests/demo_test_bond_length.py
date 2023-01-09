@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from polychrom import simulation, forcekits, starting_conformations
 
+from polychrom import forcekits, simulation, starting_conformations
 
 sim = simulation.Simulation(
     platform="cuda",  # Switch to platform="OpenCL" if you don't have cuda

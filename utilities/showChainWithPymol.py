@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+
 from openmmlib import pymol_show
 from openmmlib.polymerutils import load
 

@@ -1,13 +1,14 @@
 import numpy as np
+
 import polychrom.polymer_analyses as polymer_analyses
 from polychrom.contactmaps import (
     averageContacts,
     averageContactsSimple,
-    monomerResolutionContactMap,
     binnedContactMap,
+    monomerResolutionContactMap,
 )
-from polychrom.legacy.contactmaps import averagePureContactMap as cmapPureMap
 from polychrom.legacy.contactmaps import averageBinnedContactMap as cmapBinnedMap
+from polychrom.legacy.contactmaps import averagePureContactMap as cmapPureMap
 
 
 class DummyContactMap(object):
@@ -52,9 +53,7 @@ def test_contactmaps():
     assert np.allclose(cmap1, cmap3)
 
     for n in [1, 4]:
-        cmap6 = monomerResolutionContactMap(
-            range(8), cutoff=1, loadFunction=lambda x: ars[x], n=n
-        )
+        cmap6 = monomerResolutionContactMap(range(8), cutoff=1, loadFunction=lambda x: ars[x], n=n)
         cmap5 = cmapPureMap(
             range(8),
             cutoff=1,

@@ -1,7 +1,7 @@
 import warnings
-from math import sqrt, sin, cos
-from collections.abc import Callable
-from typing import Tuple
+from math import cos, sin, sqrt
+from typing import Callable, Tuple
+
 import numpy as np
 
 
@@ -12,15 +12,15 @@ def create_spiral(r1, r2, N):
 
     Run it with r1=10, r2 = 13, N=5000, and see what it does.
     """
-    Pi = 3.141592
+    pi = 3.141592
     points = []
     finished = [False]
 
     def rad(phi):
-        return phi / (2 * Pi)
+        return phi / (2 * pi)
 
-    def ang(rad):
-        return 2 * Pi * rad
+    def ang(radians):
+        return 2 * pi * radians
 
     def coord(phi):
         r = rad(phi)
@@ -38,7 +38,7 @@ def create_spiral(r1, r2, N):
 
     def nextphi(phi):
         phi1 = phi
-        phi2 = phi + 0.7 * Pi
+        phi2 = phi + 0.7 * pi
         mid = phi2
         while abs(dist(phi, mid) - 1) > 0.00001:
             mid = (phi1 + phi2) / 2.0
@@ -51,7 +51,7 @@ def create_spiral(r1, r2, N):
     def prevphi(phi):
 
         phi1 = phi
-        phi2 = phi - 0.7 * Pi
+        phi2 = phi - 0.7 * pi
         mid = phi2
 
         while abs(dist(phi, mid) - 1) > 0.00001:
@@ -63,7 +63,7 @@ def create_spiral(r1, r2, N):
         return mid
 
     def add_point(point, points=points, finished=finished):
-        if (len(points) == N) or (finished[0] == True):
+        if (len(points) == N) or finished[0]:
             points = np.array(points)
             finished[0] = True
             print("finished!!!")
@@ -75,9 +75,9 @@ def create_spiral(r1, r2, N):
     curphi = ang(r1)
     add_point(fullcoord(curphi, z))
     while True:
-        if finished[0] == True:
+        if finished[0]:
             return np.array(points)
-        if forward == True:
+        if forward:
             curphi = nextphi(curphi)
             add_point(fullcoord(curphi, z))
             if rad(curphi) > r2:
@@ -177,10 +177,7 @@ def create_constrained_random_walk(
             vec_to_rot = d[j]
             rot_axis = np.cross(past_displacement, np.array([0, 0, 1]))
             rot_axis = rot_axis / np.linalg.norm(rot_axis)
-            rot_angle = -np.arccos(
-                np.dot(past_displacement, np.array([0, 0, 1]))
-                / np.linalg.norm(past_displacement)
-            )
+            rot_angle = -np.arccos(np.dot(past_displacement, np.array([0, 0, 1])) / np.linalg.norm(past_displacement))
             # Rotating with the Rodriques' rotation formula
             # https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
             next_displacement = (
@@ -265,7 +262,7 @@ def grow_cubic(N, boxSize, method="standard"):
             raise ValueError("polymer too short for the box size")
 
     else:
-        raise ValueError("select methon from standard, extended, or linear")
+        raise ValueError("method should be: standard, extended, or linear")
 
     b = np.zeros((boxSize + 2, boxSize + 2, boxSize + 2), int)
     for i in a:
