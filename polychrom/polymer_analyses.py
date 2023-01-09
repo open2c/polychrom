@@ -195,13 +195,8 @@ def contact_scaling(data, bins0=None, cutoff=1.1, *, ring=False):
 
 
 def slope_contact_scaling(mids, cp, sigma=2):
-<<<<<<< HEAD
-
-    smooth = lambda x: gaussian_filter1d(x, sigma)
-=======
     def smooth(x):
         return gaussian_filter1d(x, sigma)
->>>>>>> 0541fa2bbb9cbd5a54c4e9d91dac4f4a1d9b9deb
 
     # P(s) has to be smoothed in logspace, and both P and s have to be smoothed.
     # It is discussed in detail here
@@ -544,14 +539,7 @@ def getLinkingNumber(data1, data2, simplify=True, randomOffset=True, verbose=Fal
     return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)
 
 
-<<<<<<< HEAD
-def calculate_cistrans(
-    data, chains, chain_id=0, cutoff=5, pbc_box=False, box_size=None
-):
-
-=======
 def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_size=None):
->>>>>>> 0541fa2bbb9cbd5a54c4e9d91dac4f4a1d9b9deb
     """
     Analysis of the territoriality of polymer chains from simulations, using the cis/trans ratio.
     Cis signal is computed for the marked chain ('chain_id') as amount of contacts of the chain with itself
@@ -567,11 +555,7 @@ def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_si
 
     N = len(data)
 
-<<<<<<< HEAD
-    if pbc_box == True:
-=======
     if pbc_box:
->>>>>>> 0541fa2bbb9cbd5a54c4e9d91dac4f4a1d9b9deb
         if box_size is None:
             raise ValueError("Box size is not given")
         else:
