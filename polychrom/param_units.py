@@ -76,12 +76,21 @@ from simtk import unit
 
 class SimulationParams(object):
     """
-    This class provides guidance on how to choose polychrom parameters based
-    on principles of the Rouse polymer model. The parameters in the constructor
-    are usually set for computational convenience and do not have any physical
-    meaning, except the nubmer of monomers, N. The methods in this class provide
-    ways of calculating physically meaningful quantities in the Rouse model from
-    polychrom parameter values and vice versa.
+    The methods in this class provide ways of calculating physically meaningful
+    quantities in the Rouse model fromn polychrom parameter values and vice versa.
+    The parameters in the constructor are usually set for computational convenience
+    and do not have any physical meaning, except the nubmer of monomers, N.
+
+    Notes
+    -----
+    This is only one way to guess initial polychrom simulation parameters and is
+    exclusively based on the Rouse model, which may or may not apply to chromatin.
+
+    To do
+    -----
+    - add more functions to guess parameters based on desired dimensionless ratios
+    or experimental measurements.
+    - create additional classes based on other polymer models (not the Rouse model)
     """
 
     def __init__(
@@ -135,9 +144,10 @@ class SimulationParams(object):
         Dapp=0.01 * unit.micrometer**2 / unit.second**0.5,
         b=40 * unit.nanometer,
     ):
-        """Measurements of the subdiffusive motion of chromosomal loci indicate that
-        MSD = D_app t^{1/2}, where Dapp is approximately 0.01 um^2 / s^{1/2}. Here, we
-        convert D_app to a monomer diffusion coefficient using a given Kuhn length b."""
+        """Extract the monomer diffusion coefficient from a given Kuhn length, b, and a measurement of the anomolus diffusion
+        coefficient D_app, where MSD = D_app t^{1/2}. Some measurements of the subdiffusive motion of chromosomal loci indicate that
+        Dapp is approximately 0.01 um^2 / s^{1/2}. Note, this assumes MSDs scale as :math:`t^{1/2}`. A different polymer model is
+        needed if a different scaling with time is observed."""
 
         if not isinstance(Dapp, unit.Quantity):
             raise ValueError("Dapp should be a simtk.Quantity object")
