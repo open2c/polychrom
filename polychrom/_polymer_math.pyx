@@ -1,8 +1,9 @@
 # distutils: language=c++ 
 
-cimport cython 
+cimport cython
 
 import numpy as np
+
 
 cdef extern from "__polymer_math.h":
     long int _getLinkingNumberCpp(int M, double *olddata, int N)

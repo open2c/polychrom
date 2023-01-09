@@ -1,6 +1,5 @@
 """
-A set of utilities for performing loop extrusion simulations. 
-
+A set of utilities for performing loop extrusion simulations.
 """
 
 
@@ -37,9 +36,7 @@ class bondUpdater(object):
         """
 
         if len(self.allBonds) != 0:
-            raise ValueError(
-                "Not all bonds were used; {0} sets left".format(len(self.allBonds))
-            )
+            raise ValueError("Not all bonds were used; {0} sets left".format(len(self.allBonds)))
 
         self.bondForce = bondForce
 
@@ -48,10 +45,7 @@ class bondUpdater(object):
 
         loaded_positions = self.LEFpositions[self.curtime : self.curtime + blocks]
         allBonds = [
-            [
-                (int(loaded_positions[i, j, 0]), int(loaded_positions[i, j, 1]))
-                for j in range(loaded_positions.shape[1])
-            ]
+            [(int(loaded_positions[i, j, 0]), int(loaded_positions[i, j, 1])) for j in range(loaded_positions.shape[1])]
             for i in range(blocks)
         ]
 
@@ -63,14 +57,8 @@ class bondUpdater(object):
         self.curBonds = allBonds.pop(0)
 
         for bond in self.uniqueBonds:
-            paramset = (
-                self.activeParamDict
-                if (bond in self.curBonds)
-                else self.inactiveParamDict
-            )
-            ind = bondForce.addBond(
-                bond[0], bond[1], **paramset
-            )  # changed from addBond
+            paramset = self.activeParamDict if (bond in self.curBonds) else self.inactiveParamDict
+            ind = bondForce.addBond(bond[0], bond[1], **paramset)  # changed from addBond
             self.bondInds.append(ind)
         self.bondToInd = {i: j for i, j in zip(self.uniqueBonds, self.bondInds)}
 
@@ -86,9 +74,7 @@ class bondUpdater(object):
         :return: (current bonds, previous step bonds); just for reference
         """
         if len(self.allBonds) == 0:
-            raise ValueError(
-                "No bonds left to run; you should restart simulation and run setup  again"
-            )
+            raise ValueError("No bonds left to run; you should restart simulation and run setup  again")
 
         pastBonds = self.curBonds
         self.curBonds = self.allBonds.pop(0)  # getting current bonds
@@ -106,10 +92,6 @@ class bondUpdater(object):
         for bond, isAdd in zip(bondsToChange, bondsIsAdd):
             ind = self.bondToInd[bond]
             paramset = self.activeParamDict if isAdd else self.inactiveParamDict
-            self.bondForce.setBondParameters(
-                ind, bond[0], bond[1], **paramset
-            )  # actually updating bonds
-        self.bondForce.updateParametersInContext(
-            context
-        )  # now run this to update things in the context
+            self.bondForce.setBondParameters(ind, bond[0], bond[1], **paramset)  # actually updating bonds
+        self.bondForce.updateParametersInContext(context)  # now run this to update things in the context
         return self.curBonds, pastBonds

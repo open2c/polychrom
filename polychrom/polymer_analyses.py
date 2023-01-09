@@ -11,28 +11,25 @@ Tools for calculating contacts
 ------------------------------
 
 The main function calculating contacts is: :py:func:`polychrom.polymer_analyses.calculate_contacts`
-Right now it is a simple wrapper around scipy.cKDTree. 
+Right now it is a simple wrapper around scipy.cKDTree.
 
-Another function :py:func:`polychrom.polymer_analyses.smart_contacts` was added recently
-to help build contact maps with a large contact radius. 
-It randomly sub-samples the monomers; by default selecting N/cutoff monomers. It then 
-calculates contacts from sub-sampled monomers only. It is especially helpful when the same code 
-needs to calculate contacts at large and small contact radii.Because of sub-sampling at large
-contact radius, it avoids the problem of having way-too-many-contacts at a large contact radius. 
-For ordinary contacts, the number of contacts scales as contact_radius^3; however, with smart_contacts 
-it would only scale linearly with contact radius, which leads to significant speedsups. 
+Another function :py:func:`polychrom.polymer_analyses.smart_contacts` was added recently to help build contact maps
+with a large contact radius. It randomly sub-samples the monomers; by default selecting N/cutoff monomers. It then
+calculates contacts from sub-sampled monomers only. It is especially helpful when the same code needs to calculate
+contacts at large and small contact radii.Because of sub-sampling at large contact radius, it avoids the problem of
+having way-too-many-contacts at a large contact radius. For ordinary contacts, the number of contacts scales as
+contact_radius^3; however, with smart_contacts it would only scale linearly with contact radius, which leads to
+significant speedsups.
 
 
-Tools to calculate P(s) and R(s) 
-----------------------------------
+Tools to calculate P(s) and R(s)
+--------------------------------
 
-We provide functions to calculate P(s), Rg^2(s) and R^2(s) for polymers. 
-By default, they use  log-spaced bins on the X axis, with about 10 bins per order of magnitude, 
-but aligned such that the last bins ends exactly at (N-1). They output (bin, scaling) 
-for Rg^2 and R^2, and (bin_mid, scaling) for contacts. In either case, the 
-returned values are ready to plot. The difference is that Rg and R^2 are evaluated
-at a given value of s, while contacts are aggregated for (bins[0].. bins[1]), (bins[1]..bins[2]). 
-Therefore, we have to return bin mids for contacts. 
+We provide functions to calculate P(s), Rg^2(s) and R^2(s) for polymers. By default, they use  log-spaced bins on the
+X axis, with about 10 bins per order of magnitude, but aligned such that the last bins ends exactly at (N-1). They
+output (bin, scaling) for Rg^2 and R^2, and (bin_mid, scaling) for contacts. In either case, the returned values are
+ready to plot. The difference is that Rg and R^2 are evaluated at a given value of s, while contacts are aggregated
+for (bins[0].. bins[1]), (bins[1]..bins[2]). Therefore, we have to return bin mids for contacts.
 
 """
 
@@ -40,12 +37,12 @@ from math import sqrt
 
 import numpy as np
 import pandas as pd
-
 from scipy.spatial import cKDTree
+from scipy.ndimage import gaussian_filter1d
 
 try:
     from . import _polymer_math
-except:
+except Exception:
     pass
 
 
@@ -138,7 +135,7 @@ def generate_bins(N, start=4, bins_per_order_magn=10):
     return bins
 
 
-def contact_scaling(data, bins0=None, cutoff=1.1, integrate=False, ring=False):
+def contact_scaling(data, bins0=None, cutoff=1.1, *, ring=False):
     """
     Returns contact probability scaling for a given polymer conformation
     Contact between monomers X and X+1 is counted as s=1
@@ -155,14 +152,8 @@ def contact_scaling(data, bins0=None, cutoff=1.1, integrate=False, ring=False):
         If None, bins will be calculated automatically
     cutoff : float, optional
         Cutoff to calculate scaling
-    integrate : bool, optional
-        if True, will return cumulative probability
     ring : bool, optional
         If True, will calculate contacts for the ring
-    intContacts : bool, optional
-        If True, will speed up calculation of contacts for a cubit lattice case.
-    verbose : bool, optional
-        If True, print some information.
 
     Returns
     -------
@@ -204,8 +195,8 @@ def contact_scaling(data, bins0=None, cutoff=1.1, integrate=False, ring=False):
 
 
 def slope_contact_scaling(mids, cp, sigma=2):
-
-    smooth = lambda x: gaussian_filter1d(x, sigma)
+    def smooth(x):
+        return gaussian_filter1d(x, sigma)
 
     # P(s) has to be smoothed in logspace, and both P and s have to be smoothed.
     # It is discussed in detail here
@@ -242,7 +233,6 @@ def Rg2_scaling(data, bins=None, ring=False):
     coms2 = np.cumsum(data**2, 0)  # cumulative sum of locations^2 to calculate RG
 
     def radius_gyration(len2):
-        data
         if ring:
             comsadd = coms[1:len2, :].copy()
             coms2add = coms2[1:len2, :].copy()
@@ -260,7 +250,7 @@ def Rg2_scaling(data, bins=None, ring=False):
         sums = np.sum(diffs, 1)
         return np.mean(sums)
 
-    rads = [0.0 for i in range(len(bins))]
+    rads = [0.0 for _ in range(len(bins))]
     for i in range(len(bins)):
         rads[i] = radius_gyration(int(bins[i]))
     return np.array(bins), rads
@@ -277,6 +267,7 @@ def R2_scaling(data, bins=None, ring=False):
 
     data: Nx3 array
     bins: the same as in giveCpScaling
+    ring: is the polymer a ring?
 
     """
     data = np.asarray(data, float)
@@ -289,13 +280,11 @@ def R2_scaling(data, bins=None, ring=False):
     if ring:
         data = np.concatenate([data, data], axis=1)
 
-    rads = [0.0 for i in range(len(bins))]
+    rads = [0.0 for _ in range(len(bins))]
     for i in range(len(bins)):
         length = bins[i]
         if ring:
-            rads[i] = np.mean(
-                (np.sum((data[:, :N] - data[:, length : length + N]) ** 2, 0))
-            )
+            rads[i] = np.mean((np.sum((data[:, :N] - data[:, length : length + N]) ** 2, 0)))
         else:
             rads[i] = np.mean((np.sum((data[:, :-length] - data[:, length:]) ** 2, 0)))
     return np.array(bins), rads
@@ -372,10 +361,7 @@ def ndarray_groupby_aggregate(
         """
         average_arrs = pd.Series(
             index=ndarray_cols,
-            data=[
-                ndarray_agg([np.asarray(j) for j in in_df[i].values])
-                for i in ndarray_cols
-            ],
+            data=[ndarray_agg([np.asarray(j) for j in in_df[i].values]) for i in ndarray_cols],
         )
         average_values = value_agg(in_df[value_cols])
         sample_values = in_df[sample_cols].iloc[0]
@@ -553,10 +539,7 @@ def getLinkingNumber(data1, data2, simplify=True, randomOffset=True, verbose=Fal
     return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)
 
 
-def calculate_cistrans(
-    data, chains, chain_id=0, cutoff=5, pbc_box=False, box_size=None
-):
-
+def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_size=None):
     """
     Analysis of the territoriality of polymer chains from simulations, using the cis/trans ratio.
     Cis signal is computed for the marked chain ('chain_id') as amount of contacts of the chain with itself
@@ -572,7 +555,7 @@ def calculate_cistrans(
 
     N = len(data)
 
-    if pbc_box == True:
+    if pbc_box:
         if box_size is None:
             raise ValueError("Box size is not given")
         else:

@@ -4,9 +4,12 @@
 #cython: initializedcheck=True
 
 import numpy as np
-cimport numpy as np 
+
+cimport numpy as np
+
 import cython
-cimport cython 
+
+cimport cython
 
 
 cdef extern from "<stdlib.h>":

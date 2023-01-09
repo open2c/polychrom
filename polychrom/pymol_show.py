@@ -1,26 +1,24 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 #                  Anton Goloborodko (golobor@mit.edu)
 
-"""
-This class is a collection of functions for showing data with pymol.
-Note that the limit of pymol is 100k monomers, therefore interpolateData is
-useful to collapse the 200k-long simulation into a 100k-long conformation.
-"""
+"""This class is a collection of functions for showing data with pymol. Note that the limit of pymol is 100k
+monomers, therefore interpolateData is useful to collapse the 200k-long simulation into a 100k-long conformation. """
 import os
-import tempfile
-import subprocess
-import textwrap
-import numpy as np
 import shutil
+import subprocess
+import tempfile
+import textwrap
+
+import numpy as np
 from scipy.interpolate.fitpack2 import InterpolatedUnivariateSpline
+
 from . import polymerutils
 
 
 def interpolateData(data, targetN=90000, colorArrays=[]):
     """
-    Converts a polymer of any length to a smoothed chain with (hopefully)
-    fixed distance between neighboring monomers. Does it by cubic spline
-    interpolation as following.
+    Converts a polymer of any length to a smoothed chain with (hopefully) fixed distance between neighboring
+    monomers. Does it by cubic spline interpolation as following.
 
     1. Interpolate the data using cubic spline \n
     2. Evaluate cubic spline at targetN*10 values \n
@@ -197,15 +195,11 @@ def do_coloring(
         if seg1 == seg2:
             return "resi {atom1}-{atom2} and segi {seg1}".format(**locals())
         elif np.abs(seg1 - seg2) == 1:
-            return "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(
-                **locals()
-            )
+            return "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(**locals())
 
         elif np.abs(seg1 - seg2) >= 2:
 
-            line = "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(
-                **locals()
-            )
+            line = "(resi {atom1}-{maxNum} and segi {seg1}) or (resi 0-{atom2} and segi {seg2})".format(**locals())
             for i in range(seg1 + 1, seg2):
                 line = line + " or (segi {0})".format(i)
             return line
@@ -305,14 +299,12 @@ def do_coloring(
         elif (showChain == "none") or (not showChain):
             pass
         else:
-            raise ValueError(
-                "please select showChain to be 'worm' or 'spheres' or 'none'"
-            )
+            raise ValueError("please select showChain to be 'worm' or 'spheres' or 'none'")
 
     for i in spherePositions:
         out.write("select {0} and  {1}\n".format(name, getSelectionString(i, i)))
         out.write("show spheres, sele\n")
-        out.write("alter sele, vdw={1}\n".format(i, 1.5 * sphereRadius))
+        out.write("alter sele, vdw={0}\n".format(1.5 * sphereRadius))
         out.write("set sphere_color, {0}, sele \n".format(sphereColor))
 
     if showChain == "worm":
@@ -346,11 +338,7 @@ def do_coloring(
 
     sleep(0.5)
 
-    print(
-        os.system(
-            "pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename, miscArguments)
-        )
-    )
+    print(os.system("pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename, miscArguments)))
     return script
 
 
@@ -451,7 +439,6 @@ def new_coloring(
 
     tmpPdbFile = tempfile.NamedTemporaryFile(mode="w", suffix=".pdb")
     tmpPdbFilename = tmpPdbFile.name
-    pdbname = os.path.split(tmpPdbFilename)[-1]
     tmpPdbFile.close()
     polymerutils.save(data, tmpPdbFilename, mode="pdb", pdbGroups=pdbGroups)
 
@@ -460,8 +447,6 @@ def new_coloring(
 
     out = tempfile.NamedTemporaryFile(mode="w")
 
-    if returnScriptName is not None:
-        pdbname = returnScriptName
     out.write(presupport)
     out.write("hide all\n")
     out.write("bg white\n")
@@ -522,11 +507,7 @@ def new_coloring(
 
     sleep(0.5)
 
-    print(
-        os.system(
-            "pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename, miscArguments)
-        )
-    )
+    print(os.system("pymol {1} -u {0} {2}".format(out.name, tmpPdbFilename, miscArguments)))
     return script
 
 
@@ -538,9 +519,7 @@ def getTmpPath(folder=None, **kwargs):
     return tmpPath, tmpFilename
 
 
-def show_chain(
-    data, showGui=True, saveTo=None, showChain="worm", chains=None, support="", **kwargs
-):
+def show_chain(data, showGui=True, saveTo=None, showChain="worm", chains=None, support="", **kwargs):
     """Shows a single rainbow-colored chain using PyMOL.
 
     Arguments:
@@ -558,7 +537,7 @@ def show_chain(
     print(data.min())
 
     tmpPdbPath, pdbname = getTmpPath(suffix=".pdb")
-    if chains == None:
+    if chains is None:
         polymerutils.save(data, tmpPdbPath, mode="pdb")
     else:
         pdbArray = np.zeros(len(data))
@@ -600,11 +579,7 @@ def show_chain(
 
     tmpScript.flush()
 
-    os.system(
-        "pymol {0} {1} -u {2}".format(
-            tmpPdbPath, "" if showGui else "-c", tmpScript.name
-        )
-    )
+    os.system("pymol {0} {1} -u {2}".format(tmpPdbPath, "" if showGui else "-c", tmpScript.name))
     tmpScript.close()
 
 
@@ -653,11 +628,9 @@ def makeMoviePymol(
     rotationCode = ""
     if rotationPeriod > 0:
         for i in range(numFrames // rotationPeriod + 1):
-            rotationCode += "util.mroll {0},{1},0\n".format(
-                i * rotationPeriod + 1, (i + 1) * rotationPeriod
-            )
+            rotationCode += "util.mroll {0},{1},0\n".format(i * rotationPeriod + 1, (i + 1) * rotationPeriod)
 
-    if pymolScript == None:
+    if pymolScript is None:
         script += textwrap.dedent(
             """
 
@@ -687,7 +660,7 @@ def makeMoviePymol(
                 resolution[1],
                 numFrames,
                 rotationCode,
-                max(0, len(fileList) - fps * 2),
+                # max(0, len(fileList) - fps * 2),  # unused - why it was here
             )
         )
     else:
@@ -701,9 +674,7 @@ def makeMoviePymol(
     os.system("cd {0}; pymol -c -u {1}; cd -".format(imgFolder, tmpScriptPath))
 
     _mencoder(imgFolder, fps, aviFilename)
-    shutil.move(
-        os.path.join(imgFolder, aviFilename), os.path.join(destFolder, aviFilename)
-    )
+    shutil.move(os.path.join(imgFolder, aviFilename), os.path.join(destFolder, aviFilename))
 
 
 def _mencoder(imgFolder, fps, aviFilename):

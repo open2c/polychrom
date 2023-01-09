@@ -2,23 +2,30 @@ r"""
 Polymer simulations with ActiveBrownianIntegrator
 -------------------------------------------------
 
-This is a sample python script to run a polychrom simulation with the `ActiveBrownianIntegrator' custom integrator in polychrom.contrib.integrators. This integrator is used to simulate a polymer where each mononmer has a different effective temperature and thus a different diffusion coefficient :math:`D_i = k_B T_i / \xi`. Here, we consider an example where there are just two types of monomers, active (A) and inactive (B), where :math:`D_A > D_B` and the user chooses the ratio :math:`D_A / D_B`.
+This is a sample python script to run a polychrom simulation with the `ActiveBrownianIntegrator' custom integrator in
+polychrom.contrib.integrators. This integrator is used to simulate a polymer where each mononmer has a different
+effective temperature and thus a different diffusion coefficient :math:`D_i = k_B T_i / \xi`. Here, we consider an
+example where there are just two types of monomers, active (A) and inactive (B), where :math:`D_A > D_B` and the user
+chooses the ratio :math:`D_A / D_B`.
 
 Run this script using
 >>> python activeBD.py [gpuid] [activity_ratio]
 
 """
 
+import os
+import sys
 import time
-import numpy as np
-import os, sys
-import polychrom
-from polychrom import simulation, starting_conformations, forces, forcekits
-from polychrom.contrib.integrators import ActiveBrownianIntegrator
-import openmm
-from polychrom.hdf5_format import HDF5Reporter
-from simtk import unit
 from pathlib import Path
+
+import numpy as np
+import openmm
+from simtk import unit
+
+import polychrom
+from polychrom import forcekits, forces, simulation, starting_conformations
+from polychrom.contrib.integrators import ActiveBrownianIntegrator
+from polychrom.hdf5_format import HDF5Reporter
 
 N = 1000  # 1000 monomers
 ids = np.ones(N)  # aray of 1s and 0s assigning type A and type B comonomers
@@ -27,9 +34,7 @@ ids = np.ones(N)  # aray of 1s and 0s assigning type A and type B comonomers
 ids[int(N / 2) :] = 0
 
 
-def run_monomer_diffusion(
-    gpuid, N, ids, activity_ratio, timestep=170, nblocks=10, blocksize=100
-):
+def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, nblocks=10, blocksize=100):
     """Run a single simulation on a GPU of a hetero-polymer with A monomers and B monomers. A monomers
     have a larger diffusion coefficient than B monomers, with an activity ratio of D_A / D_B.
 
@@ -53,12 +58,8 @@ def run_monomer_diffusion(
 
     """
     if len(ids) != N:
-        raise ValueError(
-            "The array of monomer identities must have length equal to the total number of monomers."
-        )
-    D = np.ones(
-        (N, 3)
-    )  # Dx, Dy, Dz --> we assume the diffusion coefficient in each spatial dimension is the same
+        raise ValueError("The array of monomer identities must have length equal to the total number of monomers.")
+    D = np.ones((N, 3))  # Dx, Dy, Dz --> we assume the diffusion coefficient in each spatial dimension is the same
     # by default set the average diffusion coefficient to be 1 kT/friction
     # let D_A = 1 + Ddiff and D_B = 1 - Ddiff such that D_A / D_B is the given activity_ratio
     Ddiff = (activity_ratio - 1) / (activity_ratio + 1)
@@ -79,9 +80,7 @@ def run_monomer_diffusion(
     particleD = unit.Quantity(D, kT / friction)
     integrator = ActiveBrownianIntegrator(timestep, collision_rate, particleD)
     gpuid = f"{gpuid}"
-    reporter = HDF5Reporter(
-        folder="active_inactive", max_data_length=100, overwrite=True
-    )
+    reporter = HDF5Reporter(folder="active_inactive", max_data_length=100, overwrite=True)
     sim = simulation.Simulation(
         platform="CUDA",
         # for custom integrators, feed a tuple with the integrator class reference and a string specifying type,
@@ -99,9 +98,7 @@ def run_monomer_diffusion(
 
     polymer = starting_conformations.grow_cubic(N, int(np.ceil(r)))
     sim.set_data(polymer, center=True)  # loads a polymer, puts a center of mass at zero
-    sim.set_velocities(
-        v=np.zeros((N, 3))
-    )  # initializes velocities of all monomers to zero (no inertia)
+    sim.set_velocities(v=np.zeros((N, 3)))  # initializes velocities of all monomers to zero (no inertia)
     sim.add_force(forces.spherical_confinement(sim, density=density, k=5.0))
     sim.add_force(
         forcekits.polymer_chains(
@@ -117,7 +114,7 @@ def run_monomer_diffusion(
             nonbonded_force_func=forces.polynomial_repulsive,
             nonbonded_force_kwargs={
                 "trunc": 3.0,  # this will let chains cross sometimes
-                #'trunc':10.0, # this will resolve chain crossings and will not let chain cross anymore
+                # 'trunc':10.0, # this will resolve chain crossings and will not let chain cross anymore
             },
             except_bonds=True,
         )
@@ -132,6 +129,8 @@ def run_monomer_diffusion(
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        raise ValueError("This script takes in 2 arguments: [gpuidi (int)], [activity_ratio (float)]")
     gpuid = int(sys.argv[1])
     activity_ratio = int(sys.argv[2])
     run_monomer_diffusion(gpuid, N, ids, activity_ratio)

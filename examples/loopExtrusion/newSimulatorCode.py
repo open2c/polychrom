@@ -1,17 +1,15 @@
-import pickle
 import os
+import pickle
 import time
-import numpy as np
-from openmmlib import polymerutils
-from openmmlib.polymerutils import scanBlocks
-from openmmlib.openmmlib import Simulation
-from openmmlib.polymerutils import grow_rw
 
+import numpy as np
 import pyximport
+from openmmlib import polymerutils
+from openmmlib.openmmlib import Simulation
+from openmmlib.polymerutils import grow_rw, scanBlocks
 
 pyximport.install()
 from smcTranslocator import smcTranslocatorDirectional
-
 
 # -------defining parameters----------
 #  -- basic loop extrusion parameters
@@ -31,9 +29,7 @@ folder = "trajectory"
 
 # new parameters because some things changed
 saveEveryBlocks = 10  # save every 10 blocks (saving every block is now too much almost)
-skipSavedBlocksBeginning = (
-    20  # how many blocks (saved) to skip after you restart LEF positions
-)
+skipSavedBlocksBeginning = 20  # how many blocks (saved) to skip after you restart LEF positions
 totalSavedBlocks = 40  # how many blocks to save (number of blocks done is totalSavedBlocks * saveEveryBlocks)
 restartMilkerEveryBlocks = 100
 
@@ -49,16 +45,8 @@ assert (totalSavedBlocks * saveEveryBlocks) % restartMilkerEveryBlocks == 0
 
 savesPerMilker = restartMilkerEveryBlocks // saveEveryBlocks
 milkerInitsSkip = saveEveryBlocks * skipSavedBlocksBeginning // restartMilkerEveryBlocks
-milkerInitsTotal = (
-    (totalSavedBlocks + skipSavedBlocksBeginning)
-    * saveEveryBlocks
-    // restartMilkerEveryBlocks
-)
-print(
-    "Milker will be initialized {0} times, first {1} will be skipped".format(
-        milkerInitsTotal, milkerInitsSkip
-    )
-)
+milkerInitsTotal = (totalSavedBlocks + skipSavedBlocksBeginning) * saveEveryBlocks // restartMilkerEveryBlocks
+print("Milker will be initialized {0} times, first {1} will be skipped".format(milkerInitsTotal, milkerInitsSkip))
 
 
 class smcTranslocatorMilker(object):
@@ -93,9 +81,7 @@ class smcTranslocatorMilker(object):
         """
 
         if len(self.allBonds) != 0:
-            raise ValueError(
-                "Not all bonds were used; {0} sets left".format(len(self.allBonds))
-            )
+            raise ValueError("Not all bonds were used; {0} sets left".format(len(self.allBonds)))
 
         self.bondForce = bondForce
 
@@ -115,11 +101,7 @@ class smcTranslocatorMilker(object):
         self.curBonds = allBonds.pop(0)
 
         for bond in self.uniqueBonds:
-            paramset = (
-                self.activeParamDict
-                if (bond in self.curBonds)
-                else self.inactiveParamDict
-            )
+            paramset = self.activeParamDict if (bond in self.curBonds) else self.inactiveParamDict
             ind = bondForce.addBond(bond[0], bond[1], **paramset)
             self.bondInds.append(ind)
         self.bondToInd = {i: j for i, j in zip(self.uniqueBonds, self.bondInds)}
@@ -133,9 +115,7 @@ class smcTranslocatorMilker(object):
         :return: (current bonds, previous step bonds); just for reference
         """
         if len(self.allBonds) == 0:
-            raise ValueError(
-                "No bonds left to run; you should restart simulation and run setup  again"
-            )
+            raise ValueError("No bonds left to run; you should restart simulation and run setup  again")
 
         pastBonds = self.curBonds
         self.curBonds = self.allBonds.pop(0)  # getting current bonds
@@ -153,12 +133,8 @@ class smcTranslocatorMilker(object):
         for bond, isAdd in zip(bondsToChange, bondsIsAdd):
             ind = self.bondToInd[bond]
             paramset = self.activeParamDict if isAdd else self.inactiveParamDict
-            self.bondForce.setBondParameters(
-                ind, bond[0], bond[1], **paramset
-            )  # actually updating bonds
-        self.bondForce.updateParametersInContext(
-            context
-        )  # now run this to update things in the context
+            self.bondForce.setBondParameters(ind, bond[0], bond[1], **paramset)  # actually updating bonds
+        self.bondForce.updateParametersInContext(context)  # now run this to update things in the context
         return self.curBonds, pastBonds
 
 
@@ -195,9 +171,7 @@ SMCTran = initModel()  # defining actual smc translocator object
 # now polymer simulation code starts
 
 # ------------feed smcTran to the milker---
-SMCTran.steps(
-    1000000
-)  # first steps to "equilibrate" SMC dynamics. If desired of course.
+SMCTran.steps(1000000)  # first steps to "equilibrate" SMC dynamics. If desired of course.
 milker = smcTranslocatorMilker(SMCTran)  # now feed this thing to milker (do it once!)
 # --------- end new code ------------
 
@@ -206,9 +180,7 @@ for milkerCount in range(milkerInitsTotal):
 
     # simulation parameters are defined below
     a = Simulation(timestep=80, thermostat=0.01)
-    a.setup(
-        platform="CUDA", PBC=True, PBCbox=[box, box, box], GPU=0, precision="mixed"
-    )  # set up GPU here
+    a.setup(platform="CUDA", PBC=True, PBCbox=[box, box, box], GPU=0, precision="mixed")  # set up GPU here
     a.saveFolder(folder)
     a.load(data)
     a.addHarmonicPolymerBonds(wiggleDist=0.1)
@@ -234,13 +206,9 @@ for milkerCount in range(milkerInitsTotal):
     )  # now only one step of SMC per step
     print("Restarting milker")
 
-    a.doBlock(
-        steps=steps, increment=False
-    )  # do block for the first time with first set of bonds in
+    a.doBlock(steps=steps, increment=False)  # do block for the first time with first set of bonds in
     for i in range(restartMilkerEveryBlocks - 1):
-        curBonds, pastBonds = milker.step(
-            a.context
-        )  # this updates bonds. You can do something with bonds here
+        curBonds, pastBonds = milker.step(a.context)  # this updates bonds. You can do something with bonds here
         if i % saveEveryBlocks == (saveEveryBlocks - 2):
             a.doBlock(steps=steps, increment=doSave)
             if doSave:
@@ -250,9 +218,7 @@ for milkerCount in range(milkerInitsTotal):
                     open(os.path.join(a.folder, "SMC{0}.dat".format(a.step)), "wb"),
                 )
         else:
-            a.integrator.step(
-                steps
-            )  # do steps without getting the positions from the GPU (faster)
+            a.integrator.step(steps)  # do steps without getting the positions from the GPU (faster)
 
     data = a.getData()  # save data and step, and delete the simulation
     block = a.step

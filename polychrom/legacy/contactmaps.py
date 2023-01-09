@@ -6,19 +6,14 @@ This file contains a bunch of method to work on contact maps of a Hi-C data.
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
-import os
-import traceback
+
+import sys
+import warnings
 
 import numpy as np
 
-from math import sqrt
-import sys
-from polychrom.polymerutils import load
-import warnings
-import polychrom.polymerutils as polymerutils
-import time
-from scipy.spatial import ckdtree
 from polychrom.polymer_analyses import calculate_contacts as giveContacts
+from polychrom.polymerutils import load
 
 
 def rescalePoints(points, bins):
@@ -120,7 +115,7 @@ def averageBinnedContactMap(
     An example:
 
     .. code-block:: python
-        >>> filenames = ["myfolder/blockd%d.dat" % i for i in xrange(1000)]
+        >>> filenames = ["myfolder/blockd%d.dat" % i for i in range(1000)]
         >>> cmap = averageBinnedContactMap(filenames) + 1  #getting cmap
         #either showing a log of a map (+1 for zeros)
         >>> plt.imshow(numpy.log(cmap +1))
@@ -162,7 +157,7 @@ def averageBinnedContactMap(
         try:
             data = loadFunction(filenames[fileInd])  # load filename
             getResolution = 1
-        except:
+        except Exception:
             fileInd = fileInd + 1
         if fileInd >= len(filenames):
             print("no valid files found in filenames")
@@ -184,9 +179,7 @@ def averageBinnedContactMap(
     Nbase = len(bins) - 1
 
     if Nbase > 10000:
-        warnings.warn(
-            UserWarning("very large contact map" " may be difficult to visualize")
-        )
+        warnings.warn(UserWarning("very large contact map" " may be difficult to visualize"))
 
     chromosomeStarts = np.cumsum(chainBinNums)
     chromosomeStarts = np.hstack((0, chromosomeStarts))
@@ -276,7 +269,7 @@ def averagePureContactMap(
             except tuple(exceptionsToIgnore):
                 print("file not found", i)
                 continue
-            except:
+            except Exception:
                 print("Unexpected error:", sys.exc_info()[0])
                 print("File is: ", i)
                 return -1
@@ -287,17 +280,10 @@ def averagePureContactMap(
 
                 if len(data) > 6000:
                     warnings.warn(
-                        UserWarning(
-                            "very large contact map"
-                            " may cause errors. these may be fixed with n=1 threads."
-                        )
+                        UserWarning("very large contact map" " may cause errors. these may be fixed with n=1 threads.")
                     )
                 if len(data) > 20000:
-                    warnings.warn(
-                        UserWarning(
-                            "very large contact map" " may be difficult to visualize."
-                        )
-                    )
+                    warnings.warn(UserWarning("very large contact map" " may be difficult to visualize."))
 
                 mysum = pureMap(data, cutoff)  # create a map
 

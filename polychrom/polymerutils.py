@@ -3,40 +3,41 @@ Loading and saving individual conformations
 ===========================================
 
 
-The module :py:mod:`polychrom.polymerutils` provides tools for saving and loading individual 
-conformations. Note that saving and loading trajectories should generally be done using :py:mod:`polychrom.hdf5_format` module. 
-This module provides tools for loading/saving invividual conformations, or for working with 
-projects that have both  old-style and new-style trajectories. 
+The module :py:mod:`polychrom.polymerutils` provides tools for saving and loading individual conformations. Note that
+saving and loading trajectories should generally be done using :py:mod:`polychrom.hdf5_format` module. This module
+provides tools for loading/saving invividual conformations, or for working with projects that have both  old-style
+and new-style trajectories.
 
-For projects using both old-style and new-style trajectories(e.g. in a project that was
-switched to polychrom, and new files were added), a function :py:func:`polychrom.polymerutils.fetch_block`
-can be helpful as it provides the same interface for fetching a conformation from both 
-old-style and new-style trajectory. Note however that it is not the fastest way to iterate over conformations
-in the new-style trajectory, and the :py:func:`polychrom.hdf5_format.list_URIs` is faster. 
+For projects using both old-style and new-style trajectories(e.g. in a project that was switched to polychrom,
+and new files were added), a function :py:func:`polychrom.polymerutils.fetch_block` can be helpful as it provides the
+same interface for fetching a conformation from both old-style and new-style trajectory. Note however that it is not
+the fastest way to iterate over conformations in the new-style trajectory, and the
+:py:func:`polychrom.hdf5_format.list_URIs` is faster.
 
-A typical workflow with the new-style trajectories should be: 
+A typical workflow with the new-style trajectories should be:
 
 .. code-block:: python
 
     URIs = polychrom.hdf5_format.list_URIs(folder)
     for URI in URIs:
         data = polychrom.hdf5_format.load_URI(URI)
-        xyz = data["pos"] 
-        
+        xyz = data["pos"]
 """
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
-import six
-import numpy as np
+
+import glob
+import io
 import os
 
-from . import hdf5_format
-from polychrom.hdf5_format import load_URI
 import joblib
-import glob
+import numpy as np
+import six
 
-import io
+from polychrom.hdf5_format import load_URI
+
+from . import hdf5_format
 
 
 def load(filename):
@@ -66,7 +67,7 @@ def load(filename):
 
     try:  # loading from a joblib file here
         return dict(joblib.load(filename)).pop("data")
-    except:  # checking for a text file
+    except Exception:  # checking for a text file
         data_file = open(filename)
         line0 = data_file.readline()
         try:
@@ -155,7 +156,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
 
         for particle in data:
             lines.append("{0:.3f} {1:.3f} {2:.3f}\n".format(*particle))
-        if filename == None:
+        if filename is None:
             return lines
 
         elif isinstance(filename, six.string_types):
@@ -167,9 +168,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
             raise ValueError("Not sure what to do with filename {0}".format(filename))
 
     elif mode == "pdb":
-        data = (
-            data - np.minimum(np.min(data, axis=0), np.zeros(3, float) - 100)[None, :]
-        )
+        data = data - np.minimum(np.min(data, axis=0), np.zeros(3, float) - 100)[None, :]
         retret = ""
 
         def add(st, n):
@@ -178,7 +177,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
             else:
                 return st + " " * (n - len(st))
 
-        if pdbGroups == None:
+        if pdbGroups is None:
             pdbGroups = ["A" for i in range(len(data))]
         else:
             pdbGroups = [str(int(i)) for i in pdbGroups]
@@ -219,13 +218,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
 def rotation_matrix(rotate):
     """Calculates rotation matrix based on three rotation angles"""
     tx, ty, tz = rotate
-    Rx = np.array(
-        [[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]]
-    )
-    Ry = np.array(
-        [[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]]
-    )
-    Rz = np.array(
-        [[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]]
-    )
+    Rx = np.array([[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]])
+    Ry = np.array([[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]])
+    Rz = np.array([[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]])
     return np.dot(Rx, np.dot(Ry, Rz))

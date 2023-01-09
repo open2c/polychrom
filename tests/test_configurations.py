@@ -1,11 +1,10 @@
-import pytest
 import numpy as np
+import pytest
+
 from polychrom import starting_conformations
 
 
-def Jun_30_2022_create_constrained_random_walk(
-    N, constraint_f, starting_point=(0, 0, 0), step_size=1.0
-):
+def Jun_30_2022_create_constrained_random_walk(N, constraint_f, starting_point=(0, 0, 0), step_size=1.0):
     """
     Creates a constrained freely joined chain of length N with step step_size.
     Each step of a random walk is tested with the constraint function and is
@@ -58,9 +57,7 @@ class Correct_outputtest:
         def alwaystrue(new_p):
             return True
 
-        polymer = starting_conformations.create_constrained_random_walk(
-            N, alwaystrue, step_size=step
-        )
+        polymer = starting_conformations.create_constrained_random_walk(N, alwaystrue, step_size=step)
         increments = [polymer[i + 1] - polymer[i] for i in range(len(polymer) - 1)]
 
         self.assertTrue(
@@ -73,7 +70,6 @@ class Correct_outputtest:
             return np.linalg.norm(new_p) < confinement
 
         polymer = starting_conformations.create_constrained_random_walk(N, confined)
-        increments = [polymer[i + 1] - polymer[i] for i in range(len(polymer) - 1)]
 
         # Check that the conformation does not go outside the allowed region
         assert np.all(np.sqrt(np.sum(polymer**2, 1)) < confinement)
@@ -89,7 +85,7 @@ class Same_output_as_old_codetest:
         np.random.seed(42)
         p_new = starting_conformations.create_constrained_random_walk(N, alwaystrue)
 
-        # Check that the output is not different compared to old random walk starting conf for all true constraint function
+        # Check: output is not different compared to old random walk starting conf for all true constraint function
         assert np.all(p_old == p_new)
 
     def test_for_same_output_with_sphericalconstraint_as_Jun_30_2022(self):
@@ -110,14 +106,9 @@ class New_addition_test:
         def alwaystrue(new_p):
             return True
 
-        polymer = starting_conformations.create_constrained_random_walk(
-            N, alwaystrue, polar_fixed=polar_fixed
-        )
+        polymer = starting_conformations.create_constrained_random_walk(N, alwaystrue, polar_fixed=polar_fixed)
         angles = np.arccos(
-            [
-                np.dot(polymer[i + 2] - polymer[i + 1], polymer[i + 1] - polymer[i])
-                for i in range(len(polymer) - 2)
-            ]
+            [np.dot(polymer[i + 2] - polymer[i + 1], polymer[i + 1] - polymer[i]) for i in range(len(polymer) - 2)]
         )
 
         # Check that the angles are correct
@@ -127,14 +118,9 @@ class New_addition_test:
         def confined(new_p):
             return np.linalg.norm(new_p) < confinement
 
-        polymer = starting_conformations.create_constrained_random_walk(
-            N, confined, polar_fixed=polar_fixed
-        )
+        polymer = starting_conformations.create_constrained_random_walk(N, confined, polar_fixed=polar_fixed)
         angles = np.arccos(
-            [
-                np.dot(polymer[i + 2] - polymer[i + 1], polymer[i + 1] - polymer[i])
-                for i in range(len(polymer) - 2)
-            ]
+            [np.dot(polymer[i + 2] - polymer[i + 1], polymer[i + 1] - polymer[i]) for i in range(len(polymer) - 2)]
         )
 
         # Check that the angles are correct
