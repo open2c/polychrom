@@ -79,7 +79,7 @@ class SimulationParams(object):
     The methods in this class provide ways of calculating physically meaningful
     quantities in the Rouse model fromn polychrom parameter values and vice versa.
     The parameters in the constructor are usually set for computational convenience
-    and do not have any physical meaning, except the nubmer of monomers, N.
+    and do not have any physical meaning, except the number of monomers, N.
 
     Notes
     -----
