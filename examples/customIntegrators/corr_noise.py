@@ -167,5 +167,7 @@ def run_correlated_diffusion(gpuid, N, rhos, timestep=170, nblocks=10, blocksize
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise ValueError("This script takes in 1 argument: [gpuid (int)]")
     gpuid = int(sys.argv[1])
     run_correlated_diffusion(gpuid, N, rhos)

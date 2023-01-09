@@ -129,6 +129,8 @@ def run_monomer_diffusion(gpuid, N, ids, activity_ratio, timestep=170, nblocks=1
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        raise ValueError("This script takes in 2 arguments: [gpuidi (int)], [activity_ratio (float)]")
     gpuid = int(sys.argv[1])
     activity_ratio = int(sys.argv[2])
     run_monomer_diffusion(gpuid, N, ids, activity_ratio)
