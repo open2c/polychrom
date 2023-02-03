@@ -244,9 +244,7 @@ class Simulation(object):
         for i in kwargs.keys():
             if i not in valid_names:
                 raise ValueError(
-                    "incorrect argument provided: {0}. Allowed are {1}".format(
-                        i, valid_names
-                    )
+                    "incorrect argument provided: {0}. Allowed are {1}".format(i, valid_names)
                 )
 
         if None in kwargs.values():
@@ -412,9 +410,7 @@ class Simulation(object):
 
         if data.shape[1] != 3:
             raise ValueError(
-                "Data is not shaped correctly. Needs (N,3), provided: {0}".format(
-                    data.shape
-                )
+                "Data is not shaped correctly. Needs (N,3), provided: {0}".format(data.shape)
             )
         if np.isnan(data).any():
             raise ValueError("Data contains NANs")
@@ -451,21 +447,15 @@ class Simulation(object):
 
         v = np.asarray(v, dtype="float")
         if len(v) != self.N:
-            raise ValueError(
-                f"length of velocity array, {len(v)} does not match N, {self.N}"
-            )
+            raise ValueError(f"length of velocity array, {len(v)} does not match N, {self.N}")
 
         if v.shape[1] != 3:
             raise ValueError(
-                "Data is not shaped correctly. Needs (N,3), provided: {0}".format(
-                    v.shape
-                )
+                "Data is not shaped correctly. Needs (N,3), provided: {0}".format(v.shape)
             )
         if np.isnan(v).any():
             raise ValueError("Data contains NANs")
-        self.velocities = simtk.unit.Quantity(
-            v, simtk.unit.nanometer / simtk.unit.picosecond
-        )
+        self.velocities = simtk.unit.Quantity(v, simtk.unit.nanometer / simtk.unit.picosecond)
         if hasattr(self, "context"):
             self.init_velocities()
 
@@ -543,9 +533,7 @@ class Simulation(object):
                 else:
                     force.setNonbondedMethod(force.CutoffNonPeriodic)
 
-            logging.info(
-                "adding force {} {}".format(i, self.system.addForce(self.force_dict[i]))
-            )
+            logging.info("adding force {} {}".format(i, self.system.addForce(self.force_dict[i])))
 
         for reporter in self.reporters:
             reporter.report(
@@ -553,9 +541,7 @@ class Simulation(object):
                 {i: j.__getstate__() for i, j in self.force_dict.items()},
             )
 
-        self.context = openmm.Context(
-            self.system, self.integrator, self.platform, self.properties
-        )
+        self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
         self.init_positions()
         self.init_velocities()
         self.forces_applied = True
@@ -570,9 +556,7 @@ class Simulation(object):
         self.masses = np.zeros(self.N, dtype=float) + self.kwargs["mass"]
         for mass in self.masses:
             self.system.addParticle(mass)
-        self.context = openmm.Context(
-            self.system, self.integrator, self.platform, self.properties
-        )
+        self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
         self.init_positions()
         self.init_velocities(**kwargs)
 
@@ -589,9 +573,7 @@ class Simulation(object):
         try:
             self.context
         except:
-            raise ValueError(
-                "No context, cannot set velocs." "Initialize context before that"
-            )
+            raise ValueError("No context, cannot set velocs.Initialize context before that")
 
         if hasattr(self, "velocities"):
             self.context.setVelocities(self.velocities)
@@ -609,15 +591,9 @@ class Simulation(object):
         try:
             self.context
         except:
-            raise ValueError(
-                "No context, cannot set positions." " Initialize context before that"
-            )
+            raise ValueError("No context, cannot set positions. Initialize context before that")
         self.context.setPositions(self.data)
-        eP = (
-            self.context.getState(getEnergy=True).getPotentialEnergy()
-            / self.N
-            / self.kT
-        )
+        eP = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
         logging.info("Particles loaded. Potential energy is %lf" % eP)
 
     def reinitialize(self):
@@ -630,9 +606,7 @@ class Simulation(object):
         self.init_positions()
         self.init_velocities()
 
-    def local_energy_minimization(
-        self, tolerance=0.3, maxIterations=0, random_offset=0.02
-    ):
+    def local_energy_minimization(self, tolerance=0.3, maxIterations=0, random_offset=0.02):
         """
         A wrapper to the build-in OpenMM Local Energy Minimization
 
@@ -692,9 +666,7 @@ class Simulation(object):
         eK = self.state.getKineticEnergy() / self.N / self.kT
         eP = self.state.getPotentialEnergy() / self.N / self.kT
         locTime = self.state.getTime()
-        logging.info(
-            "before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime)
-        )
+        logging.info("before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
         openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)
 
@@ -713,9 +685,7 @@ class Simulation(object):
 
         locTime = self.state.getTime()
 
-        logging.info(
-            "after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime)
-        )
+        logging.info("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
     def do_block(
         self,
@@ -795,7 +765,7 @@ class Simulation(object):
         ):
             dt = self.integrator.getStepSize()
             msg += "dt=%.1lffs " % (dt / simtk.unit.femtosecond)
-            mass = self.system.getParticleMass(1)
+            mass = self.system.getParticleMass(0)
             dx = simtk.unit.sqrt(2.0 * eK * self.kT / mass) * dt
             msg += "dx=%.2lfpm " % (dx / simtk.unit.nanometer * 1000.0)
 
@@ -826,9 +796,7 @@ class Simulation(object):
         """Prints detailed statistics of a system.
         Will be run every 50 steps
         """
-        state = self.context.getState(
-            getPositions=True, getVelocities=True, getEnergy=True
-        )
+        state = self.context.getState(getPositions=True, getVelocities=True, getEnergy=True)
 
         eP = state.getPotentialEnergy()
         pos = np.array(state.getPositions() / simtk.unit.nanometer)
@@ -872,9 +840,7 @@ class Simulation(object):
         print("     z: %.2lf, %.2lf, %.2lf, %.2lf" % minmedmax(z))
         print()
         print("Statistics for velocities:")
-        print(
-            "     mean kinetic energy is: ", np.mean(EkPerParticle), "should be:", 1.5
-        )
+        print("     mean kinetic energy is: ", np.mean(EkPerParticle), "should be:", 1.5)
         print("     fastest particles are (in kT): ", np.sort(EkPerParticle)[-5:])
 
         print()
@@ -900,9 +866,7 @@ class Simulation(object):
             return
         # determining the 95 percentile distance between particles,
         if scale == "auto":
-            meandist = np.percentile(
-                np.sqrt(np.sum(np.diff(data, axis=0) ** 2, axis=1)), 95
-            )
+            meandist = np.percentile(np.sqrt(np.sum(np.diff(data, axis=0) ** 2, axis=1)), 95)
             # rescaling the data, so that bonds are of the order of 1.
             # This is because rasmol spheres are of the fixed diameter.
             data /= meandist
@@ -918,8 +882,7 @@ class Simulation(object):
                     count += 1
             if count > 100:
                 raise RuntimeError(
-                    "Too many particles are close together. "
-                    "This will cause rasmol to choke"
+                    "Too many particles are close together. This will cause rasmol to choke"
                 )
 
         rascript = tempfile.NamedTemporaryFile()
@@ -935,16 +898,12 @@ class Simulation(object):
 
         # creating the array, linearly chanhing from -225 to 225
         # to serve as an array of colors
-        colors = np.array(
-            [int((j * 450.0) / (len(data))) - 225 for j in range(len(data))]
-        )
+        colors = np.array([int((j * 450.0) / (len(data))) - 225 for j in range(len(data))])
 
         # creating spheres along the trajectory
         newData = np.zeros((len(data) * len(shifts) - (len(shifts) - 1), 4))
         for i in range(len(shifts)):
-            newData[i : -1 : len(shifts), :3] = data[:-1] * shifts[i] + data[1:] * (
-                1 - shifts[i]
-            )
+            newData[i : -1 : len(shifts), :3] = data[:-1] * shifts[i] + data[1:] * (1 - shifts[i])
             newData[i : -1 : len(shifts), 3] = colors[:-1]
         newData[-1, :3] = data[-1]
         newData[-1, 3] = colors[-1]
@@ -955,9 +914,9 @@ class Simulation(object):
         # number of atoms and a blank line after is a requirement of rasmol
         for i in newData:
             towrite.write(
-                (
-                    "CA\t{:f}\t{:f}\t{:f}\t{:d}\n".format(i[0], i[1], i[2], int(i[3]))
-                ).encode("utf-8")
+                ("CA\t{:f}\t{:f}\t{:f}\t{:d}\n".format(i[0], i[1], i[2], int(i[3]))).encode(
+                    "utf-8"
+                )
             )
 
         towrite.flush()
@@ -966,10 +925,7 @@ class Simulation(object):
         if os.name == "posix":  # if linux
             os.system("rasmol -xyz %s -script %s" % (towrite.name, rascript.name))
         else:  # if windows
-            os.system(
-                "C:/RasWin/raswin.exe -xyz %s -script %s"
-                % (towrite.name, rascript.name)
-            )
+            os.system("C:/RasWin/raswin.exe -xyz %s -script %s" % (towrite.name, rascript.name))
 
         rascript.close()
         towrite.close()
