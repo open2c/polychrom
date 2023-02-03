@@ -790,7 +790,7 @@ class Simulation(object):
         bonds = np.sqrt(np.sum(np.diff(pos, axis=0) ** 2, axis=1))
         sbonds = np.sort(bonds)
         vel = state.getVelocities()
-        mass = self.system.getParticleMass(1)
+        mass = self.system.getParticleMass(0)
         vkT = np.array(vel / simtk.unit.sqrt(self.kT / mass), dtype=float)
         self.velocs = vkT
         EkPerParticle = 0.5 * np.sum(vkT**2, axis=1)
