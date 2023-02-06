@@ -850,7 +850,7 @@ def spherical_well(sim_object, particles, r, center=[0, 0, 0], width=1, depth=1,
     """
 
     force = openmm.CustomExternalForce(
-        "step(1+d) * step(1-d) * SPHWELLdepth * (1 - cos(3.1415926536*d)) / 2;"
+        "step(1+d) * step(1-d) * SPHWELLdepth * (1 + cos(3.1415926536*d)) / 2;"
         "d = (sqrt((x-SPHWELLx)^2 + (y-SPHWELLy)^2 + (z-SPHWELLz)^2) - SPHWELLradius) / SPHWELLwidth"
     )
 
