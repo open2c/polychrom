@@ -1,7 +1,7 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 """
 Analyses of polymer conformations
-=================================
+------------------------------
 
 
 This module presents a collection of utils to work with polymer conformations.
