@@ -16,6 +16,10 @@ import sys
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 # sys.path.insert(0, os.path.abspath('.'))
 
+## We shall consider removing the sys path changes according to https://www.sphinx-doc.org/en/master/tutorial/describing-code.html#including-doctests-in-your-documentation
+## if using pyproject.toml
+sys.path.insert(0, os.path.abspath(".."))
+
 
 def skip(app, what, name, obj, would_skip, options):
     if name == "__init__":
@@ -26,8 +30,6 @@ def skip(app, what, name, obj, would_skip, options):
 def setup(app):
     app.connect("autodoc-skip-member", skip)
 
-
-sys.path.insert(0, os.path.abspath(".."))
 
 # autodoc_mock_imports = [
 #     'numpy',
@@ -45,6 +47,7 @@ MOCK_MODULES = [
     "scipy.sparse",
     "scipy.spatial",
     "scipy.interpolate",
+    "scipy.ndimage",
     "pandas",
     "pandas.algos",
     "pandas.api",
@@ -58,6 +61,7 @@ MOCK_MODULES = [
     "dask.dataframe.utils",
     "simtk",
     "simtk.unit",
+    "simtk.unit.nanometer",
     "simtk.openmm",
     "joblib",
     "scipy.interpolate.fitpack2",
@@ -92,12 +96,35 @@ napoleon_use_rtype = False
 # -- Project information -----------------------------------------------------
 
 project = "polychrom"
-copyright = "2020, Mirny lab"
+copyright = "2023, Mirny lab"
 author = "Mirny lab"
 master_doc = "index"
 
 # The full version, including alpha/beta/rc tags
-release = "0.1.0"
+# Read the version from the __init__ file
+import io
+import re
+
+
+def _read(*parts, **kwargs):
+    filepath = os.path.join(os.path.dirname(__file__), *parts)
+    encoding = kwargs.pop("encoding", "utf-8")
+    with io.open(filepath, encoding=encoding) as fh:
+        text = fh.read()
+    return text
+
+
+def get_version():
+    version = re.search(
+        r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
+        _read("../polychrom", "__init__.py"),
+        re.MULTILINE,
+    ).group(1)
+    return version
+
+
+version = get_version()
+release = version
 
 # -- General configuration ---------------------------------------------------
 
@@ -138,4 +165,4 @@ html_theme_options = {
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = []  # removed the path to static files
