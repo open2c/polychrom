@@ -16,6 +16,9 @@ import sys
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 # sys.path.insert(0, os.path.abspath('.'))
 
+## We shall consider removing the sys path changes according to https://www.sphinx-doc.org/en/master/tutorial/describing-code.html#including-doctests-in-your-documentation
+## if using pyproject.toml
+sys.path.insert(0, os.path.abspath(".."))
 
 def skip(app, what, name, obj, would_skip, options):
     if name == "__init__":
@@ -26,9 +29,6 @@ def skip(app, what, name, obj, would_skip, options):
 def setup(app):
     app.connect("autodoc-skip-member", skip)
 
-## Remove the sys path changes according to https://www.sphinx-doc.org/en/master/tutorial/describing-code.html#including-doctests-in-your-documentation
-## if using pyproject.toml
-# sys.path.insert(0, os.path.abspath(".."))
 
 # autodoc_mock_imports = [
 #     'numpy',
@@ -46,6 +46,7 @@ MOCK_MODULES = [
     "scipy.sparse",
     "scipy.spatial",
     "scipy.interpolate",
+    "scipy.ndimage",
     "pandas",
     "pandas.algos",
     "pandas.api",
