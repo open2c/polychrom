@@ -26,8 +26,9 @@ def skip(app, what, name, obj, would_skip, options):
 def setup(app):
     app.connect("autodoc-skip-member", skip)
 
-
-sys.path.insert(0, os.path.abspath(".."))
+## Remove the sys path changes according to https://www.sphinx-doc.org/en/master/tutorial/describing-code.html#including-doctests-in-your-documentation
+## if using pyproject.toml
+# sys.path.insert(0, os.path.abspath(".."))
 
 # autodoc_mock_imports = [
 #     'numpy',
@@ -138,4 +139,4 @@ html_theme_options = {
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = [] # removed the path to static files
