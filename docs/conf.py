@@ -20,6 +20,7 @@ import sys
 ## if using pyproject.toml
 sys.path.insert(0, os.path.abspath(".."))
 
+
 def skip(app, what, name, obj, would_skip, options):
     if name == "__init__":
         return False
@@ -104,12 +105,14 @@ master_doc = "index"
 import io
 import re
 
+
 def _read(*parts, **kwargs):
     filepath = os.path.join(os.path.dirname(__file__), *parts)
     encoding = kwargs.pop("encoding", "utf-8")
     with io.open(filepath, encoding=encoding) as fh:
         text = fh.read()
     return text
+
 
 def get_version():
     version = re.search(
@@ -118,6 +121,7 @@ def get_version():
         re.MULTILINE,
     ).group(1)
     return version
+
 
 version = get_version()
 release = version
@@ -161,4 +165,4 @@ html_theme_options = {
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = [] # removed the path to static files
+html_static_path = []  # removed the path to static files
