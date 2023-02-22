@@ -101,6 +101,8 @@ master_doc = "index"
 
 # The full version, including alpha/beta/rc tags
 # Read the version from the __init__ file
+import io
+import re
 
 def _read(*parts, **kwargs):
     filepath = os.path.join(os.path.dirname(__file__), *parts)
