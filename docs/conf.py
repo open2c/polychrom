@@ -60,6 +60,7 @@ MOCK_MODULES = [
     "dask.dataframe.utils",
     "simtk",
     "simtk.unit",
+    "simtk.unit.nanometer",
     "simtk.openmm",
     "joblib",
     "scipy.interpolate.fitpack2",
@@ -94,12 +95,30 @@ napoleon_use_rtype = False
 # -- Project information -----------------------------------------------------
 
 project = "polychrom"
-copyright = "2020, Mirny lab"
+copyright = "2023, Mirny lab"
 author = "Mirny lab"
 master_doc = "index"
 
 # The full version, including alpha/beta/rc tags
-release = "0.1.0"
+# Read the version from the __init__ file
+
+def _read(*parts, **kwargs):
+    filepath = os.path.join(os.path.dirname(__file__), *parts)
+    encoding = kwargs.pop("encoding", "utf-8")
+    with io.open(filepath, encoding=encoding) as fh:
+        text = fh.read()
+    return text
+
+def get_version():
+    version = re.search(
+        r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
+        _read("../polychrom", "__init__.py"),
+        re.MULTILINE,
+    ).group(1)
+    return version
+
+version = get_version()
+release = version
 
 # -- General configuration ---------------------------------------------------
 
