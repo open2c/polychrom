@@ -754,7 +754,7 @@ class Simulation(object):
         if self.integrator_type.lower() == "variablelangevin" or self.integrator_type.lower() == "variableverlet":
             dt = self.integrator.getStepSize()
             msg += "dt=%.1lffs " % (dt / simtk.unit.femtosecond)
-            mass = self.system.getParticleMass(1)
+            mass = self.system.getParticleMass(0)
             dx = simtk.unit.sqrt(2.0 * eK * self.kT / mass) * dt
             msg += "dx=%.2lfpm " % (dx / simtk.unit.nanometer * 1000.0)
 
