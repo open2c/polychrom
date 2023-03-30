@@ -249,10 +249,14 @@ class Simulation(object):
         ]
         for i in kwargs.keys():
             if i not in valid_names:
-                raise ValueError("incorrect argument provided: {0}. Allowed are {1}".format(i, valid_names))
+                raise ValueError(
+                    "incorrect argument provided: {0}. Allowed are {1}".format(i, valid_names)
+                )
 
         if None in kwargs.values():
-            raise ValueError("None is not allowed in arguments due to HDF5 incompatiliblity. Use False instead.")
+            raise ValueError(
+                "None is not allowed in arguments due to HDF5 incompatiliblity. Use False instead."
+            )
         default_args.update(kwargs)
         kwargs = default_args
         self.kwargs = kwargs
@@ -361,7 +365,9 @@ class Simulation(object):
                         f"LangevinMiddle not implemented for backend: {self.backend}"
                     )
             elif self.integrator_type.lower() == "verlet":
-                self.integrator = openmm.VariableVerletIntegrator(kwargs["timestep"] * simtk.unit.femtosecond)
+                self.integrator = openmm.VariableVerletIntegrator(
+                    kwargs["timestep"] * simtk.unit.femtosecond
+                )
             elif self.integrator_type.lower() == "variableverlet":
                 if self.backend == "openmm":
                     self.integrator = openmm.VariableVerletIntegrator(kwargs["error_tol"])
@@ -413,7 +419,8 @@ class Simulation(object):
         self.conlen = 1.0 * simtk.unit.nanometer * self.length_scale
 
         self.kbondScalingFactor = float(
-            (2 * self.kT / self.conlen**2) / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer**2)
+            (2 * self.kT / self.conlen**2)
+            / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer**2)
         )
 
         self.system: openmm.System = openmm.System()
@@ -478,7 +485,9 @@ class Simulation(object):
             raise ValueError(f"length of data, {len(data)} does not match N, {self.N}")
 
         if data.shape[1] != 3:
-            raise ValueError("Data is not shaped correctly. Needs (N,3), provided: {0}".format(data.shape))
+            raise ValueError(
+                "Data is not shaped correctly. Needs (N,3), provided: {0}".format(data.shape)
+            )
         if np.isnan(data).any():
             raise ValueError("Data contains NANs")
 
@@ -519,7 +528,9 @@ class Simulation(object):
             raise ValueError(f"length of velocity array, {len(v)} does not match N, {self.N}")
 
         if v.shape[1] != 3:
-            raise ValueError("Data is not shaped correctly. Needs (N,3), provided: {0}".format(v.shape))
+            raise ValueError(
+                "Data is not shaped correctly. Needs (N,3), provided: {0}".format(v.shape)
+            )
         if np.isnan(v).any():
             raise ValueError("Data contains NANs")
         self.velocities = simtk.unit.Quantity(v, simtk.unit.nanometer / simtk.unit.picosecond)
@@ -556,7 +567,9 @@ class Simulation(object):
                 self.add_force(f)
         else:
             if force.name in self.force_dict:
-                raise ValueError("A force named {} was added to the system twice!".format(force.name))
+                raise ValueError(
+                    "A force named {} was added to the system twice!".format(force.name)
+                )
             forces._prepend_force_name_to_params(force)
             self.force_dict[force.name] = force
 
@@ -609,8 +622,10 @@ class Simulation(object):
             )
         if self.backend == "openmm":
 
-        self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
-        self.init_positions()
+            self.context = openmm.Context(
+                self.system, self.integrator, self.platform, self.properties
+            )
+            self.init_positions()
         if self.backend == "hoomd":
             if hasattr(self, "velocities"):
                 self.system.particles.velocity = self.velocities
@@ -651,7 +666,7 @@ class Simulation(object):
         temperature: temperature to set velocities (default: temerature of the simulation)
         """
         if not hasattr(self, "context"):
-            raise ValueError("No context, cannot set velocs." "Initialize context before that")
+            raise ValueError("No context, cannot set velocs.Initialize context before that")
 
         if hasattr(self, "velocities"):
             if self.backend == "openmm":
@@ -674,7 +689,7 @@ class Simulation(object):
         If system has exploded, this is
          used in the code to reset coordinates."""
         if not hasattr(self, "context"):
-            raise ValueError("No context, cannot set positions." " Initialize context before that")
+            raise ValueError("No context, cannot set positions. Initialize context before that")
         self.context.setPositions(self.data)
         e_p = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
         logging.info("Particles loaded. Potential energy is %lf" % e_p)
@@ -832,7 +847,9 @@ class Simulation(object):
             self.platform.run(steps)
             self.state = self.platform.state.get_snapshot()
 
-        self.state = self.context.getState(getPositions=True, getVelocities=get_velocities, getEnergy=True)
+        self.state = self.context.getState(
+            getPositions=True, getVelocities=get_velocities, getEnergy=True
+        )
         b = time.time()
         if self.backend == "openmm":
             coords = self.state.getPositions(asNumpy=True)
@@ -889,7 +906,10 @@ class Simulation(object):
         msg += "Rg=%.3lf " % self.RG()
         msg += "SPS=%.0lf " % (steps / (float(b - a)))
 
-        if self.integrator_type.lower() == "variablelangevin" or self.integrator_type.lower() == "variableverlet":
+        if (
+            self.integrator_type.lower() == "variablelangevin"
+            or self.integrator_type.lower() == "variableverlet"
+        ):
             dt = self.integrator.getStepSize()
             msg += "dt=%.1lffs " % (dt / simtk.unit.femtosecond)
             mass = self.system.getParticleMass(0)
@@ -906,7 +926,9 @@ class Simulation(object):
             "block": self.block,
         }
         if get_velocities:
-            result["vel"] = self.state.getVelocities() / (simtk.unit.nanometer / simtk.unit.picosecond)
+            result["vel"] = self.state.getVelocities() / (
+                simtk.unit.nanometer / simtk.unit.picosecond
+            )
         result.update(save_extras)
         if save:
             for reporter in self.reporters:
@@ -1008,7 +1030,9 @@ class Simulation(object):
                 if dist < 1.3:
                     count += 1
             if count > 100:
-                raise RuntimeError("Too many particles are close together. " "This will cause rasmol to choke")
+                raise RuntimeError(
+                    "Too many particles are close together. This will cause rasmol to choke"
+                )
 
         rascript = tempfile.NamedTemporaryFile()
         # writing the rasmol script. Spacefill controls radius of the sphere.
@@ -1038,7 +1062,11 @@ class Simulation(object):
 
         # number of atoms and a blank line after is a requirement of rasmol
         for i in newData:
-            towrite.write(("CA\t{:f}\t{:f}\t{:f}\t{:d}\n".format(i[0], i[1], i[2], int(i[3]))).encode("utf-8"))
+            towrite.write(
+                ("CA\t{:f}\t{:f}\t{:f}\t{:d}\n".format(i[0], i[1], i[2], int(i[3]))).encode(
+                    "utf-8"
+                )
+            )
 
         towrite.flush()
         "TODO: rewrite using subprocess.popen"
