@@ -69,6 +69,7 @@ import warnings
 import h5py
 import glob
 import os
+import hoomd
 
 DEFAULT_OPTS = {"compression_opts": 9, "compression": "gzip"}
 
@@ -87,13 +88,13 @@ def _convert_to_hdf5_array(data):
     """
     Attempts to convert data to HDF5 compatible array
     or to an HDF5 attribute compatible entity (str, number)
-    
-    Does its best at determining if this is a "normal" 
-    object (str, int, float), or an array. 
-    
-    Right now, if something got converted to a numpy object, 
-    it is discarded and not saved in any way. 
-    We could think about pickling those cases, or JSONing them... 
+
+    Does its best at determining if this is a "normal"
+    object (str, int, float), or an array.
+
+    Right now, if something got converted to a numpy object,
+    it is discarded and not saved in any way.
+    We could think about pickling those cases, or JSONing them...
     """
     if type(data) == str:
         data = np.array(data, dtype="S")
@@ -111,8 +112,8 @@ def _convert_to_hdf5_array(data):
 def _write_group(dataDict, group, dset_opts=None):
     """
     Writes a dictionary of elements to an HDF5 group
-    Puts all "items" into attrs, and all ndarrays into datasets 
-    
+    Puts all "items" into attrs, and all ndarrays into datasets
+
     dset_opts is a dictionary of arguments passed to create_dataset function
     (compression would be here for example). By default set to DEFAULT_OPTS
     """
@@ -133,37 +134,37 @@ def _write_group(dataDict, group, dset_opts=None):
 def list_URIs(folder, empty_error=True, read_error=True, return_dict=False):
     """
     Makes a list of URIs (path-like records for each block). for a trajectory folder
-    Now we store multiple blocks per file, and URI is a 
-    Universal Resource Identifier for a block. 
-    
-    It is be compatible with polymerutils.load, and with contactmap finders, and is 
-    generally treated like a filename. 
-    
+    Now we store multiple blocks per file, and URI is a
+    Universal Resource Identifier for a block.
+
+    It is be compatible with polymerutils.load, and with contactmap finders, and is
+    generally treated like a filename.
+
     This function checks that the HDF5 file is openable (if read_error==True),
-    but does not check if individual datasets (blocks) exist in a file. 
-    If read_error==False, a non-openable file is fully ignored. 
+    but does not check if individual datasets (blocks) exist in a file.
+    If read_error==False, a non-openable file is fully ignored.
     NOTE: This covers the most typical case of corruption due to a terminated write,
-    because an HDF5 file becomes invalid in that case. 
-    
+    because an HDF5 file becomes invalid in that case.
+
     It does not check continuity of blocks (blocks_1-10.h5; blocks_20-30.h5 is valid)
     But it does error if one block is listed twice
     (e.g. blocks_1-10.h5; blocks_5-15.h5 is invalid)
-    
+
     TODO: think about the above checks, and check for readable datasets as well
-    
+
     Parameters
     ----------
-    
+
     folder : str
-        folder to find conformations in 
+        folder to find conformations in
     empty_error : bool, optional
         Raise error if the folder does not exist or has no files, default True
-    read_error : bool, optional 
+    read_error : bool, optional
         Raise error if one of the HDF5 files cannot be read, default True
     return_dict : bool, optional
-        True: return a dict of {block_number, URI}. 
-        False: return a list of URIs. This is a default.                   
-        
+        True: return a dict of {block_number, URI}.
+        False: return a list of URIs. This is a default.
+
     """
 
     files = glob.glob(os.path.join(folder, "blocks_*-*.h5"))
@@ -186,19 +187,17 @@ def list_URIs(folder, empty_error=True, read_error=True, return_dict=False):
     if not return_dict:
         return [i[1] for i in sorted(filenames.items(), key=lambda x: int(x[0]))]
     else:
-        return {
-            int(i[0]): i[1] for i in sorted(filenames.items(), key=lambda x: int(x[0]))
-        }
+        return {int(i[0]): i[1] for i in sorted(filenames.items(), key=lambda x: int(x[0]))}
 
 
 def load_URI(dset_path):
     """
     Loads a single block of the simulation using address provided by list_filenames
-    dset_path should be 
-    
-    /path/to/trajectory/folder/blocks_X-Y.h5::Z    
-    
-    where Z is the block number 
+    dset_path should be
+
+    /path/to/trajectory/folder/blocks_X-Y.h5::Z
+
+    where Z is the block number
     """
 
     fname, group = dset_path.split("::")
@@ -208,7 +207,7 @@ def load_URI(dset_path):
 
 def save_hdf5_file(filename, data_dict, dset_opts=None, mode="w"):
     """
-    Saves data_dict to filename 
+    Saves data_dict to filename
     """
     if dset_opts is None:
         dset_opts = DEFAULT_OPTS
@@ -218,7 +217,7 @@ def save_hdf5_file(filename, data_dict, dset_opts=None, mode="w"):
 
 def load_hdf5_file(fname):
     """
-    Loads a saved HDF5 files, reading all datasets and attributes. 
+    Loads a saved HDF5 files, reading all datasets and attributes.
     We save arrays as datasets, and regular types as attributes in HDF5
     """
     with h5py.File(fname, mode="r") as myfile:
@@ -234,30 +233,32 @@ class HDF5Reporter(object):
         overwrite=False,
         blocks_only=False,
         check_exists=True,
+        backend="openmm",
+        triggertime=10000,
     ):
         """
-        Creates a reporter object that saves a trajectory to a folder 
-        
+        Creates a reporter object that saves a trajectory to a folder
+
         Parameters
         ----------
-        
-        folder : str 
-            Folder to save data to. 
-            
-        max_data_length: int, optional (default=50)
-            Will save data in groups of max_data_length blocks 
-            
-        overwrite: bool, optional (default=False)
-            Overwrite an existing trajectory in a folder. 
-        
-        check_exists: bool (optional, default=True)
-            Raise an error if previous trajectory exists in the folder 
-            
-        blocks_only: bool, optional (default=False) 
-            Only save blocks, do not save any other information 
-        
 
-        
+        folder : str
+            Folder to save data to.
+
+        max_data_length: int, optional (default=50)
+            Will save data in groups of max_data_length blocks
+
+        overwrite: bool, optional (default=False)
+            Overwrite an existing trajectory in a folder.
+
+        check_exists: bool (optional, default=True)
+            Raise an error if previous trajectory exists in the folder
+
+        blocks_only: bool, optional (default=False)
+            Only save blocks, do not save any other information
+
+
+
         """
 
         if h5py_dset_opts is None:
@@ -301,46 +302,55 @@ class HDF5Reporter(object):
                             raise RuntimeError(
                                 f"folder {folder} is not empty: set check_exists=False to ignore"
                             )
+        if backend == "hoomd":
+            if overwrite is False:
+                mode = "xb"
+            else:
+                mode = "wb"
+            self.writer = hoomd.write.GSD(
+                filename=folder + "/log.gsd",
+                mode=mode,
+                filter=hoomd.filter.Null(),
+                trigger=hoomd.trigger.Periodic(triggertime),
+            )
 
     def continue_trajectory(self, continue_from=None, continue_max_delete=5):
-        """        
+        """
         Continues a simulation in a current folder (i.e. continues from the last block, or the block you specify).
-        By default, takes the last block. Otherwise, takes the continue_from block 
-        
-        You should initialize the class with "check_exists=False" to continue a simulation 
-        
-        NOTE: This funciton does not continue the simulation itself (parameters, bonds, etc.) - it only 
-        manages counting the blocks and the saved files. 
-                
-        
+        By default, takes the last block. Otherwise, takes the continue_from block
+
+        You should initialize the class with "check_exists=False" to continue a simulation
+
+        NOTE: This funciton does not continue the simulation itself (parameters, bonds, etc.) - it only
+        manages counting the blocks and the saved files.
+
+
         Returns (block_number, data_dict) - you should start a new simulation with data_dict["pos"]
-        
-        
+
+
         Parameters
         ----------
-        
+
         continue_from: int or None, optional (default=None)
             Block number to continue a simulation from. Default: last block found
-        
-        continue_max_delete: int (default = 5) 
-            Maximum number of blocks to delete if continuing a simulation. 
-            It is here to avoid accidentally deleting a lot of blocks. 
-            
+
+        continue_max_delete: int (default = 5)
+            Maximum number of blocks to delete if continuing a simulation.
+            It is here to avoid accidentally deleting a lot of blocks.
+
         Returns
         -------
-        
+
         (block_number, data_dict)
-        
+
         block_number is a number of a current block
-        
-        data_dict is what load_URI would return on the last block of a trajectory. 
-        
-            """
+
+        data_dict is what load_URI would return on the last block of a trajectory.
+
+        """
 
         uris = list_URIs(self.folder, return_dict=True)
-        uri_inds = np.array(
-            list(uris.keys())
-        )  # making a list of all URIs and filenames
+        uri_inds = np.array(list(uris.keys()))  # making a list of all URIs and filenames
         uri_vals = np.array(list(uris.values()))
         uri_fnames = np.array([i.split("::")[0] for i in uris.values()])
         if continue_from is None:
@@ -349,9 +359,7 @@ class HDF5Reporter(object):
         if int(continue_from) not in uris:
             raise ValueError(f"block {continue_from} not in folder")
 
-        ind = np.nonzero(uri_inds == continue_from)[0][
-            0
-        ]  # position of a starting block in arrays
+        ind = np.nonzero(uri_inds == continue_from)[0][0]  # position of a starting block in arrays
         newdata = load_URI(uri_vals[ind])
 
         todelete = np.nonzero(uri_inds >= continue_from)[0]
@@ -363,9 +371,7 @@ class HDF5Reporter(object):
         fnames_delete = np.unique(uri_fnames[todelete])
         inds_tosave = np.nonzero((uri_fnames == uri_fnames[ind]) * (uri_inds <= ind))[0]
 
-        for (
-            saveind
-        ) in inds_tosave:  # we are saving some data and deleting the whole last file
+        for saveind in inds_tosave:  # we are saving some data and deleting the whole last file
             self.datas[uri_inds[saveind]] = load_URI(uri_vals[saveind])
         self.counter["data"] = ind + 1
 
@@ -373,7 +379,7 @@ class HDF5Reporter(object):
             self.folder
         )  # some heuristics to infer values of counters - not crucial but maybe useful
         for prefix in self.prefixes:
-            if prefix !=  "data":
+            if prefix != "data":
                 myfiles = [i for i in files if i.startswith(prefix)]
                 inds = []
                 for i in myfiles:
@@ -392,19 +398,19 @@ class HDF5Reporter(object):
         return uri_inds[ind], newdata
 
     def report(self, name, values):
-        """        
-        Semi-internal method to be called when you need to report something 
-        
+        """
+        Semi-internal method to be called when you need to report something
+
         Parameters
         ----------
-        
+
         name : str
             Name of what is being reported ("data", "init_args", anything else)
-        values : dict 
-            Dict of what to report. Accepted types are np-array-compatible, 
+        values : dict
+            Dict of what to report. Accepted types are np-array-compatible,
             numbers, strings. No dicts, objects, or what cannot be converted
-            to a np-array of numbers or strings/bytes.            
-        
+            to a np-array of numbers or strings/bytes.
+
         """
         count = self.counter.get(name, 0)
 

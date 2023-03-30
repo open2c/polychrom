@@ -86,8 +86,9 @@ import time
 import tempfile
 import logging
 import warnings
-
-
+import hoomd
+import gsd.hoomd
+import copy
 from collections.abc import Iterable
 
 try:
@@ -234,6 +235,7 @@ class Simulation(object):
             "precision": "mixed",
             "save_decimals": 2,
             "verbose": False,
+            "backend": "openmm",
         }
         valid_names = list(default_args.keys()) + [
             "N",
@@ -257,6 +259,7 @@ class Simulation(object):
 
         platform = kwargs["platform"]
         self.GPU = kwargs["GPU"]  # setting default GPU
+        self.backend = kwargs["backend"]
 
         properties = {}
         if self.GPU.lower() != "default":
@@ -264,17 +267,28 @@ class Simulation(object):
                 properties["DeviceIndex"] = str(self.GPU)
                 properties["Precision"] = kwargs["precision"]
         self.properties = properties
-
-        if platform.lower() == "opencl":
-            platform_object = openmm.Platform.getPlatformByName("OpenCL")
-        elif platform.lower() == "reference":
-            platform_object = openmm.Platform.getPlatformByName("Reference")
-        elif platform.lower() == "cuda":
-            platform_object = openmm.Platform.getPlatformByName("CUDA")
-        elif platform.lower() == "cpu":
-            platform_object = openmm.Platform.getPlatformByName("CPU")
+        if self.backend == "openmm":
+            if platform.lower() == "opencl":
+                platform_object = openmm.Platform.getPlatformByName("OpenCL")
+            elif platform.lower() == "reference":
+                platform_object = openmm.Platform.getPlatformByName("Reference")
+            elif platform.lower() == "cuda":
+                platform_object = openmm.Platform.getPlatformByName("CUDA")
+            elif platform.lower() == "cpu":
+                platform_object = openmm.Platform.getPlatformByName("CPU")
+            else:
+                raise RuntimeError("Undefined platform: {0}".format(platform))
         else:
-            raise RuntimeError("Undefined platform: {0}".format(platform))
+            if platform.lower() == "cuda":
+                platform_object = hoomd.Simulation(
+                    device=hoomd.device.GPU(), seed=np.random.randint(100000)
+                )
+            elif platform.lower() == "cpu":
+                platform_object = hoomd.Simulation(
+                    device=hoomd.device.CPU(), seed=np.random.randint(100000)
+                )
+            else:
+                raise RuntimeError("Undefined platform: {0}".format(platform))
         self.platform = platform_object
 
         self.temperature = kwargs["temperature"]
@@ -282,44 +296,120 @@ class Simulation(object):
         self.collisionRate = kwargs["collision_rate"] * (1 / simtk.unit.picosecond)
 
         self.integrator_type = kwargs["integrator"]
+
+        self.kB = simtk.unit.BOLTZMANN_CONSTANT_kB * simtk.unit.AVOGADRO_CONSTANT_NA
+        self.kT = self.kB * self.temperature * simtk.unit.kelvin  # thermal energy
         if isinstance(self.integrator_type, str):
             self.integrator_type = str(self.integrator_type)
-            if self.integrator_type.lower() == "langevin":
-                self.integrator = openmm.LangevinIntegrator(
-                    self.temperature,
-                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
-                    kwargs["timestep"] * simtk.unit.femtosecond,
-                )
+            if self.integrator_type.lower() == "dpd":
+                if self.backend == "openmm":
+                    raise NotImplementedError("DPD is not implemented in OpenMM")
+                else:
+                    self.nl = hoomd.md.nlist.Cell(0.4)
+                    self.dpd = hoomd.md.pair.DPD(
+                        default_r_cut=1.0,
+                        nlist=self.nl,
+                        kT=self.kT.value_in_unit(simtk.unit.kilojoule_per_mole),
+                    )
+                    self.dpd.params.default = dict(
+                        A=0,
+                        gamma=self.kwargs["mass"] * kwargs["collision_rate"],
+                    )
+
+                    nve = hoomd.md.methods.NVE(filter=hoomd.filter.All())
+                    self.integrator = hoomd.md.Integrator(
+                        dt=kwargs["timestep"] * 1e-3, methods=[nve], forces=[self.dpd]
+                    )
+
+            elif self.integrator_type.lower() == "langevin":
+                if self.backend == "openmm":
+                    self.integrator = openmm.LangevinIntegrator(
+                        self.temperature,
+                        kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
+                        kwargs["timestep"] * simtk.unit.femtosecond,
+                    )
+                else:
+                    nvt = hoomd.md.methods.NVT(
+                        kT=self.kT.value_in_unit(simtk.unit.kilojoule_per_mole),
+                        filter=hoomd.filter.All(),
+                        tau=1 / kwargs["collision_rate"],
+                    )
+                    self.integrator = hoomd.md.Integrator(
+                        dt=kwargs["timestep"] * 1e-3, methods=[nvt]
+                    )
             elif self.integrator_type.lower() == "variablelangevin":
-                self.integrator = openmm.VariableLangevinIntegrator(
-                    self.temperature,
-                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
-                    kwargs["error_tol"],
-                )
+                if self.backend == "openmm":
+                    self.integrator = openmm.VariableLangevinIntegrator(
+                        self.temperature,
+                        kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
+                        kwargs["error_tol"],
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"VariableLangevin not implemented for backend: {self.backend}"
+                    )
+
             elif self.integrator_type.lower() == "langevinmiddle":
-                self.integrator = openmm.LangevinMiddleIntegrator(
-                    self.temperature,
-                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
-                    kwargs["timestep"] * simtk.unit.femtosecond,
-                )
+                if self.backend == "openmm":
+                    self.integrator = openmm.LangevinMiddleIntegrator(
+                        self.temperature,
+                        kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
+                        kwargs["timestep"] * simtk.unit.femtosecond,
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"LangevinMiddle not implemented for backend: {self.backend}"
+                    )
             elif self.integrator_type.lower() == "verlet":
-                self.integrator = openmm.VariableVerletIntegrator(
-                    kwargs["timestep"] * simtk.unit.femtosecond
-                )
+                if self.backend == "hoomd":
+                    nve = hoomd.md.methods.NVE(filter=hoomd.filter.All())
+                    self.integrator = hoomd.md.Integrator(
+                        dt=kwargs["timestep"] * 1e-3, methods=[nve]
+                    )
+                else:
+                    self.integrator = openmm.VerletIntegrator(
+                        kwargs["timestep"] * simtk.unit.femtosecond
+                    )
             elif self.integrator_type.lower() == "variableverlet":
-                self.integrator = openmm.VariableVerletIntegrator(kwargs["error_tol"])
+                if self.backend == "openmm":
+                    self.integrator = openmm.VariableVerletIntegrator(kwargs["error_tol"])
+                else:
+                    raise NotImplementedError(
+                        f"Variableverlet not implemented for backend: {self.backend}"
+                    )
 
             elif self.integrator_type.lower() == "brownian":
-                self.integrator = openmm.BrownianIntegrator(
-                    self.temperature,
-                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
-                    kwargs["timestep"] * simtk.unit.femtosecond,
-                )
+                if self.backend == "openmm":
+                    self.integrator = openmm.BrownianIntegrator(
+                        self.temperature,
+                        kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
+                        kwargs["timestep"] * simtk.unit.femtosecond,
+                    )
+                else:
+                    brown = hoomd.md.methods.Brownian(
+                        kT=self.kT.value_in_unit(simtk.unit.kilojoule_per_mole),
+                        filter=hoomd.filter.All(),
+                        default_gamma=self.kwargs["mass"]
+                        * kwargs["collision_rate"],  # amu/picosecond
+                    )
+                    self.integrator = hoomd.md.Integrator(
+                        dt=kwargs["timestep"] * 1e-3, methods=[brown]
+                    )
         else:
-            logging.info("Using the provided integrator object")
-            self.integrator = self.integrator_type
-            self.integrator_type = "UserDefined"
-            kwargs["integrator"] = "user_defined"
+            if self.backend == "openmm":
+                logging.info("Using the provided integrator object")
+                self.integrator = self.integrator_type
+                self.integrator_type = "UserDefined"
+                kwargs["integrator"] = "user_defined"
+            else:
+                raise NotImplementedError(
+                    f"provided integrator objects are not implemented for backend: {self.backend}"
+                )
+        if self.backend == "hoomd":
+            self.thermodynamic_properties = hoomd.md.compute.ThermodynamicQuantities(
+                filter=hoomd.filter.All()
+            )
+            self.platform.operations.computes.append(self.thermodynamic_properties)
 
         self.N = kwargs["N"]
 
@@ -335,9 +425,6 @@ class Simulation(object):
 
         self.nm = simtk.unit.nanometer
 
-        self.kB = simtk.unit.BOLTZMANN_CONSTANT_kB * simtk.unit.AVOGADRO_CONSTANT_NA
-        self.kT = self.kB * self.temperature * simtk.unit.kelvin  # thermal energy
-
         # All masses are the same,
         # unless individual mass multipliers are specified in self.load()
         self.conlen = 1.0 * simtk.unit.nanometer * self.length_scale
@@ -346,19 +433,37 @@ class Simulation(object):
             (2 * self.kT / self.conlen**2)
             / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer**2)
         )
-
-        self.system = openmm.System()
+        if self.backend == "openmm":
+            self.system = openmm.System()
+        else:
+            snapshot = gsd.hoomd.Frame()
+            snapshot.particles.N = self.N
+            snapshot.particles.typeid = np.array([0] * self.N)
+            snapshot.particles.types = ["A"]
+            self.system = snapshot
+            self.platform.operations.integrator = self.integrator
+            self.untouched_force_dict = {}
 
         # adding PBC
         self.PBC = False
         if kwargs["PBCbox"]:
             self.PBC = True
             PBCbox = np.array(kwargs["PBCbox"])
-            self.system.setDefaultPeriodicBoxVectors(
-                [float(PBCbox[0]), 0.0, 0.0],
-                [0.0, float(PBCbox[1]), 0.0],
-                [0.0, 0.0, float(PBCbox[2])],
-            )
+            if self.backend == "openmm":
+                self.system.setDefaultPeriodicBoxVectors(
+                    [float(PBCbox[0]), 0.0, 0.0],
+                    [0.0, float(PBCbox[1]), 0.0],
+                    [0.0, 0.0, float(PBCbox[2])],
+                )
+            else:
+                self.system.configuration.box = [
+                    float(PBCbox[0]),
+                    float(PBCbox[1]),
+                    float(PBCbox[2]),
+                    0,
+                    0,
+                    0,
+                ]
 
         self.force_dict = {}  # Dictionary to store forces
 
@@ -424,8 +529,10 @@ class Simulation(object):
         elif center == "zero":
             minvalue = np.min(data, axis=0)
             data -= minvalue
-
-        self.data = simtk.unit.Quantity(data, simtk.unit.nanometer)
+        if self.backend == "openmm":
+            self.data = simtk.unit.Quantity(data, simtk.unit.nanometer)
+        else:
+            self.data = data
         if report:
             for reporter in self.reporters:
                 reporter.report(
@@ -488,12 +595,18 @@ class Simulation(object):
             for f in force:
                 self.add_force(f)
         else:
-            if force.name in self.force_dict:
-                raise ValueError(
-                    "A force named {} was added to the system twice!".format(force.name)
-                )
-            forces._prepend_force_name_to_params(force)
-            self.force_dict[force.name] = force
+            if force.name is None:
+                pass
+            else:
+                if force.name in self.force_dict:
+                    raise ValueError(
+                        "A force named {} was added to the system twice!".format(force.name)
+                    )
+                if self.backend == "openmm":
+                    forces._prepend_force_name_to_params(force)
+                self.force_dict[force.name] = force
+                if self.backend == "hoomd":
+                    self.untouched_force_dict[force.name] = copy.deepcopy(force)
 
         if self.forces_applied:
             raise RuntimeError("Cannot add force after the context has been created")
@@ -520,29 +633,61 @@ class Simulation(object):
             return
 
         self.masses = np.zeros(self.N, dtype=float) + self.kwargs["mass"]
-        for mass in self.masses:
-            self.system.addParticle(mass)
+        if self.backend == "openmm":
+            for mass in self.masses:
+                self.system.addParticle(mass)
+        else:
+            self.system.particles.mass = self.masses
 
         for i in list(self.force_dict.keys()):  # Adding forces
             force = self.force_dict[i]
 
             if hasattr(force, "CutoffNonPeriodic") and hasattr(force, "CutoffPeriodic"):
-                if self.PBC:
-                    force.setNonbondedMethod(force.CutoffPeriodic)
-                    logging.info("Using periodic boundary conditions")
+                if self.backend == "hoomd":
+                    raise NotImplementedError("Cutoffstuffs not implemented for hoomd yet")
                 else:
-                    force.setNonbondedMethod(force.CutoffNonPeriodic)
-
-            logging.info("adding force {} {}".format(i, self.system.addForce(self.force_dict[i])))
+                    if self.PBC:
+                        force.setNonbondedMethod(force.CutoffPeriodic)
+                        logging.info("Using periodic boundary conditions")
+                    else:
+                        force.setNonbondedMethod(force.CutoffNonPeriodic)
+            if self.backend == "openmm":
+                logging.info(
+                    "adding force {} {}".format(i, self.system.addForce(self.force_dict[i]))
+                )
+            else:
+                logging.info(
+                    "adding force {} {}".format(
+                        i, self.integrator.forces.append(self.force_dict[i])
+                    )
+                )
 
         for reporter in self.reporters:
             reporter.report(
                 "applied_forces",
                 {i: j.__getstate__() for i, j in self.force_dict.items()},
             )
+        if self.backend == "openmm":
 
-        self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
+            self.context = openmm.Context(
+                self.system, self.integrator, self.platform, self.properties
+            )
         self.init_positions()
+        if self.backend == "hoomd":
+            if hasattr(self, "velocities"):
+                self.system.particles.velocity = self.velocities
+            self.platform.create_state_from_snapshot(self.system)
+            self.context = self.platform.state
+            self.platform.operations.integrator = self.integrator
+            self.platform.run(0)
+            eP = (
+                self.thermodynamic_properties.potential_energy
+                / self.N
+                / self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)
+            )
+
+            logging.info("Particles loaded. Potential energy is %lf" % eP)
+
         self.init_velocities()
         self.forces_applied = True
 
@@ -576,25 +721,38 @@ class Simulation(object):
             raise ValueError("No context, cannot set velocs.Initialize context before that")
 
         if hasattr(self, "velocities"):
-            self.context.setVelocities(self.velocities)
+            if self.backend == "openmm":
+                self.context.setVelocities(self.velocities)
+            else:
+                pass  # already set in hoomd
             return
 
         if temperature == "current":
             temperature = self.temperature
-        self.context.setVelocitiesToTemperature(temperature)
+        if self.backend == "openmm":
+            self.context.setVelocitiesToTemperature(temperature)
+        else:
+            self.context.thermalize_particle_momenta(
+                filter=hoomd.filter.All(), kT=self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)
+            )
 
     def init_positions(self):
         """Sends particle coordinates to OpenMM system.
         If system has exploded, this is
          used in the code to reset coordinates."""
+        if self.backend == "openmm":
+            try:
+                self.context
+            except:
+                raise ValueError(
+                    "No context, cannot set positions. Initialize context before that"
+                )
+            self.context.setPositions(self.data)
+            eP = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
+            logging.info("Particles loaded. Potential energy is %lf" % eP)
 
-        try:
-            self.context
-        except:
-            raise ValueError("No context, cannot set positions. Initialize context before that")
-        self.context.setPositions(self.data)
-        eP = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
-        logging.info("Particles loaded. Potential energy is %lf" % eP)
+        else:
+            self.system.particles.position = self.data
 
     def reinitialize(self):
         """Reinitializes the OpenMM context object.
@@ -662,19 +820,70 @@ class Simulation(object):
 
         self._apply_forces()
 
-        self.state = self.context.getState(getPositions=False, getEnergy=True)
-        eK = self.state.getKineticEnergy() / self.N / self.kT
-        eP = self.state.getPotentialEnergy() / self.N / self.kT
-        locTime = self.state.getTime()
+        if self.backend == "openmm":
+            self.state = self.context.getState(getPositions=False, getEnergy=True)
+            eK = self.state.getKineticEnergy() / self.N / self.kT
+            eP = self.state.getPotentialEnergy() / self.N / self.kT
+            locTime = self.state.getTime()
+        else:
+            eK = (
+                self.thermodynamic_properties.kinetic_energy
+                / self.N
+                / self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)
+            )
+            eP = (
+                self.thermodynamic_properties.potential_energy
+                / self.N
+                / self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)
+            )
+            locTime = self.platform.walltime
         logging.info("before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
+        if self.backend == "openmm":
+            openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)
+        else:
+            fire = hoomd.md.minimize.FIRE(
+                dt=self.kwargs["timestep"] * 1e-3 * 1e-2,
+                energy_tol=5e-2 * self.kT.value_in_unit(simtk.unit.kilojoule_per_mole),
+                force_tol=5e-2 * self.kT.value_in_unit(simtk.unit.kilojoule_per_mole),
+                angmom_tol=5e-2 * self.kT.value_in_unit(simtk.unit.kilojoule_per_mole),
+                forces=[copy.deepcopy(i) for i in list(self.untouched_force_dict.values())],
+                methods=[hoomd.md.methods.NVE(filter=hoomd.filter.All())],
+            )
+            self.platform.operations.integrator = fire
 
-        openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)
+            while not (fire.converged):
+                self.platform.run(100)
+                print(
+                    f"kin temp = {self.thermodynamic_properties.kinetic_temperature}, E_P/N ="
+                    f" {self.thermodynamic_properties.potential_energy   / self.N/ self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)}"
+                )
+                # gsd_optimized_writer.write(sim.state, gsd_optimized_writer.filename)
 
-        self.state = self.context.getState(getPositions=True, getEnergy=True)
-        eK = self.state.getKineticEnergy() / self.N / self.kT
-        eP = self.state.getPotentialEnergy() / self.N / self.kT
+            self.platform.operations.integrator = self.integrator
 
-        coords = self.state.getPositions(asNumpy=True)
+        if self.backend == "openmm":
+            self.state = self.context.getState(getPositions=True, getEnergy=True)
+            eK = self.state.getKineticEnergy() / self.N / self.kT
+            eP = self.state.getPotentialEnergy() / self.N / self.kT
+            coords = self.state.getPositions(asNumpy=True)
+            locTime = self.state.getTime()
+        else:
+
+            self.init_velocities()
+
+            eK = (
+                self.thermodynamic_properties.kinetic_energy
+                / self.N
+                / self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)
+            )
+            eP = (
+                self.thermodynamic_properties.potential_energy
+                / self.N
+                / self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)
+            )
+            locTime = self.platform.walltime
+            coords = self.platform.state.get_snapshot().particles.position
+
         self.data = coords
         self.set_data(self.get_data(), random_offset=random_offset, report=False)
         for reporter in self.reporters:
@@ -682,8 +891,6 @@ class Simulation(object):
                 "energy_minimization",
                 {"pos": self.get_data(), "time": self.time, "block": self.block},
             )
-
-        locTime = self.state.getTime()
 
         logging.info("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
@@ -715,24 +922,45 @@ class Simulation(object):
             self.forces_applied = True
 
         a = time.time()
-        self.integrator.step(steps)  # integrate!
+        if self.backend == "openmm":
+            self.integrator.step(steps)  # integrate!
+            self.state = self.context.getState(
+                getPositions=True, getVelocities=get_velocities, getEnergy=True
+            )
+        else:
+            self.platform.run(steps)
+            self.state = self.platform.state.get_snapshot()
 
-        self.state = self.context.getState(
-            getPositions=True, getVelocities=get_velocities, getEnergy=True
-        )
         b = time.time()
-        coords = self.state.getPositions(asNumpy=True)
-        newcoords = coords / simtk.unit.nanometer
+        if self.backend == "openmm":
+            coords = self.state.getPositions(asNumpy=True)
+            newcoords = coords / simtk.unit.nanometer
+            self.time = self.state.getTime() / simtk.unit.picosecond
+            # calculate energies in KT/particle
+            eK = self.state.getKineticEnergy() / self.N / self.kT
+            eP = self.state.getPotentialEnergy() / self.N / self.kT
+        else:
+
+            newcoords = self.state.particles.position
+            coords = newcoords
+            self.time = self.platform.timestep
+            # calculate energies in KT/particle
+            eK = (
+                self.thermodynamic_properties.kinetic_energy
+                / self.N
+                / self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)
+            )
+            eP = (
+                self.thermodynamic_properties.potential_energy
+                / self.N
+                / self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)
+            )
+
         newcoords = np.array(newcoords, dtype=np.float32)
         if self.kwargs["save_decimals"] is not False:
             newcoords = np.round(newcoords, self.kwargs["save_decimals"])
 
-        self.time = self.state.getTime() / simtk.unit.picosecond
-
-        # calculate energies in KT/particle
-        eK = self.state.getKineticEnergy() / self.N / self.kT
-        eP = self.state.getPotentialEnergy() / self.N / self.kT
-        curtime = self.state.getTime() / simtk.unit.picosecond
+        curtime = self.time  # self.state.getTime() / simtk.unit.picosecond
 
         msg = "block %4s " % int(self.block)
         msg += "pos[1]=[%.1lf %.1lf %.1lf] " % tuple(newcoords[0])
@@ -754,7 +982,7 @@ class Simulation(object):
         dif = np.sqrt(np.mean(np.sum((newcoords - self.get_data()) ** 2, axis=1)))
         msg += "dr=%.2lf " % (dif,)
         self.data = coords
-        msg += "t=%2.1lfps " % (self.state.getTime() / simtk.unit.picosecond)
+        msg += "t=%2.1lfps " % self.time  # (self.state.getTime() / simtk.unit.picosecond)
         msg += "kin=%.2lf pot=%.2lf " % (eK, eP)
         msg += "Rg=%.3lf " % self.RG()
         msg += "SPS=%.0lf " % (steps / (float(b - a)))
@@ -762,7 +990,7 @@ class Simulation(object):
         if (
             self.integrator_type.lower() == "variablelangevin"
             or self.integrator_type.lower() == "variableverlet"
-        ):
+        ) and self.backend == "openmm":
             dt = self.integrator.getStepSize()
             msg += "dt=%.1lffs " % (dt / simtk.unit.femtosecond)
             mass = self.system.getParticleMass(0)
@@ -779,9 +1007,12 @@ class Simulation(object):
             "block": self.block,
         }
         if get_velocities:
-            result["vel"] = self.state.getVelocities() / (
-                simtk.unit.nanometer / simtk.unit.picosecond
-            )
+            if self.backend == "openmm":
+                result["vel"] = self.state.getVelocities() / (
+                    simtk.unit.nanometer / simtk.unit.picosecond
+                )
+            else:
+                result["vel"] = self.state.particles.velocity
         result.update(save_extras)
         if save:
             for reporter in self.reporters:
