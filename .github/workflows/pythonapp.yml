@@ -24,6 +24,8 @@ jobs:
         run: |
           sudo apt-get install build-essential
           conda install -c conda-forge openmm
+          conda install -c conda-forge hoomd
+          conda install -c conda-forge gsd
           conda install pip 
           pip install cython
           pip install -r requirements.txt 
