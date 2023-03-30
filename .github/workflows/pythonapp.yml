@@ -24,13 +24,13 @@ jobs:
         run: |
           sudo apt-get install build-essential
           conda install -c conda-forge openmm
-          conda install -c conda-forge hoomd
-          conda install -c conda-forge gsd
           conda install pip 
           pip install cython
           pip install -r requirements.txt 
           pip install -e . 
           conda install -c conda-forge libstdcxx-ng=12
+          conda install -c conda-forge hoomd
+          conda install -c conda-forge gsd
       - name: Test with pytest
         run: |          
           pytest
