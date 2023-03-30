@@ -1,5 +1,5 @@
-from openmmlib import pymol_show
 import numpy as np
+from openmmlib import pymol_show
 
 rw = 0.4 * np.cumsum(np.random.random((1000, 3)) - 0.5, axis=0)
 

@@ -2,18 +2,18 @@
 Creating a simulation: Simulation class
 =======================================
 
-Both initialization and running the simulation is done by interacting with an instance 
-of :py:class:`polychrom.simulation.Simulation` class.  
+Both initialization and running the simulation is done by interacting with an instance
+of :py:class:`polychrom.simulation.Simulation` class.
 
 Overall parameters
 ------------------
 
-Overall technical parameters of a simulation are generally initialized in the constructor of the 
-Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This includes 
+Overall technical parameters of a simulation are generally initialized in the constructor of the
+Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This includes
 
 **Techcnical parameters not affecting the output of simulations**
 
-* Platform (cuda (usually), opencl, or CPU (slow)) 
+* Platform (cuda (usually), opencl, or CPU (slow))
 * GPU index
 * reporter (where to save results): see :py:mod`polychrom.hdf5_reporter`
 
@@ -21,84 +21,87 @@ Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This inc
 
 * number of particles
 * integrator (we usually use variable Langevin) + error tolerance of integrator
-* collision rate 
+* collision rate
 * Whether to use periodic boundary conditions (PBC)
 * timestep (if using non-variable integrator)
 
 **Parameters that are changed rarely, but may be useful**
 
-* particle mass, temperature and length scale 
-* kinetic energy at which to raise an error 
+* particle mass, temperature and length scale
+* kinetic energy at which to raise an error
 * OpenMM precision
-* Rounding before saving (default is to 0.01) 
+* Rounding before saving (default is to 0.01)
 
-Starting conformation is loaded using :meth:`polychrom.simulation.Simulation.set_data` method. 
+Starting conformation is loaded using :meth:`polychrom.simulation.Simulation.set_data` method.
 Many tools for creating starting conformations are in :mod:`polychrom.starting_conformations`
 
-Adding forces 
+Adding forces
 -------------
 
-**Forces** define the main aspects of a given simulation. Polymer connectivity, confinement, crosslinks, tethering monomers, etc. 
-are all defined as different forces acting on the particles. 
+**Forces** define the main aspects of a given simulation. Polymer connectivity, confinement, crosslinks,
+tethering monomers, etc. are all defined as different forces acting on the particles.
 
-Typicall used forces are listed in :py:mod:`polychrom.forces` module. Forces out of there can be added using :py:meth:`polychrom.simulation.Simulation.add_force` method. 
+Typicall used forces are listed in :py:mod:`polychrom.forces` module. Forces out of there can be added using
+:py:meth:`polychrom.simulation.Simulation.add_force` method.
 
-Forces and their parameters are an essential part of nearly any polymer simulations. Some forces have just a few paramters (e.g. spherical confinement just needs a radius), while other forces may have lots of parameters and can define complex structures. For example, harmonidBondForce with a specially-created bond list was used to create a backbone-plectoneme conformation in Caulobacter simulations (Le et al, Science 2013). Same harmonic bonds that change over time are used to simulate loop extrusion as in (Fudenberg, 2016). 
+Forces and their parameters are an essential part of nearly any polymer simulations. Some forces have just a few
+paramters (e.g. spherical confinement just needs a radius), while other forces may have lots of parameters and can
+define complex structures. For example, harmonidBondForce with a specially-created bond list was used to create a
+backbone-plectoneme conformation in Caulobacter simulations (Le et al, Science 2013). Same harmonic bonds that change
+over time are used to simulate loop extrusion as in (Fudenberg, 2016).
 
-Some forces need to be added together. Those include forces defining polymer connectivity. Those forces are combined 
-into **forcekits**. Forcekits are defined in :py:mod:`polychrom.forcekits` module. The only example 
-of a forcekit for now is defining polymer connectivity using bonds, polymer stiffness, and inter-monomer interaction 
-("nonbonded force"). 
+Some forces need to be added together. Those include forces defining polymer connectivity. Those forces are combined
+into **forcekits**. Forcekits are defined in :py:mod:`polychrom.forcekits` module. The only example
+of a forcekit for now is defining polymer connectivity using bonds, polymer stiffness, and inter-monomer interaction
+("nonbonded force").
 
-Some forces were written for openmm-polymer library and were not fully ported/tested into the polychrom library. 
-Those forces reside in :py:mod:`polychrom.legacy.forces` module. Some of them can be used as is, and some of them 
-would need to be copied to your code and potentially conformed to the new style of defining forces. This includes 
-accepting simulation object as a parameter, and having a ``.name`` attribute. 
+Some forces were written for openmm-polymer library and were not fully ported/tested into the polychrom library.
+Those forces reside in :py:mod:`polychrom.legacy.forces` module. Some of them can be used as is, and some of them
+would need to be copied to your code and potentially conformed to the new style of defining forces. This includes
+accepting simulation object as a parameter, and having a ``.name`` attribute.
 
 
 Defining your own forces
 ------------------------
 
-Each force in :py:mod:`polychrom.forces` is a simple function that wraps creation of an openmm force object. 
-Users can create new forces in the script defining their simulation and add them using add_force method. 
-Good examples of forces are in :py:mod:`polychrom.forces` - all but harmonic bond force use custom forces, 
-and provide explanations of why particular energy function was chosen. Description of the module :py:mod:`polychrom.forces` 
-has some important information about adding new forces. 
+Each force in :py:mod:`polychrom.forces` is a simple function that wraps creation of an openmm force object. Users
+can create new forces in the script defining their simulation and add them using add_force method. Good examples of
+forces are in :py:mod:`polychrom.forces` - all but harmonic bond force use custom forces, and provide explanations of
+why particular energy function was chosen. Description of the module :py:mod:`polychrom.forces` has some important
+information about adding new forces.
 
 
 
-Running a simulation 
+Running a simulation
 --------------------
 
-To run a simulation, you call :py:meth:`polychrom.simulation.Simulation.doBlock` method in a loop. 
-Unless specified otherwise, this would save a conformation into a defined reporter. Terminating a 
-simulation is not necessary; however, terminating a reporter using reporter.dump_data() is needed for 
-the hdf5 reporter. This all can be viewed in the example script. 
+To run a simulation, you call :py:meth:`polychrom.simulation.Simulation.doBlock` method in a loop.
+Unless specified otherwise, this would save a conformation into a defined reporter. Terminating a
+simulation is not necessary; however, terminating a reporter using reporter.dump_data() is needed for
+the hdf5 reporter. This all can be viewed in the example script.
 
 """
 
-
 from __future__ import absolute_import, division, print_function
-import numpy as np
-import sys
-import os
-import time
-import tempfile
+
 import logging
+import os
+import sys
+import tempfile
+import time
 import warnings
-import hoomd
-import gsd.hoomd
-import copy
 from collections.abc import Iterable
+from typing import Optional, Dict
+import numpy as np
 
 try:
     import openmm
 except Exception:
     import simtk.openmm as openmm
+
 import simtk.unit
 
 from polychrom import forces
-
 
 logging.basicConfig(level=logging.INFO)
 
@@ -177,8 +180,9 @@ class Simulation(object):
             Machines with 1 GPU automatically select their GPU.
 
         integrator : "langevin", "variableLangevin", "verlet", "variableVerlet",
-                     "brownian", optional Integrator to use
-                     (see Openmm class reference)
+                     "brownian", or tuple containing Integrator from Openmm class reference and string
+                     defining integrator type. For user-defined integrators, specify type "brownian" to
+                     avoid checking if kinetic energy exceeds max_Ek.
 
         mass : number or np.array
             Particle mass (default 100 amu)
@@ -208,7 +212,7 @@ class Simulation(object):
             Shout out loud about every change.
 
         precision: str, optional (not recommended to change)
-            mixed is optimal for most situations.
+            single is the default now, because mixed is much slower on 3080 and other new GPUs
             If you are using double precision, it will be slower by a factor of 10 or so.
 
         save_decimals: int or False, optional
@@ -232,7 +236,7 @@ class Simulation(object):
             "mass": 100,
             "reporters": [],
             "max_Ek": 10,
-            "precision": "mixed",
+            "precision": "single",
             "save_decimals": 2,
             "verbose": False,
             "backend": "openmm",
@@ -245,14 +249,10 @@ class Simulation(object):
         ]
         for i in kwargs.keys():
             if i not in valid_names:
-                raise ValueError(
-                    "incorrect argument provided: {0}. Allowed are {1}".format(i, valid_names)
-                )
+                raise ValueError("incorrect argument provided: {0}. Allowed are {1}".format(i, valid_names))
 
         if None in kwargs.values():
-            raise ValueError(
-                "None is not allowed in arguments due to HDF5 incompatiliblity. Use False instead."
-            )
+            raise ValueError("None is not allowed in arguments due to HDF5 incompatiliblity. Use False instead.")
         default_args.update(kwargs)
         kwargs = default_args
         self.kwargs = kwargs
@@ -361,15 +361,7 @@ class Simulation(object):
                         f"LangevinMiddle not implemented for backend: {self.backend}"
                     )
             elif self.integrator_type.lower() == "verlet":
-                if self.backend == "hoomd":
-                    nve = hoomd.md.methods.NVE(filter=hoomd.filter.All())
-                    self.integrator = hoomd.md.Integrator(
-                        dt=kwargs["timestep"] * 1e-3, methods=[nve]
-                    )
-                else:
-                    self.integrator = openmm.VerletIntegrator(
-                        kwargs["timestep"] * simtk.unit.femtosecond
-                    )
+                self.integrator = openmm.VariableVerletIntegrator(kwargs["timestep"] * simtk.unit.femtosecond)
             elif self.integrator_type.lower() == "variableverlet":
                 if self.backend == "openmm":
                     self.integrator = openmm.VariableVerletIntegrator(kwargs["error_tol"])
@@ -396,32 +388,23 @@ class Simulation(object):
                         dt=kwargs["timestep"] * 1e-3, methods=[brown]
                     )
         else:
-            if self.backend == "openmm":
-                logging.info("Using the provided integrator object")
-                self.integrator = self.integrator_type
-                self.integrator_type = "UserDefined"
-                kwargs["integrator"] = "user_defined"
-            else:
-                raise NotImplementedError(
-                    f"provided integrator objects are not implemented for backend: {self.backend}"
-                )
-        if self.backend == "hoomd":
-            self.thermodynamic_properties = hoomd.md.compute.ThermodynamicQuantities(
-                filter=hoomd.filter.All()
-            )
-            self.platform.operations.computes.append(self.thermodynamic_properties)
+            logging.info("Using the provided integrator object")
+            integrator, integrator_type = self.integrator_type
+            self.integrator = integrator
+            self.integrator_type = integrator_type
+            kwargs["integrator"] = "user_defined"
 
-        self.N = kwargs["N"]
+        self.N: int = kwargs["N"]
 
-        self.verbose = kwargs["verbose"]
+        self.verbose: bool = kwargs["verbose"]
         self.reporters = kwargs["reporters"]
-        self.forces_applied = False
-        self.length_scale = kwargs["length_scale"]
-        self.eK_critical = kwargs["max_Ek"]  # Max allowed kinetic energy
+        self.forces_applied: bool = False
+        self.length_scale: float = kwargs["length_scale"]
+        self.eK_critical: float = kwargs["max_Ek"]  # Max allowed kinetic energy
 
-        self.step = 0
-        self.block = 0
-        self.time = 0
+        self.step: int = 0
+        self.block: int = 0
+        self.time: float = 0
 
         self.nm = simtk.unit.nanometer
 
@@ -430,50 +413,31 @@ class Simulation(object):
         self.conlen = 1.0 * simtk.unit.nanometer * self.length_scale
 
         self.kbondScalingFactor = float(
-            (2 * self.kT / self.conlen**2)
-            / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer**2)
+            (2 * self.kT / self.conlen**2) / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer**2)
         )
-        if self.backend == "openmm":
-            self.system = openmm.System()
-        else:
-            snapshot = gsd.hoomd.Frame()
-            snapshot.particles.N = self.N
-            snapshot.particles.typeid = np.array([0] * self.N)
-            snapshot.particles.types = ["A"]
-            self.system = snapshot
-            self.platform.operations.integrator = self.integrator
-            self.untouched_force_dict = {}
+
+        self.system: openmm.System = openmm.System()
 
         # adding PBC
-        self.PBC = False
+        self.PBC: bool = False
         if kwargs["PBCbox"]:
             self.PBC = True
-            PBCbox = np.array(kwargs["PBCbox"])
-            if self.backend == "openmm":
-                self.system.setDefaultPeriodicBoxVectors(
-                    [float(PBCbox[0]), 0.0, 0.0],
-                    [0.0, float(PBCbox[1]), 0.0],
-                    [0.0, 0.0, float(PBCbox[2])],
-                )
-            else:
-                self.system.configuration.box = [
-                    float(PBCbox[0]),
-                    float(PBCbox[1]),
-                    float(PBCbox[2]),
-                    0,
-                    0,
-                    0,
-                ]
+            pbc_box = np.array(kwargs["PBCbox"])
+            self.system.setDefaultPeriodicBoxVectors(
+                [float(pbc_box[0]), 0.0, 0.0],
+                [0.0, float(pbc_box[1]), 0.0],
+                [0.0, 0.0, float(pbc_box[2])],
+            )
 
         self.force_dict = {}  # Dictionary to store forces
 
         # saving arguments - not trying to save reporters because they are not serializable
-        kwCopy = {i: j for i, j in kwargs.items() if i != "reporters"}
+        kw_copy = {i: j for i, j in kwargs.items() if i != "reporters"}
         for reporter in self.reporters:
-            reporter.report("initArgs", kwCopy)
+            reporter.report("initArgs", kw_copy)
 
     def get_data(self):
-        "Returns an Nx3 array of positions"
+        """Returns an Nx3 array of positions"""
         return np.asarray(self.data / simtk.unit.nanometer, dtype=np.float32)
 
     def get_scaled_data(self):
@@ -483,9 +447,9 @@ class Simulation(object):
         alldata = self.get_data()
         boxsize = np.array(self.kwargs["PBCbox"])
         mults = np.floor(alldata / boxsize[None, :])
-        toRet = alldata - mults * boxsize[None, :]
-        assert toRet.min() >= 0
-        return toRet
+        to_ret = alldata - mults * boxsize[None, :]
+        assert to_ret.min() >= 0
+        return to_ret
 
     def set_data(self, data, center=False, random_offset=1e-5, report=True):
         """Sets particle positions
@@ -514,9 +478,7 @@ class Simulation(object):
             raise ValueError(f"length of data, {len(data)} does not match N, {self.N}")
 
         if data.shape[1] != 3:
-            raise ValueError(
-                "Data is not shaped correctly. Needs (N,3), provided: {0}".format(data.shape)
-            )
+            raise ValueError("Data is not shaped correctly. Needs (N,3), provided: {0}".format(data.shape))
         if np.isnan(data).any():
             raise ValueError("Data contains NANs")
 
@@ -557,9 +519,7 @@ class Simulation(object):
             raise ValueError(f"length of velocity array, {len(v)} does not match N, {self.N}")
 
         if v.shape[1] != 3:
-            raise ValueError(
-                "Data is not shaped correctly. Needs (N,3), provided: {0}".format(v.shape)
-            )
+            raise ValueError("Data is not shaped correctly. Needs (N,3), provided: {0}".format(v.shape))
         if np.isnan(v).any():
             raise ValueError("Data contains NANs")
         self.velocities = simtk.unit.Quantity(v, simtk.unit.nanometer / simtk.unit.picosecond)
@@ -595,18 +555,10 @@ class Simulation(object):
             for f in force:
                 self.add_force(f)
         else:
-            if force.name is None:
-                pass
-            else:
-                if force.name in self.force_dict:
-                    raise ValueError(
-                        "A force named {} was added to the system twice!".format(force.name)
-                    )
-                if self.backend == "openmm":
-                    forces._prepend_force_name_to_params(force)
-                self.force_dict[force.name] = force
-                if self.backend == "hoomd":
-                    self.untouched_force_dict[force.name] = copy.deepcopy(force)
+            if force.name in self.force_dict:
+                raise ValueError("A force named {} was added to the system twice!".format(force.name))
+            forces._prepend_force_name_to_params(force)
+            self.force_dict[force.name] = force
 
         if self.forces_applied:
             raise RuntimeError("Cannot add force after the context has been created")
@@ -646,21 +598,9 @@ class Simulation(object):
                 if self.backend == "hoomd":
                     raise NotImplementedError("Cutoffstuffs not implemented for hoomd yet")
                 else:
-                    if self.PBC:
-                        force.setNonbondedMethod(force.CutoffPeriodic)
-                        logging.info("Using periodic boundary conditions")
-                    else:
-                        force.setNonbondedMethod(force.CutoffNonPeriodic)
-            if self.backend == "openmm":
-                logging.info(
-                    "adding force {} {}".format(i, self.system.addForce(self.force_dict[i]))
-                )
-            else:
-                logging.info(
-                    "adding force {} {}".format(
-                        i, self.integrator.forces.append(self.force_dict[i])
-                    )
-                )
+                    force.setNonbondedMethod(force.CutoffNonPeriodic)
+
+            logging.info("adding force {} {}".format(i, self.system.addForce(self.force_dict[i])))
 
         for reporter in self.reporters:
             reporter.report(
@@ -669,9 +609,7 @@ class Simulation(object):
             )
         if self.backend == "openmm":
 
-            self.context = openmm.Context(
-                self.system, self.integrator, self.platform, self.properties
-            )
+        self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
         self.init_positions()
         if self.backend == "hoomd":
             if hasattr(self, "velocities"):
@@ -711,14 +649,9 @@ class Simulation(object):
         Parameters
         ----------
         temperature: temperature to set velocities (default: temerature of the simulation)
-        v: (N,) array-like
-            Vector of initial velocities for the N particles. If None, velocities are chosen
-            from a Boltzmann distribution at a given temperature.
         """
-        try:
-            self.context
-        except:
-            raise ValueError("No context, cannot set velocs.Initialize context before that")
+        if not hasattr(self, "context"):
+            raise ValueError("No context, cannot set velocs." "Initialize context before that")
 
         if hasattr(self, "velocities"):
             if self.backend == "openmm":
@@ -740,19 +673,11 @@ class Simulation(object):
         """Sends particle coordinates to OpenMM system.
         If system has exploded, this is
          used in the code to reset coordinates."""
-        if self.backend == "openmm":
-            try:
-                self.context
-            except:
-                raise ValueError(
-                    "No context, cannot set positions. Initialize context before that"
-                )
-            self.context.setPositions(self.data)
-            eP = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
-            logging.info("Particles loaded. Potential energy is %lf" % eP)
-
-        else:
-            self.system.particles.position = self.data
+        if not hasattr(self, "context"):
+            raise ValueError("No context, cannot set positions." " Initialize context before that")
+        self.context.setPositions(self.data)
+        e_p = self.context.getState(getEnergy=True).getPotentialEnergy() / self.N / self.kT
+        logging.info("Particles loaded. Potential energy is %lf" % e_p)
 
     def reinitialize(self):
         """Reinitializes the OpenMM context object.
@@ -803,8 +728,8 @@ class Simulation(object):
             See why do we need it in the caveat below.
 
 
-        Caveat
-        ------
+        NOTES
+        -----
 
         If using variable langevin integrator after minimization, a big error may
         happen in the first timestep. The reason is that enregy minimization
@@ -820,46 +745,11 @@ class Simulation(object):
 
         self._apply_forces()
 
-        if self.backend == "openmm":
-            self.state = self.context.getState(getPositions=False, getEnergy=True)
-            eK = self.state.getKineticEnergy() / self.N / self.kT
-            eP = self.state.getPotentialEnergy() / self.N / self.kT
-            locTime = self.state.getTime()
-        else:
-            eK = (
-                self.thermodynamic_properties.kinetic_energy
-                / self.N
-                / self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)
-            )
-            eP = (
-                self.thermodynamic_properties.potential_energy
-                / self.N
-                / self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)
-            )
-            locTime = self.platform.walltime
+        self.state = self.context.getState(getPositions=False, getEnergy=True)
+        eK = self.state.getKineticEnergy() / self.N / self.kT
+        eP = self.state.getPotentialEnergy() / self.N / self.kT
+        locTime = self.state.getTime()
         logging.info("before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
-        if self.backend == "openmm":
-            openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)
-        else:
-            fire = hoomd.md.minimize.FIRE(
-                dt=self.kwargs["timestep"] * 1e-3 * 1e-2,
-                energy_tol=5e-2 * self.kT.value_in_unit(simtk.unit.kilojoule_per_mole),
-                force_tol=5e-2 * self.kT.value_in_unit(simtk.unit.kilojoule_per_mole),
-                angmom_tol=5e-2 * self.kT.value_in_unit(simtk.unit.kilojoule_per_mole),
-                forces=[copy.deepcopy(i) for i in list(self.untouched_force_dict.values())],
-                methods=[hoomd.md.methods.NVE(filter=hoomd.filter.All())],
-            )
-            self.platform.operations.integrator = fire
-
-            while not (fire.converged):
-                self.platform.run(100)
-                print(
-                    f"kin temp = {self.thermodynamic_properties.kinetic_temperature}, E_P/N ="
-                    f" {self.thermodynamic_properties.potential_energy   / self.N/ self.kT.value_in_unit(simtk.unit.kilojoule_per_mole)}"
-                )
-                # gsd_optimized_writer.write(sim.state, gsd_optimized_writer.filename)
-
-            self.platform.operations.integrator = self.integrator
 
         if self.backend == "openmm":
             self.state = self.context.getState(getPositions=True, getEnergy=True)
@@ -892,6 +782,8 @@ class Simulation(object):
                 {"pos": self.get_data(), "time": self.time, "block": self.block},
             )
 
+        locTime = self.state.getTime()
+
         logging.info("after minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
     def do_block(
@@ -911,7 +803,16 @@ class Simulation(object):
         steps : int or None
             Number of timesteps to perform.
         increment : bool, optional
-            If true, will not increment self.block and self.steps counters
+            If true, will not increment `self.block` and `self.steps` counters
+        check_functions: list of functions, optional
+            List of functions to call every block. coordinates are passed to a function.
+            If a function returns False, simulation is stopped.
+        get_velocities: bool, default=False
+            If True, will return velocities
+        save: bool, defualt=True
+            If True, save results of this block
+        save_extras: dict
+            A dict of (key, value) with additional info to save
         """
 
         if not self.forces_applied:
@@ -931,6 +832,7 @@ class Simulation(object):
             self.platform.run(steps)
             self.state = self.platform.state.get_snapshot()
 
+        self.state = self.context.getState(getPositions=True, getVelocities=get_velocities, getEnergy=True)
         b = time.time()
         if self.backend == "openmm":
             coords = self.state.getPositions(asNumpy=True)
@@ -987,10 +889,7 @@ class Simulation(object):
         msg += "Rg=%.3lf " % self.RG()
         msg += "SPS=%.0lf " % (steps / (float(b - a)))
 
-        if (
-            self.integrator_type.lower() == "variablelangevin"
-            or self.integrator_type.lower() == "variableverlet"
-        ) and self.backend == "openmm":
+        if self.integrator_type.lower() == "variablelangevin" or self.integrator_type.lower() == "variableverlet":
             dt = self.integrator.getStepSize()
             msg += "dt=%.1lffs " % (dt / simtk.unit.femtosecond)
             mass = self.system.getParticleMass(0)
@@ -1007,12 +906,7 @@ class Simulation(object):
             "block": self.block,
         }
         if get_velocities:
-            if self.backend == "openmm":
-                result["vel"] = self.state.getVelocities() / (
-                    simtk.unit.nanometer / simtk.unit.picosecond
-                )
-            else:
-                result["vel"] = self.state.particles.velocity
+            result["vel"] = self.state.getVelocities() / (simtk.unit.nanometer / simtk.unit.picosecond)
         result.update(save_extras)
         if save:
             for reporter in self.reporters:
@@ -1034,7 +928,7 @@ class Simulation(object):
         bonds = np.sqrt(np.sum(np.diff(pos, axis=0) ** 2, axis=1))
         sbonds = np.sort(bonds)
         vel = state.getVelocities()
-        mass = self.system.getParticleMass(1)
+        mass = self.system.getParticleMass(0)
         vkT = np.array(vel / simtk.unit.sqrt(self.kT / mass), dtype=float)
         self.velocs = vkT
         EkPerParticle = 0.5 * np.sum(vkT**2, axis=1)
@@ -1047,7 +941,9 @@ class Simulation(object):
         per5 = np.percentile(dists, 5)
         den5 = (0.05 * self.N) / ((4.0 * np.pi * per5**3) / 3)
         x, y, z = pos[:, 0], pos[:, 1], pos[:, 2]
-        minmedmax = lambda x: (x.min(), np.median(x), x.mean(), x.max())
+
+        def minmedmax(value):
+            return value.min(), np.median(value), value.mean(), value.max()
 
         print("\n Statistics: number of particles: %d\n" % (self.N,))
         print("Statistics for particle position")
@@ -1112,9 +1008,7 @@ class Simulation(object):
                 if dist < 1.3:
                     count += 1
             if count > 100:
-                raise RuntimeError(
-                    "Too many particles are close together. This will cause rasmol to choke"
-                )
+                raise RuntimeError("Too many particles are close together. " "This will cause rasmol to choke")
 
         rascript = tempfile.NamedTemporaryFile()
         # writing the rasmol script. Spacefill controls radius of the sphere.
@@ -1144,11 +1038,7 @@ class Simulation(object):
 
         # number of atoms and a blank line after is a requirement of rasmol
         for i in newData:
-            towrite.write(
-                ("CA\t{:f}\t{:f}\t{:f}\t{:d}\n".format(i[0], i[1], i[2], int(i[3]))).encode(
-                    "utf-8"
-                )
-            )
+            towrite.write(("CA\t{:f}\t{:f}\t{:f}\t{:d}\n".format(i[0], i[1], i[2], int(i[3]))).encode("utf-8"))
 
         towrite.flush()
         "TODO: rewrite using subprocess.popen"

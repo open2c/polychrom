@@ -1,12 +1,11 @@
-from polychrom.polymerutils import load, save
 import os
+
+from polychrom.polymerutils import load, save
 
 
 class LegacyReporter(object):
     def __init__(self, folder):
-        """
-        
-        """
+        """ """
         if not os.path.exists(folder):
             os.mkdir(folder)
         if len(os.listdir(folder)) != 0:

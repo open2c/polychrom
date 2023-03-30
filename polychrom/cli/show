@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function
-import os, tempfile, sys
-import numpy as np
-import joblib
 
+import os
+import sys
+import tempfile
+
+import joblib
+import numpy as np
 
 usage = """
 Usage: show filename [start end step]
@@ -132,8 +135,7 @@ def showData(data):
         )
 
 
-from polychrom.polymerutils import load, fetch_block
-
+from polychrom.polymerutils import fetch_block, load
 
 filename = sys.argv[1]
 

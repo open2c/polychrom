@@ -1,15 +1,18 @@
 #!/usr/bin/env python
-import os, tempfile, sys
-import numpy as np
-import joblib
+import os
+import sys
+import tempfile
 import textwrap
+
+import joblib
+import numpy as np
 
 if len(sys.argv) < 2:
     print(
         textwrap.dedent(
             """
             Usage: show filename [start end pace]
-                 show filenum [start end pace] 
+                 show filenum [start end pace]
 
                  filenum is a number of files of the type block123.dat
 
@@ -46,7 +49,6 @@ def showData(data):
 
     # rescaling the data, so that bonds are of the order of 1. This is because rasmol spheres are of the fixed diameter.
     data /= meandist
-    diffs = data[:1] - data[1:]
 
     # writing the rasmol script. Spacefill controls radius of the sphere.
     rascript = tempfile.NamedTemporaryFile(mode="w")
@@ -67,29 +69,24 @@ def showData(data):
     # for speedup I just create a Nx4 array, where first three columns are coordinates, and fourth is the color
 
     def convertData(data, colors):
-        "Returns an somethingx4 array for each subchain"
+        """Returns an somethingx4 array for each subchain"""
         newData = np.zeros((len(data) * len(shifts) - (len(shifts) - 1), 4))
         for i in range(len(shifts)):
             # filling in the array like 0,5,10,15; then 1,6,11,16; then 2,7,12,17, etc.
             # this is just very fast
-            newData[i : -1 : len(shifts), :3] = data[:-1] * shifts[i] + data[1:] * (
-                1 - shifts[i]
-            )
+            newData[i : -1 : len(shifts), :3] = data[:-1] * shifts[i] + data[1:] * (1 - shifts[i])
             newData[i : -1 : len(shifts), 3] = colors[:-1]
         newData[-1, :3] = data[-1]
         newData[-1, 3] = colors[-1]
         return newData
 
     newDatas = [
-        convertData(data[breaks[i] : breaks[i + 1]], colors[breaks[i] : breaks[i + 1]])
-        for i in range(len(breaks) - 1)
+        convertData(data[breaks[i] : breaks[i + 1]], colors[breaks[i] : breaks[i + 1]]) for i in range(len(breaks) - 1)
     ]
     newData = np.concatenate(newDatas)
 
     towrite = tempfile.NamedTemporaryFile(mode="w")
-    towrite.write(
-        "%d\n\n" % (len(newData))
-    )  # number of atoms and a blank line after is a requirement of rasmol
+    towrite.write("%d\n\n" % (len(newData)))  # number of atoms and a blank line after is a requirement of rasmol
 
     for i in newData:
         towrite.write("CA\t%lf\t%lf\t%lf\t%d\n" % tuple(i))
@@ -98,9 +95,7 @@ def showData(data):
     if os.name == "posix":  # if linux
         os.system("rasmol -xyz %s -script %s" % (towrite.name, rascript.name))
     else:  # if windows
-        os.system(
-            "C:/RasWin/raswin.exe -xyz %s -script %s" % (towrite.name, rascript.name)
-        )
+        os.system("C:/RasWin/raswin.exe -xyz %s -script %s" % (towrite.name, rascript.name))
     exit()
 
 

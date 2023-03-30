@@ -2,24 +2,24 @@
 Forcekits (new in polychrom)
 ----------------------------
 
-The goal of the forcekits is two-fold. First, sometimes communication between forces is required. 
-Since explicit is better than implicit, according to The Zen of Python, we are trying to 
-avoid communication between forces using hidden variables (as done in openmm-polymer), and make it explicit. 
-Forcekits are the tool to implement groups of forces that go together, as to avoid hidden communication between forces. 
-Second, some structures can be realized using many different forces: e.g. polymer chain connectivity
-can be done using harmonic bond force, FENE bonds, etc. Forcekits help avoid duplicating code, and allow swapping 
-one force for another and keeping the topology/geometry of the system the same
+The goal of the forcekits is two-fold. First, sometimes communication between forces is required. Since explicit is
+better than implicit, according to The Zen of Python, we are trying to avoid communication between forces using
+hidden variables (as done in openmm-polymer), and make it explicit. Forcekits are the tool to implement groups of
+forces that go together, as to avoid hidden communication between forces. Second, some structures can be realized
+using many different forces: e.g. polymer chain connectivity can be done using harmonic bond force, FENE bonds,
+etc. Forcekits help avoid duplicating code, and allow swapping one force for another and keeping the
+topology/geometry of the system the same
 
-The only forcekit that we have now implements polymer chain connectivity. It then explicitly adds exclusions 
-for all the polymer bonds into the nonbonded force, without using hidden variables for communication between forces. 
-It also allows using any bond force, any angle force, and any nonbonded force, allowing for easy swapping of 
-one force for another without duplicating code. 
+The only forcekit that we have now implements polymer chain connectivity. It then explicitly adds exclusions for all
+the polymer bonds into the nonbonded force, without using hidden variables for communication between forces. It also
+allows using any bond force, any angle force, and any nonbonded force, allowing for easy swapping of one force for
+another without duplicating code.
 
 """
 
 import numpy as np
-from . import forces
 
+from . import forces
 
 def polymer_chains(
     sim_object,
@@ -91,8 +91,8 @@ def polymer_chains(
         errs = np.where(num_chains_for_monomer != 1)[0]
         if len(errs) != 0:
             raise ValueError(
-                f"Monomer {errs[0]} is a member of {num_chains_for_monomer[errs[0]]} chains. Set"
-                " override_checks=True to override this check."
+                f"Monomer {errs[0]} is a member of {num_chains_for_monomer[errs[0]]} chains. "
+                f"Set override_checks=True to override this check."
             )
 
     report_dict = {
@@ -124,9 +124,7 @@ def polymer_chains(
             # The built-in LJ nonbonded force uses "exclusions" instead of "exceptions"
             elif hasattr(nb_force, "addExclusion"):
                 print("Exclude neighbouring chain particles from {}".format(nb_force.name))
-                nb_force.createExclusionsFromBonds(
-                    [(int(b[0]), int(b[1])) for b in bonds], int(except_bonds)
-                )
+                nb_force.createExclusionsFromBonds([(int(b[0]), int(b[1])) for b in bonds], int(except_bonds))
                 # for pair in exc:
                 #     nb_force.addExclusion(int(pair[0]), int(pair[1]))
                 num_exc = nb_force.getNumExclusions()

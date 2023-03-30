@@ -3,58 +3,59 @@ Loading and saving individual conformations
 ===========================================
 
 
-The module :py:mod:`polychrom.polymerutils` provides tools for saving and loading individual 
-conformations. Note that saving and loading trajectories should generally be done using :py:mod:`polychrom.hdf5_format` module. 
-This module provides tools for loading/saving invividual conformations, or for working with 
-projects that have both  old-style and new-style trajectories. 
+The module :py:mod:`polychrom.polymerutils` provides tools for saving and loading individual conformations. Note that
+saving and loading trajectories should generally be done using :py:mod:`polychrom.hdf5_format` module. This module
+provides tools for loading/saving invividual conformations, or for working with projects that have both  old-style
+and new-style trajectories.
 
-For projects using both old-style and new-style trajectories(e.g. in a project that was
-switched to polychrom, and new files were added), a function :py:func:`polychrom.polymerutils.fetch_block`
-can be helpful as it provides the same interface for fetching a conformation from both 
-old-style and new-style trajectory. Note however that it is not the fastest way to iterate over conformations
-in the new-style trajectory, and the :py:func:`polychrom.hdf5_format.list_URIs` is faster. 
+For projects using both old-style and new-style trajectories(e.g. in a project that was switched to polychrom,
+and new files were added), a function :py:func:`polychrom.polymerutils.fetch_block` can be helpful as it provides the
+same interface for fetching a conformation from both old-style and new-style trajectory. Note however that it is not
+the fastest way to iterate over conformations in the new-style trajectory, and the
+:py:func:`polychrom.hdf5_format.list_URIs` is faster.
 
-A typical workflow with the new-style trajectories should be: 
+A typical workflow with the new-style trajectories should be:
 
 .. code-block:: python
 
     URIs = polychrom.hdf5_format.list_URIs(folder)
     for URI in URIs:
         data = polychrom.hdf5_format.load_URI(URI)
-        xyz = data["pos"] 
-        
+        xyz = data["pos"]
 """
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
-import six
-import numpy as np
+
+import glob
+import io
 import os
 
-from . import hdf5_format
-from polychrom.hdf5_format import load_URI
 import joblib
-import glob
+import numpy as np
+import six
 
-import io
+from polychrom.hdf5_format import load_URI
+
+from . import hdf5_format
 
 
 def load(filename):
     """Universal load function for any type of data file It always returns just XYZ
     positions - use fetch_block or hdf5_format.load_URI for loading the whole metadata
-    
+
     Accepted file types
     -------------------
-    
+
     New-style URIs (HDF5 based storage)
-    
+
     Text files in openmm-polymer format
-    joblib files in openmm-polymer format 
-    
+    joblib files in openmm-polymer format
+
     Parameters
     ----------
-    
-    filename: str 
+
+    filename: str
         filename to load or a URI
 
     """
@@ -66,7 +67,7 @@ def load(filename):
 
     try:  # loading from a joblib file here
         return dict(joblib.load(filename)).pop("data")
-    except:  # checking for a text file
+    except Exception:  # checking for a text file
         data_file = open(filename)
         line0 = data_file.readline()
         try:
@@ -83,29 +84,29 @@ def load(filename):
 def fetch_block(folder, ind, full_output=False):
     """
     A more generic function to fetch block number "ind" from a trajectory in a folder
-    
-    
-    This function is useful both if you want to load both "old style" trajectories (block1.dat), 
+
+
+    This function is useful both if you want to load both "old style" trajectories (block1.dat),
     and "new style" trajectories ("blocks_1-50.h5")
-    
-    It will be used in files "show" 
-    
+
+    It will be used in files "show"
+
     Parameters
     ----------
-    
+
         folder: str, folder with a trajectory
 
-        ind: str or int, number of a block to fetch 
-        
+        ind: str or int, number of a block to fetch
+
         full_output: bool (default=False)
-            If set to true, outputs a dict with positions, eP, eK, time etc. 
+            If set to true, outputs a dict with positions, eP, eK, time etc.
             if False, outputs just the conformation
-            (relevant only for new-style URIs, so default is False) 
-    
+            (relevant only for new-style URIs, so default is False)
+
     Returns
     -------
-        data, Nx3 numpy array     
-        
+        data, Nx3 numpy array
+
         if full_output==True, then dict with data and metadata; XYZ is under key "pos"
     """
     blocksh5 = glob.glob(os.path.join(folder, "blocks*.h5"))
@@ -138,9 +139,9 @@ def fetch_block(folder, ind, full_output=False):
 def save(data, filename, mode="txt", pdbGroups=None):
     """
     Basically unchanged polymerutils.save function from openmm-polymer
-    
+
     It can save into txt or joblib formats used by old openmm-polymer
-    
+
     It is also very useful for saving files to PDB format to make them compatible
     with nglview, pymol_show and others
     """
@@ -155,7 +156,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
 
         for particle in data:
             lines.append("{0:.3f} {1:.3f} {2:.3f}\n".format(*particle))
-        if filename == None:
+        if filename is None:
             return lines
 
         elif isinstance(filename, six.string_types):
@@ -167,9 +168,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
             raise ValueError("Not sure what to do with filename {0}".format(filename))
 
     elif mode == "pdb":
-        data = (
-            data - np.minimum(np.min(data, axis=0), np.zeros(3, float) - 100)[None, :]
-        )
+        data = data - np.minimum(np.min(data, axis=0), np.zeros(3, float) - 100)[None, :]
         retret = ""
 
         def add(st, n):
@@ -178,7 +177,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
             else:
                 return st + " " * (n - len(st))
 
-        if pdbGroups == None:
+        if pdbGroups is None:
             pdbGroups = ["A" for i in range(len(data))]
         else:
             pdbGroups = [str(int(i)) for i in pdbGroups]
@@ -219,13 +218,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
 def rotation_matrix(rotate):
     """Calculates rotation matrix based on three rotation angles"""
     tx, ty, tz = rotate
-    Rx = np.array(
-        [[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]]
-    )
-    Ry = np.array(
-        [[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]]
-    )
-    Rz = np.array(
-        [[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]]
-    )
+    Rx = np.array([[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]])
+    Ry = np.array([[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]])
+    Rz = np.array([[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]])
     return np.dot(Rx, np.dot(Ry, Rz))

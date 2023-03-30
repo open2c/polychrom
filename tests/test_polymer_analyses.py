@@ -1,7 +1,8 @@
 import numpy as np
+
 import polychrom
-import polychrom.starting_conformations
 import polychrom.polymer_analyses as polymer_analyses
+import polychrom.starting_conformations
 
 
 def test_smart_contacts():
@@ -27,13 +28,9 @@ def _testMutualSimplify():
         b = np.dot(b, mat)
         a = a + np.random.random(a.shape) * 0.0001
         b = b + np.random.random(b.shape) * 0.0001
-        c1 = polychrom.polymer_analyses.getLinkingNumber(
-            a, b, simplify=False, randomOffset=False
-        )
+        c1 = polychrom.polymer_analyses.getLinkingNumber(a, b, simplify=False, randomOffset=False)
         a, b = polychrom.polymer_analyses.mutualSimplify(a, b, verbose=False)
-        c2 = polychrom.polymer_analyses.getLinkingNumber(
-            a, b, simplify=False, randomOffset=False
-        )
+        c2 = polychrom.polymer_analyses.getLinkingNumber(a, b, simplify=False, randomOffset=False)
         print("simplified from 200 to {0} and {1}".format(len(a), len(b)))
         print("Link before: {0}, link after: {1}".format(c1, c2))
         assert c1 == c2
@@ -48,40 +45,41 @@ def _testMutualSimplify():
         a = a + np.random.random(a.shape) * 0.0001
         b = b + np.random.random(b.shape) * 0.0001
 
-        c1 = polychrom.polymer_analyses.getLinkingNumber(
-            a, b, simplify=False, randomOffset=False
-        )
+        c1 = polychrom.polymer_analyses.getLinkingNumber(a, b, simplify=False, randomOffset=False)
         a, b = polychrom.polymer_analyses.mutualSimplify(a, b, verbose=False)
-        c2 = polychrom.polymer_analyses.getLinkingNumber(
-            a, b, simplify=False, randomOffset=False
-        )
+        c2 = polychrom.polymer_analyses.getLinkingNumber(a, b, simplify=False, randomOffset=False)
         print("simplified from 3000 and 1000 to {0} and {1}".format(len(a), len(b)))
         print("Link before: {0}, link after: {1}".format(c1, c2))
         assert c1 == c2
 
+
 def test_scalings():
-    import polychrom.starting_conformations, polychrom.polymer_analyses
-    import numpy as np 
-    datas = [polychrom.starting_conformations.create_random_walk(1,80) for _ in range(100)]
+    import numpy as np
+
+    import polychrom.polymer_analyses
+    import polychrom.starting_conformations
+
+    datas = [polychrom.starting_conformations.create_random_walk(1, 80) for _ in range(100)]
 
     scals = [polychrom.polymer_analyses.R2_scaling(i) for i in datas]
     scals = np.mean(scals, axis=0)
-    assert np.max(np.abs((scals[1]-scals[0])/scals[0])) < 0.2
+    assert np.max(np.abs((scals[1] - scals[0]) / scals[0])) < 0.2
 
     scals = [polychrom.polymer_analyses.Rg2_scaling(i) for i in datas]
     scals = np.mean(scals, axis=0)
-    assert np.max((scals[1] - scals[0]/6)/ scals[0]) < 0.06
+    assert np.max((scals[1] - scals[0] / 6) / scals[0]) < 0.06
 
-    scals = [polychrom.polymer_analyses.contact_scaling(i,cutoff=2) for i in datas]
+    scals = [polychrom.polymer_analyses.contact_scaling(i, cutoff=2) for i in datas]
     scals = np.mean(scals, axis=0)
-    assert np.max(((scals[1]- 8 / scals[0]**(3/2))/scals[0])[3:] < 0.15)
-    
-    polychrom.polymer_analyses.contact_scaling(datas[0],cutoff=2, ring=True)
+    assert np.max(((scals[1] - 8 / scals[0] ** (3 / 2)) / scals[0])[3:] < 0.15)
+
+    polychrom.polymer_analyses.contact_scaling(datas[0], cutoff=2, ring=True)
     polychrom.polymer_analyses.Rg2_scaling(datas[0], ring=True)
     polychrom.polymer_analyses.R2_scaling(datas[0], ring=True)
     meanrg = np.mean([polychrom.polymer_analyses.Rg2(x) for x in datas])
-    assert (np.abs(meanrg - len(datas[0])/6) / len(datas[0])) < 0.15
-        
+    assert (np.abs(meanrg - len(datas[0]) / 6) / len(datas[0])) < 0.15
+
+
 def _test_Rg_scalings_vs_Rg_matrix():
     a = np.random.lognormal(1, 1, size=(30, 3))  # array for testing
 
@@ -111,6 +109,6 @@ def _test_Rg_scalings_vs_Rg_matrix():
 
 
 if __name__ == "__main__":
-    _test_Rg_scalings()
+    _test_Rg_scalings_vs_Rg_matrix()
     _testMutualSimplify()
     test_smart_contacts()

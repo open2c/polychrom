@@ -1,17 +1,15 @@
 """
-A set of utilities for performing loop extrusion simulations. 
-
+A set of utilities for performing loop extrusion simulations.
 """
 
 
 class bondUpdater(object):
-
     def __init__(self, LEFpositions):
         """
         :param smcTransObject: smc translocator object to work with
         """
         self.LEFpositions = LEFpositions
-        self.curtime  = 0
+        self.curtime = 0
         self.allBonds = []
 
     def setParams(self, activeParamDict, inactiveParamDict):
@@ -26,8 +24,7 @@ class bondUpdater(object):
         self.activeParamDict = activeParamDict
         self.inactiveParamDict = inactiveParamDict
 
-
-    def setup(self, bondForce,  blocks=100, smcStepsPerBlock=1):
+    def setup(self, bondForce, blocks=100, smcStepsPerBlock=1):
         """
         A method that milks smcTranslocator object
         and creates a set of unique bonds, etc.
@@ -38,36 +35,36 @@ class bondUpdater(object):
         :return:
         """
 
-
         if len(self.allBonds) != 0:
             raise ValueError("Not all bonds were used; {0} sets left".format(len(self.allBonds)))
 
         self.bondForce = bondForce
 
-        #precalculating all bonds
+        # precalculating all bonds
         allBonds = []
-        
-        loaded_positions  = self.LEFpositions[self.curtime : self.curtime+blocks]
-        allBonds = [[(int(loaded_positions[i, j, 0]), int(loaded_positions[i, j, 1])) 
-                        for j in range(loaded_positions.shape[1])] for i in range(blocks)]
+
+        loaded_positions = self.LEFpositions[self.curtime : self.curtime + blocks]
+        allBonds = [
+            [(int(loaded_positions[i, j, 0]), int(loaded_positions[i, j, 1])) for j in range(loaded_positions.shape[1])]
+            for i in range(blocks)
+        ]
 
         self.allBonds = allBonds
         self.uniqueBonds = list(set(sum(allBonds, [])))
 
-        #adding forces and getting bond indices
+        # adding forces and getting bond indices
         self.bondInds = []
         self.curBonds = allBonds.pop(0)
 
         for bond in self.uniqueBonds:
             paramset = self.activeParamDict if (bond in self.curBonds) else self.inactiveParamDict
-            ind = bondForce.addBond(bond[0], bond[1], **paramset) # changed from addBond
+            ind = bondForce.addBond(bond[0], bond[1], **paramset)  # changed from addBond
             self.bondInds.append(ind)
-        self.bondToInd = {i:j for i,j in zip(self.uniqueBonds, self.bondInds)}
-        
-        self.curtime += blocks 
-        
-        return self.curBonds,[]
+        self.bondToInd = {i: j for i, j in zip(self.uniqueBonds, self.bondInds)}
 
+        self.curtime += blocks
+
+        return self.curBonds, []
 
     def step(self, context, verbose=False):
         """
@@ -85,8 +82,11 @@ class bondUpdater(object):
         bondsAdd = [i for i in self.curBonds if i not in pastBonds]
         bondsStay = [i for i in pastBonds if i in self.curBonds]
         if verbose:
-            print("{0} bonds stay, {1} new bonds, {2} bonds removed".format(len(bondsStay),
-                                                                            len(bondsAdd), len(bondsRemove)))
+            print(
+                "{0} bonds stay, {1} new bonds, {2} bonds removed".format(
+                    len(bondsStay), len(bondsAdd), len(bondsRemove)
+                )
+            )
         bondsToChange = bondsAdd + bondsRemove
         bondsIsAdd = [True] * len(bondsAdd) + [False] * len(bondsRemove)
         for bond, isAdd in zip(bondsToChange, bondsIsAdd):

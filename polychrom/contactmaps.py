@@ -3,20 +3,19 @@ Building contact maps
 =====================
 
 
-This module is the main workhorse of tools to calculate contactmaps, both from 
-polymer simulations and from other simulations (e.g. 1D simulations of loop 
-extrusion). All of the functions here are designed to be parallelized, and lots of 
-efforts were put into making this possible. 
+This module is the main workhorse of tools to calculate contactmaps, both from polymer simulations and from other
+simulations (e.g. 1D simulations of loop extrusion). All of the functions here are designed to be parallelized,
+and lots of efforts were put into making this possible.
 
-The reasons we need parallel contactmap code is the following: 
+The reasons we need parallel contactmap code is the following:
 
-* Calculating contact maps is slow, esp. at large contact radii, and benefits greatly 
+* Calculating contact maps is slow, esp. at large contact radii, and benefits greatly
   from parallelizing
 * Doing regular multiprocesing.map has limitations
-* It can only handle heataps up to some size, and transferring gigabyte-sized heatmaps between processes takes minutes 
-* It can only do as many heatmaps as fits in RAM, which on 20-core 128GB machine is no more than 5GB/heatmap 
+* It can only handle heataps up to some size, and transferring gigabyte-sized heatmaps between processes takes minutes
+* It can only do as many heatmaps as fits in RAM, which on 20-core 128GB machine is no more than 5GB/heatmap
 
-The structure of this class is as follows. 
+The structure of this class is as follows.
 
 On the outer level, it  provides three methods to average contactmaps:
 
@@ -24,38 +23,34 @@ On the outer level, it  provides three methods to average contactmaps:
 * :func:`binnedContactMap`,
 * :func:`monomerResolutionContactMapSubchains`.
 
-The first two create contact map from an
-entire file: either monomer-resolution or binned. The last one creates contact maps 
-from sub-chains in a file, starting at a given set of starting points. It is useful 
-when doing contact maps from several copies of a system in one simulation. 
+The first two create contact map from an entire file: either monomer-resolution or binned. The last one creates
+contact maps from sub-chains in a file, starting at a given set of starting points. It is useful when doing contact
+maps from several copies of a system in one simulation.
 
-The first two methods have a legacy implementation from the old library that is still 
-here to do the tests. 
+The first two methods have a legacy implementation from the old library that is still here to do the tests.
 
-On the middle level, it provides a method "averageContacts". This method accepts a 
-"contact iterator", and can be used to average contacts from both a set of filenames 
-and from a simulation of some kind (e.g. averaging positions of loop extruding 
-factors from a 1D loop extrusion simulation). All of the outer level functions (
-monomerResolutionContactMap for example) are implemented using this method. 
+On the middle level, it provides a method "averageContacts". This method accepts a "contact iterator", and can be
+used to average contacts from both a set of filenames and from a simulation of some kind (e.g. averaging positions of
+loop extruding factors from a 1D loop extrusion simulation). All of the outer level functions (
+monomerResolutionContactMap for example) are implemented using this method.
 
-On the lower level, there are internals of the "averageContacts" method and an 
-associated "worker" function. There is generally no need to understand the code of 
-those functions. There exists a reference implementation of both the worker and the 
-:func:`averageContacts` function,  :class:`simpleWorker` and :func:`averageContactsSimple`. They do
-all the things that "averageContacts" do, but on only one core. In fact, 
-"averageContacts" defaults to "averageContactsSimple" if requested to run on one core 
-because it is a little bit faster. 
+On the lower level, there are internals of the "averageContacts" method and an associated "worker" function. There is
+generally no need to understand the code of those functions. There exists a reference implementation of both the
+worker and the :func:`averageContacts` function,  :class:`simpleWorker` and :func:`averageContactsSimple`. They do
+all the things that "averageContacts" do, but on only one core. In fact, "averageContacts" defaults to
+"averageContactsSimple" if requested to run on one core because it is a little bit faster.
 
 """
 
-import numpy as np
-import random
 import ctypes
 import multiprocessing as mp
-from contextlib import closing
-from . import polymerutils
+import random
 import warnings
-from . import polymer_analyses
+from contextlib import closing
+
+import numpy as np
+
+from . import polymer_analyses, polymerutils
 
 
 def indexing(smaller, larger, M):
@@ -171,7 +166,7 @@ def averageContactsSimple(contactIterator, inValues, N, **kwargs):
         contactIterator:
             an iterator. See descriptions of "filenameContactMap" class below for example and explanations
         inValues:
-            an array of values to pass to contactIterator. Would be an array of arrays of filenames or something like that.
+            an array of values to pass to contactIterator. Would be an array of arrays of filenames etc.
         N:
             Size of the resulting contactmap
 
@@ -193,9 +188,7 @@ def averageContactsSimple(contactIterator, inValues, N, **kwargs):
     uniqueContacts = kwargs.get("uniqueContacts", False)
     contactProcessing = kwargs.get("contactProcessing", lambda x: x)
     finalSize = N * (N + 1) // 2
-    sharedArrays = [
-        np.zeros(finalSize, dtype=arrayDtype)
-    ]  # just an array, not a shared array here bc 1 core
+    sharedArrays = [np.zeros(finalSize, dtype=arrayDtype)]  # just an array, not a shared array here bc 1 core
     argset = list(sharedArrays) + [
         contactProcessing,
         classInitArgs,
@@ -215,8 +208,8 @@ def worker(x):
     This worker is being called by the averageContact method
     It receives contacts from the contactIterator by calling .next()
     And puts contacts into the shared memory buckets
-    
-    All the locks etc. for shared memory objects are handeled here as well 
+
+    All the locks etc. for shared memory objects are handeled here as well
     """
     import numpy as np
 
@@ -228,9 +221,7 @@ def worker(x):
     sharedNumpy = list(map(tonumpyarray, sharedArrays__))  # shared numpy arrays
     allContacts = []
     contactSum = 0
-    myIterator = contactIterator__(
-        x, *classInitArgs__, **classInitKwargs__
-    )  # acquiring and initializing iterator
+    myIterator = contactIterator__(x, *classInitArgs__, **classInitKwargs__)  # acquiring and initializing iterator
     stopped = False
     while True:  # main event loop
         try:
@@ -246,9 +237,7 @@ def worker(x):
         except StopIteration:
             stopped = True
 
-        if (
-            contactSum > contactBlock__
-        ) or stopped:  # we aggregated enough contacts.  ready to dump them.
+        if (contactSum > contactBlock__) or stopped:  # we aggregated enough contacts.  ready to dump them.
             if len(allContacts) == 0:
                 return  # no contacts found at all - exiting (we must be stopped)
             contactSum = 0
@@ -258,30 +247,20 @@ def worker(x):
                 if stopped:  # contactProcessing killed all contacts? are we done?
                     return  # if yes, exiting
                 continue  # if not, going to the next bucket
-            ctrue = indexing(
-                contacts[:, 0], contacts[:, 1], N__
-            )  # converting to 1D contacts
+            ctrue = indexing(contacts[:, 0], contacts[:, 1], N__)  # converting to 1D contacts
             position, counts = np.unique(ctrue, return_counts=True)  # unique contacts
             assert position[0] >= 0
             assert position[-1] < N__ * (N__ + 1) // 2  # boundary check for contacts
-            chunks = np.array(
-                np.r_[0, np.cumsum(list(map(len, sharedArrays__)))], dtype=int
-            )
-            inds = np.searchsorted(
-                position, chunks
-            )  # assinging contacts to chunks here
+            chunks = np.array(np.r_[0, np.cumsum(list(map(len, sharedArrays__)))], dtype=int)
+            inds = np.searchsorted(position, chunks)  # assinging contacts to chunks here
             if inds[-1] != len(position):
                 raise ValueError  # last chunks boundary must be after all contacts)
             indszip = list(zip(inds[:-1], inds[1:]))  # extents of contact buckets
 
             indarray = list(range(len(sharedArrays__)))
-            random.shuffle(
-                indarray
-            )  # shuffled array of contactmap bucket indices we are going to work with
+            random.shuffle(indarray)  # shuffled array of contactmap bucket indices we are going to work with
             for j, (st, end) in enumerate(indszip):
-                position[st:end] -= chunks[
-                    j
-                ]  # pre-subtracting offsets now - not to do it when the lock is being held
+                position[st:end] -= chunks[j]  # pre-subtracting offsets now - not to do it when the lock is being held
 
             while len(indarray) > 0:  # continue until all contacts are put in buckets
                 for i in range(len(indarray)):  # going over all buckets
@@ -290,20 +269,12 @@ def worker(x):
                     if i == len(indarray):  # is this the last bucket?
                         lock.acquire()  # wait for it to be free, and work with it
                     else:
-                        if not lock.acquire(
-                            0
-                        ):  # not the last bucket? Try to acquire the lock
+                        if not lock.acquire(0):  # not the last bucket? Try to acquire the lock
                             continue  # if failed, move to the next bucket
-                    st, end = indszip[
-                        ind
-                    ]  # succeeded acquiring the lock? Then do things with our bucket
-                    sharedNumpy[ind][position[st:end]] += counts[
-                        st:end
-                    ]  # add to the current bucket
+                    st, end = indszip[ind]  # succeeded acquiring the lock? Then do things with our bucket
+                    sharedNumpy[ind][position[st:end]] += counts[st:end]  # add to the current bucket
                     lock.release()
-                    indarray.pop(
-                        i
-                    )  # remove the index of the bucket because it's finished
+                    indarray.pop(i)  # remove the index of the bucket because it's finished
                     break  # back to the main loop
             allContacts = []
             if stopped:
@@ -345,32 +316,32 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
 
             Sorry, no outside multiprocessing-style maps for now, it's easy to fix
             Let me know if it is needed.
-                     
-                     
+
+
     Code that calcualtes a contactmap from a set of polymer conformation is in the
     methods below (averageMonomerResolutionContactMap, etc.)
-    
-    An example code that would run a contactmap from a simulation is below:  
-    
-    ..code-block:: python 
-    
+
+    An example code that would run a contactmap from a simulation is below:
+
+    ..code-block:: python
+
         class simContactMap(object):
             "contactmap 'finder' for a simulation"
             def __init__(self, ind):  # accept a parameter (e.g. random number generator seed)
-                self.model = initModel(ind)  # pass parameter to the functon that returns me a model object 
-                self.count = 10000000   # how many times to run a step of the model 
-                self.model.steps(10000)   # initial steps of the model to equilibrate it 
+                self.model = initModel(ind)  # pass parameter to the functon that returns me a model object
+                self.count = 10000000   # how many times to run a step of the model
+                self.model.steps(10000)   # initial steps of the model to equilibrate it
 
             def next(self):  # actual realization of the self.next method
                 if self.count == 0:   # terminate the simulation if we did self.count iterations
                     raise StopIteration
-                self.count -= 1      #decrement the counter 
-                self.model.steps(30)   # advance model by 30 steps 
-                return np.array(self.model.getSMCs()).T   # return current LEF positions 
+                self.count -= 1      #decrement the counter
+                self.model.steps(30)   # advance model by 30 steps
+                return np.array(self.model.getSMCs()).T   # return current LEF positions
 
-        mymap = polychrom.contactmaps.averageContacts(simContactMap, range(20), 30000,  nproc=20 )    
+        mymap = polychrom.contactmaps.averageContacts(simContactMap, range(20), 30000,  nproc=20 )
 
-    
+
     """
 
     arrayDtype = kwargs.get("arrayDtype", ctypes.c_int32)
@@ -379,7 +350,6 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
     if nproc == 1:
         return averageContactsSimple(contactIterator, inValues, N, **kwargs)
     contactBlock = kwargs.get("contactBlock", 5000000)
-    useFmap = kwargs.get("useFmap", False)
     classInitArgs = kwargs.get("classInitArgs", [])
     classInitKwargs = kwargs.get("classInitKwargs", {})
     contactProcessing = kwargs.get("contactProcessing", lambda x: x)
@@ -396,22 +366,8 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
         N,
     ]
 
-    if (
-        not useFmap
-    ):  # for mp.map we need initializer because shared memory cannot be pickled
-        # # or passed as an argument in inValues
-        with closing(mp.Pool(processes=nproc, initializer=init, initargs=argset)) as p:
-            p.map(worker, inValues)
-
-    # diffent strategy for a local map
-    # shared memory is just a global variable created by init()
-    else:
-        init(*argset)  # creating global variables here
-        if callable(useFmap):
-            fmap = useFmap
-        else:
-            from mirnylib.systemutils import fmap
-        fmap(worker, inValues, nproc=nproc)
+    with closing(mp.Pool(processes=nproc, initializer=init, initargs=argset)) as p:
+        p.map(worker, inValues)
 
     res = np.concatenate([tonumpyarray(i) for i in sharedArrays])
     del sharedArrays  # save memory
@@ -519,9 +475,7 @@ def binnedContactMap(
     Nbase = len(bins) - 1
 
     if Nbase > 25000:
-        warnings.warn(
-            UserWarning("very large contact map" " may be difficult to visualize")
-        )
+        warnings.warn(UserWarning("very large contact map" " may be difficult to visualize"))
 
     chromosomeStarts = np.cumsum(chainBinNums)
     chromosomeStarts = np.hstack((0, chromosomeStarts))
