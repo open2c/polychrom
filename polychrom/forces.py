@@ -619,7 +619,7 @@ def heteropolymer_SSW(
 
     interactionMatrix: np.array
         the **EXTRA** interaction strenghts between the different types.
-        Only upper triangular values are used. See "Force summary" above
+        Only upper triangular values are used. See "Force summary" abovec
     monomerTypes: list of int or np.array
         the type of each monomer, starting at 0
     extraHardParticlesIdxs : list of int
@@ -726,7 +726,7 @@ def heteropolymer_SSW(
 def cylindrical_confinement(sim_object, r, bottom=None, k=0.1, top=9999, name="cylindrical_confinement"):
     """As it says."""
 
-    if bottom:
+    if bottom == True:
         warnings.warn(DeprecationWarning("Use bottom=0 instead of bottom = True! "))
         bottom = 0
 
