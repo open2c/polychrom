@@ -323,6 +323,8 @@ class Simulation(object):
 
         self.N: int = kwargs["N"]
 
+        self.masses = np.zeros(self.N, dtype=float) + self.kwargs["mass"]
+
         self.verbose: bool = kwargs["verbose"]
         self.reporters = kwargs["reporters"]
         self.forces_applied: bool = False
@@ -512,7 +514,6 @@ class Simulation(object):
         if self.forces_applied:
             return
 
-        self.masses = np.zeros(self.N, dtype=float) + self.kwargs["mass"]
         for mass in self.masses:
             self.system.addParticle(mass)
 
