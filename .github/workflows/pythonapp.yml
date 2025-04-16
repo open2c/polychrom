@@ -8,13 +8,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Python 3.9
+      - name: Set up Python 3.12
         uses: actions/setup-python@v1
         with:
-          python-version: 3.9
+          python-version: 3.12
       - uses: s-weigand/setup-conda@v1
         with:
-          python-version: 3.9
+          python-version: 3.12
           activate-conda: true
       - run: conda --version
       - run: which python
@@ -22,9 +22,9 @@ jobs:
       - run: ls -la
       - name: Install dependencies
         run: |
-          sudo apt-get install build-essential
-          conda install -c conda-forge openmm
+          sudo apt-get install build-essential          
           conda install pip 
+          pip install openmm
           pip install cython
           pip install -r requirements.txt 
           pip install -e . 
