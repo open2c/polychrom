@@ -275,7 +275,8 @@ class Simulation(object):
         elif platform.lower() == "cpu":
             platform_object = openmm.Platform.getPlatformByName("CPU")
         else:
-            raise RuntimeError("Undefined platform: {0}".format(platform))
+            platform_object = openmm.Platform.getPlatformByName(platform)
+            
         self.platform = platform_object
 
         self.temperature = kwargs["temperature"]
@@ -680,6 +681,7 @@ class Simulation(object):
         get_velocities=False,
         save=True,
         save_extras={},
+        print_messages=True,
     ):
         """performs one block of simulations, doing steps timesteps,
         or steps_per_block if not specified.
@@ -758,8 +760,8 @@ class Simulation(object):
             mass = self.system.getParticleMass(0)
             dx = simtk.unit.sqrt(2.0 * eK * self.kT / mass) * dt
             msg += "dx=%.2lfpm " % (dx / simtk.unit.nanometer * 1000.0)
-
-        logging.info(msg)
+        if print_messages:
+            logging.info(msg)
 
         result = {
             "pos": newcoords,
