@@ -1,4 +1,4 @@
-""" 
+"""
 Simulation parameters and the Rouse model
 -----------------------------------------
 
@@ -9,19 +9,19 @@ is a simulated self-avoiding polymer. However, since the Rouse model has been us
 to fit experimental data on chromatin dynamics, it provides some intuition for how
 to guess polychrom parameters from first principles.
 
-For example, the mass of a particle is automatically set to 100 amu and 
+For example, the mass of a particle is automatically set to 100 amu and
 the collision rate is set depending on the integrator. For Brownian integrators,
 setting the collision rate to 2.0 works well, whereas for Langevin integrators,
 it is best to set the collision rate to 0.001-0.01. For loop extrusion simulations,
 it is typically set to 0.1. These values have been determined empirically by group
 members. For Brownian dynamics, for example, using a smaller collision rate leads
-to integration failures. By default the temperature is set to 300K. 
+to integration failures. By default the temperature is set to 300K.
 
 In any case, the monomer diffusion coefficient naturally follows as
 :math:`D=k_B T / m \zeta`, where :math:`\zeta` is the collision rate. So once the
 mass and collision rate are set, there is no control over the choice of D unless
 you use a custom Brownian integrator (see integrators module) that directly takes
-in D as a parameter. However, even then, the units of D are in terms of 
+in D as a parameter. However, even then, the units of D are in terms of
 :math:`k_B T / m \zeta`.
 
 The other arbitrary parameters are the monomer radius, set to sim.conlen = 1 nm
@@ -31,17 +31,17 @@ the stiffness, :math:`k`,  of the springs connecting adjacent monomers, such tha
 :math:`k = 2k_B T / x^2`. For a Rouse chain, :math:`k = 3 k_B T / y^2`, where
 :math:`y` is the standard deviation of the bond extension. The Rouse model of DNA
 is secretely a wormlike chain at shorter length scales; thus, :math:`y` should
-be set to the end-to-end distance of the underlying WLC, which is defined as 
+be set to the end-to-end distance of the underlying WLC, which is defined as
 :math:`y = \sqrt{L_0 b}`, where :math:`L_0` is the length of DNA per monomer and
 :math:`b` is the Kuhn length. These relations imply that the bondWiggleDistance
-should be set to :math:`x = \sqrt{2L_0 b / 3}`. 
+should be set to :math:`x = \sqrt{2L_0 b / 3}`.
 
 Note that all length scales in
 polychrom are in terms of sim.conlen = 1 nm. So :math:`L_0` and :math:`b` should
 also be in nanometers. It is not obvious how to convert from nanometers of
 chromatin to basepairs. One way of doing it is using the formula
 n_basepairs = (n_nm / 0.34 nm/bp) * (1 + 146/<L>), where <L> is the average linker
-length in the cell. For example, for human T cells, <L> = 50 bp; so b=40nm of 
+length in the cell. For example, for human T cells, <L> = 50 bp; so b=40nm of
 cumulative linker length would translate to 469 bp of chromatin, where we account
 for the buried DNA in nucleosomes. We can also invert this relation to get
 n_nm = n_basepairs/(1 + 146/<L>) * 0.34 nm/bp. So if we would like each monomer
@@ -49,8 +49,8 @@ to represent 2 kilobases, this would translate to 174 nm of cumulative linker le
 Using these values as an example, the resulting bondWiggleDistance would be
 sqrt(2Lb/3) = 68 nm. We then divide by the size of a monomer to understand what the
 bondWiggleDistance would be in terms of sim.conlen. So if we posit that the diameter
-of a bead is equal to 34 nm, the bondWiggleDistance would be close to 2.0. This is 
-a much larger number than 0.1, which is what is used as default in polychrom! 
+of a bead is equal to 34 nm, the bondWiggleDistance would be close to 2.0. This is
+a much larger number than 0.1, which is what is used as default in polychrom!
 
 Generally, the more coarse-grained the simulation is, the more flexible the springs
 should be and the larger the bondWiggleDistance should be, since there is more DNA
@@ -61,14 +61,13 @@ bending rigidity in polychrom simulations of chromatin.
 
 For a self avoiding polymer there are 2 main dimensionless numbers to keep in mind.
 One is Ddt/b^2 and the other is a/b, where a is the radius of a monomer and b is the
-Kuhn length. Recall that D and dt (timestep) are set arbitrarily based on 
-computational convenience, and a is set to 1 nm by default. 
+Kuhn length. Recall that D and dt (timestep) are set arbitrarily based on
+computational convenience, and a is set to 1 nm by default.
 Thus, even if length scales and time scales can be
 rescaled at the end of the simulation to match experimental data, these ratios should
 be decided on beforehand and preserved. Most people set the rest length of the spring
-to be the diameter of the monomer = 1 nm. 
+to be the diameter of the monomer = 1 nm.
 """
-
 
 import numpy as np
 from simtk import unit

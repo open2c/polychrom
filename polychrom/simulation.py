@@ -91,7 +91,8 @@ import tempfile
 import time
 import warnings
 from collections.abc import Iterable
-from typing import Optional, Dict
+from typing import Dict, Optional
+
 import numpy as np
 
 try:

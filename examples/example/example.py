@@ -5,7 +5,6 @@ of how create a Simulation object, add forces, and initialize the reporter.
 In this simulation, a simple polymer chain of 10,000 monomers is simulated.
 """
 
-
 import os
 import sys
 

@@ -91,6 +91,7 @@ autodetermine the type of a trajectory folder. So it will fetch both `/path/to/t
 `/path/to/the/trajectory/blocks_x-y.h5::42` automatically
 
 """
+
 import glob
 import os
 import warnings

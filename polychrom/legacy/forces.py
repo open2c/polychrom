@@ -1,9 +1,10 @@
-import numpy as np
-import simtk.openmm as openmm
-import simtk.unit.nanometer as nm
-import simtk.unit as units
 import os
 import pickle
+
+import numpy as np
+import simtk.openmm as openmm
+import simtk.unit as units
+import simtk.unit.nanometer as nm
 
 """
 This is a collection of old forces that are likely no longer used
@@ -186,7 +187,6 @@ def lennard_jones_force(
     sigmaRep=None,
     sigmaAttr=None,
 ):
-
     """
     Adds a lennard-jones force, that allows for mutual attraction.
     This is the slowest force out of all repulsive.
@@ -372,7 +372,6 @@ def exclude_sphere(sim_object, r=5, position=(0, 0, 0)):
 
 
 def attraction_to_the_core(sim_object, k, r0, coreParticles=[]):
-
     """Attracts a subset of particles to the core,
     repells the rest from the core"""
 

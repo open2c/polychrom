@@ -281,6 +281,10 @@ def worker(x):
                 return
 
 
+def identity(x):
+    return x
+
+
 def averageContacts(contactIterator, inValues, N, **kwargs):
     """
     A main workhorse for averaging contacts on multiple cores into one shared contact
@@ -352,7 +356,7 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
     contactBlock = kwargs.get("contactBlock", 5000000)
     classInitArgs = kwargs.get("classInitArgs", [])
     classInitKwargs = kwargs.get("classInitKwargs", {})
-    contactProcessing = kwargs.get("contactProcessing", lambda x: x)
+    contactProcessing = kwargs.get("contactProcessing", identity)
     finalSize = N * (N + 1) // 2
     boundaries = np.linspace(0, finalSize, bucketNum + 1, dtype=int)
     chunks = zip(boundaries[:-1], boundaries[1:])

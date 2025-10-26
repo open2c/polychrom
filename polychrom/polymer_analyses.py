@@ -37,8 +37,8 @@ from math import sqrt
 
 import numpy as np
 import pandas as pd
-from scipy.spatial import cKDTree
 from scipy.ndimage import gaussian_filter1d
+from scipy.spatial import cKDTree
 
 try:
     from . import _polymer_math

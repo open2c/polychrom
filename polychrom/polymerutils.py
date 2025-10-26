@@ -24,7 +24,6 @@ A typical workflow with the new-style trajectories should be:
         xyz = data["pos"]
 """
 
-
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
