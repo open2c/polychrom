@@ -16,7 +16,6 @@ from openmmlib.contactmapManager import averageContacts
 # matplotlib.use("Agg")
 
 
-
 setExceptionHook()
 
 import mirnylib.plotting

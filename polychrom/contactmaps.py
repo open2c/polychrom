@@ -47,6 +47,7 @@ import multiprocessing as mp
 import random
 import warnings
 from contextlib import closing
+from functools import partial
 
 import numpy as np
 
@@ -451,6 +452,15 @@ def monomerResolutionContactMap(
     )
 
 
+def contactAction(contacts, myBins):
+    contacts = np.asarray(contacts, order="C")
+    cshape = contacts.shape
+    contacts.shape = (-1,)
+    contacts = np.searchsorted(myBins[0], contacts) - 1
+    contacts.shape = cshape
+    return contacts
+
+
 def binnedContactMap(
     filenames,
     chains=None,
@@ -484,14 +494,6 @@ def binnedContactMap(
     chromosomeStarts = np.cumsum(chainBinNums)
     chromosomeStarts = np.hstack((0, chromosomeStarts))
 
-    def contactAction(contacts, myBins=[bins]):
-        contacts = np.asarray(contacts, order="C")
-        cshape = contacts.shape
-        contacts.shape = (-1,)
-        contacts = np.searchsorted(myBins[0], contacts) - 1
-        contacts.shape = cshape
-        return contacts
-
     args = [cutoff, loadFunction, exceptionsToIgnore, contactFinder]
     values = [filenames[i::n] for i in range(n)]
     mymap = averageContacts(
@@ -500,7 +502,7 @@ def binnedContactMap(
         Nbase,
         classInitArgs=args,
         useFmap=useFmap,
-        contactProcessing=contactAction,
+        contactProcessing=partial(contactAction, myBins=[bins]),
         nproc=n,
     )
     return mymap, chromosomeStarts

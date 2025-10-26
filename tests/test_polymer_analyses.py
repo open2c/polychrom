@@ -16,7 +16,7 @@ def test_smart_contacts():
     ind_smart = np.sort(c2[:, 0] * 10000 + c2[:, 1])
     ind_regular = np.sort(conts[:, 0] * 10000 + conts[:, 1])
 
-    assert np.in1d(ind_smart, ind_regular).all()
+    assert np.isin(ind_smart, ind_regular).all()
 
 
 def _testMutualSimplify():
