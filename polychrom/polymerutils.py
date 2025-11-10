@@ -60,7 +60,7 @@ def load(filename):
 def fetch_block(folder, ind, full_output=False):
     """
     A function to fetch a single block from a folder with a new-style trajectory.
-    Old-style trajectores are deprecated.
+    Old-style trajectories are deprecated.
 
     Parameters
     ----------
