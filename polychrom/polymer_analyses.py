@@ -11,7 +11,7 @@ Tools for calculating contacts
 ------------------------------
 
 The main function calculating contacts is: :py:func:`polychrom.polymer_analyses.calculate_contacts`
-Right now it is a simple wrapper around scipy.cKDTree.
+Right now it is a simple wrapper around scipy.KDTree.
 
 Another function :py:func:`polychrom.polymer_analyses.smart_contacts` was added recently to help build contact maps
 with a large contact radius. It randomly sub-samples the monomers; by default selecting N/cutoff monomers. It then
@@ -37,7 +37,7 @@ from math import sqrt
 
 import numpy as np
 import pandas as pd
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 from scipy.ndimage import gaussian_filter1d
 
 try:
@@ -66,7 +66,7 @@ def calculate_contacts(data, cutoff=1.7):
     if np.isnan(data).any():
         raise RuntimeError("Data contains NANs")
 
-    tree = cKDTree(data)
+    tree = KDTree(data)
     pairs = tree.query_pairs(cutoff, output_type="ndarray")
     return pairs
 
@@ -573,7 +573,7 @@ def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_si
     chain_end = chains[chain_id][1]
 
     # all contact pairs available in the scaled data
-    tree = cKDTree(data_scaled, boxsize=box_size)
+    tree = KDTree(data_scaled, boxsize=box_size)
     pairs = tree.query_pairs(cutoff, output_type="ndarray")
 
     # total number of contacts of the marked chain:
@@ -582,7 +582,7 @@ def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_si
     all_signal = len(pairs[pairs < chain_end]) - len(pairs[pairs < chain_start])
 
     # contact pairs of the marked chain with itself
-    tree = cKDTree(data[chain_start:chain_end], boxsize=None)
+    tree = KDTree(data[chain_start:chain_end], boxsize=None)
     pairs = tree.query_pairs(cutoff, output_type="ndarray")
 
     # doubled number of contacts of the marked chain with itself (i.e. cis signal)
@@ -593,3 +593,12 @@ def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_si
     trans_signal = all_signal - cis_signal
 
     return cis_signal, trans_signal
+
+
+def rotation_matrix(rotate):
+    """Calculates rotation matrix based on three rotation angles"""
+    tx, ty, tz = rotate
+    Rx = np.array([[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]])
+    Ry = np.array([[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]])
+    Rz = np.array([[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]])
+    return np.dot(Rx, np.dot(Ry, Rz))

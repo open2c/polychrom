@@ -24,12 +24,11 @@ A typical workflow with the new-style trajectories should be:
         xyz = data["pos"]
 """
 
-
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
-import io
 import os
+import warnings
 
 import numpy as np
 
@@ -39,15 +38,9 @@ from . import hdf5_format
 
 
 def load(filename):
-    """Universal load function for any type of data file It always returns just XYZ
-    positions - use fetch_block or hdf5_format.load_URI for loading the whole metadata
-
-    Accepted file types
-    -------------------
-
-    New-style URIs (HDF5 based storage)
-
-    Joblib and text files were deprecated.
+    """
+    A function to load a single conformation from a URI. Deprecated.
+    Use load_URI from hdf5_format instead.
 
     Parameters
     ----------
@@ -56,23 +49,18 @@ def load(filename):
         filename to load or a URI
 
     """
+    warnings.warn("polymerutils.load is deprecated. Use hdf5_format.load_URI instead.", DeprecationWarning)
+
     if "::" in filename:
         return hdf5_format.load_URI(filename)["pos"]
-    
+
     raise ValueError("Only URIs are supported in this version of polychrom")
-
-
 
 
 def fetch_block(folder, ind, full_output=False):
     """
-    A more generic function to fetch block number "ind" from a trajectory in a folder
-
-
-    This function is useful both if you want to load both "old style" trajectories (block1.dat),
-    and "new style" trajectories ("blocks_1-50.h5")
-
-    It will be used in files "show"
+    A function to fetch a single block from a folder with a new-style trajectory.
+    Old-style trajectores are deprecated.
 
     Parameters
     ----------
@@ -92,12 +80,14 @@ def fetch_block(folder, ind, full_output=False):
 
         if full_output==True, then dict with data and metadata; XYZ is under key "pos"
     """
+    warnings.warn(
+        "fetch_block is deprecated. Use hdf5_format.list_uris followed by hdf5_format.load_URI instead.",
+        DeprecationWarning,
+    )
+
     blocksh5 = glob.glob(os.path.join(folder, "blocks*.h5"))
-    blocksdat = glob.glob(os.path.join(folder, "block*.dat"))
     ind = int(ind)
-    if (len(blocksh5) > 0) and (len(blocksdat) > 0):
-        raise ValueError("both .h5 and .dat files found in folder - exiting")
-    if (len(blocksh5) == 0) and (len(blocksdat) == 0):
+    if len(blocksh5) == 0:
         raise ValueError("no blocks found")
 
     if len(blocksh5) > 0:
@@ -113,21 +103,17 @@ def fetch_block(folder, ind, full_output=False):
         block = load_URI(blocksh5[pos] + f"::{ind}")
         if not full_output:
             return block["pos"]
+        return block
 
-    if len(blocksdat) > 0:
-        return load(os.path.join(folder, f"block{ind}.dat"))
     raise ValueError(f"Cannot find the block {ind} in the folder {folder}")
 
 
 def save(data, filename, mode="txt", pdbGroups=None):
     """
-    Basically unchanged polymerutils.save function from openmm-polymer
-
-
-
-    It is also very useful for saving files to PDB format to make them compatible
-    with nglview, pymol_show and others
+    A legacy function, currently only kept for compatibility with PDB saving that is rarely used.
     """
+    warnings.warn("polymerutils.save is deprecated. Will be moved to legacy", DeprecationWarning)
+
     data = np.asarray(data, dtype=np.float32)
 
     if mode == "pdb":
@@ -175,13 +161,10 @@ def save(data, filename, mode="txt", pdbGroups=None):
                 filename.write("C {0} {1} {2}".format(*i))
 
     else:
-        raise ValueError("Unknown mode : %s, use or pdb" % mode)
+        raise ValueError(f"Unknown mode {mode}. Only 'pdb' and 'pyxyz' are supported.")
 
 
 def rotation_matrix(rotate):
-    """Calculates rotation matrix based on three rotation angles"""
-    tx, ty, tz = rotate
-    Rx = np.array([[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]])
-    Ry = np.array([[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]])
-    Rz = np.array([[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]])
-    return np.dot(Rx, np.dot(Ry, Rz))
+    warnings.warn("rotation_matrix will be moved to polymer_analyses", DeprecationWarning)
+    from polychrom.polymer_analyses import rotation_matrix as rm
+    return rm(rotate)
