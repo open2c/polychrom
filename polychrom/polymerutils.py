@@ -31,9 +31,7 @@ import glob
 import io
 import os
 
-import joblib
 import numpy as np
-import six
 
 from polychrom.hdf5_format import load_URI
 
@@ -49,8 +47,7 @@ def load(filename):
 
     New-style URIs (HDF5 based storage)
 
-    Text files in openmm-polymer format
-    joblib files in openmm-polymer format
+    Joblib and text files were deprecated.
 
     Parameters
     ----------
@@ -61,24 +58,10 @@ def load(filename):
     """
     if "::" in filename:
         return hdf5_format.load_URI(filename)["pos"]
+    
+    raise ValueError("Only URIs are supported in this version of polychrom")
 
-    if not os.path.exists(filename):
-        raise IOError("File not found :( \n %s" % filename)
 
-    try:  # loading from a joblib file here
-        return dict(joblib.load(filename)).pop("data")
-    except Exception:  # checking for a text file
-        data_file = open(filename)
-        line0 = data_file.readline()
-        try:
-            N = int(line0)
-        except (ValueError, UnicodeDecodeError):
-            raise TypeError("Could not read the file. Not text or joblib.")
-        data = [list(map(float, i.split())) for i in data_file.readlines()]
-
-        if len(data) != N:
-            raise ValueError("N does not correspond to the number of lines!")
-        return np.array(data)
 
 
 def fetch_block(folder, ind, full_output=False):
@@ -129,45 +112,25 @@ def fetch_block(folder, ind, full_output=False):
         pos = exists.index(True)
         block = load_URI(blocksh5[pos] + f"::{ind}")
         if not full_output:
-            block = block["pos"]
+            return block["pos"]
 
     if len(blocksdat) > 0:
-        block = load(os.path.join(folder, f"block{ind}.dat"))
-    return block
+        return load(os.path.join(folder, f"block{ind}.dat"))
+    raise ValueError(f"Cannot find the block {ind} in the folder {folder}")
 
 
 def save(data, filename, mode="txt", pdbGroups=None):
     """
     Basically unchanged polymerutils.save function from openmm-polymer
 
-    It can save into txt or joblib formats used by old openmm-polymer
+
 
     It is also very useful for saving files to PDB format to make them compatible
     with nglview, pymol_show and others
     """
     data = np.asarray(data, dtype=np.float32)
 
-    if mode.lower() == "joblib":
-        joblib.dump({"data": data}, filename=filename, compress=9)
-        return
-
-    if mode.lower() == "txt":
-        lines = [str(len(data)) + "\n"]
-
-        for particle in data:
-            lines.append("{0:.3f} {1:.3f} {2:.3f}\n".format(*particle))
-        if filename is None:
-            return lines
-
-        elif isinstance(filename, six.string_types):
-            with open(filename, "w") as myfile:
-                myfile.writelines(lines)
-        elif hasattr(filename, "writelines"):
-            filename.writelines(lines)
-        else:
-            raise ValueError("Not sure what to do with filename {0}".format(filename))
-
-    elif mode == "pdb":
+    if mode == "pdb":
         data = data - np.minimum(np.min(data, axis=0), np.zeros(3, float) - 100)[None, :]
         retret = ""
 
@@ -212,7 +175,7 @@ def save(data, filename, mode="txt", pdbGroups=None):
                 filename.write("C {0} {1} {2}".format(*i))
 
     else:
-        raise ValueError("Unknown mode : %s, use h5dict, joblib, txt or pdb" % mode)
+        raise ValueError("Unknown mode : %s, use or pdb" % mode)
 
 
 def rotation_matrix(rotate):

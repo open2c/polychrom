@@ -3,8 +3,7 @@ import os
 import sys
 import tempfile
 import textwrap
-
-import joblib
+import polychrom.polymerutils as polymerutils
 import numpy as np
 
 if len(sys.argv) < 2:
@@ -100,8 +99,6 @@ def showData(data):
 
 
 def load(filename):
-    from openmmlib import polymerutils
-
     return polymerutils.load(filename)
 
 

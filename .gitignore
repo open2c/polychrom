@@ -8,3 +8,4 @@ polychrom/_polymer_math.cpp
 *.dat
 .idea
 dist
+polychrom/*.so

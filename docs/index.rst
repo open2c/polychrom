@@ -17,7 +17,7 @@ Polychrom requires OpenMM, which can be installed through conda: ``conda install
 
 CUDA is the fastest GPU-assisted backend to OpenMM. You would need to have the required version of CUDA, or install OpenMM compiled for your version of CUDA. 
 
-Other dependencies are simple, and are listed in requirements.txt. All but joblib are installable from either conda/pip, and joblib installs well with pip.
+Other dependencies are simple, and are listed in requirements.txt. All are installable through pip or conda.
 
 Installation errors and possible fixes
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
