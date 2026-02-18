@@ -95,7 +95,7 @@ autodetermine the type of a trajectory folder. So it will fetch both `/path/to/t
 import glob
 import os
 import warnings
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union, overload
 
 import h5py
 import numpy as np
@@ -194,6 +194,22 @@ def _write_group(dataDict: Dict[str, Any], group: h5py.Group, dset_opts: Optiona
             raise ValueError(f"Unknown datatype: {datatype}")
 
 
+
+@overload
+def list_URIs(  # type: ignore[overload-overlap]
+    folder: str, empty_error: bool = ..., read_error: bool = ..., return_dict: Literal[False] = ...
+) -> List[str]: ...
+
+@overload
+def list_URIs(
+    folder: str, empty_error: bool = ..., read_error: bool = ..., return_dict: Literal[True] = ...
+) -> Dict[int, str]: ...
+
+@overload  # dummy overload 
+def list_URIs(
+    folder: str, empty_error: bool = ..., read_error: bool = ..., return_dict: bool = ...
+) -> Union[List[str], Dict[int, str]]: ...
+
 def list_URIs(
     folder: str, empty_error: bool = True, read_error: bool = True, return_dict: bool = False
 ) -> Union[List[str], Dict[int, str]]:
@@ -276,7 +292,7 @@ def load_URI(dset_path: str) -> Dict[str, Any]:
 
     fname, group = dset_path.split("::")
     with h5py.File(fname, mode="r") as myfile:
-        return _read_h5_group(myfile[group])
+        return _read_h5_group(myfile[group])  # type: ignore
 
 
 def save_hdf5_file(
@@ -438,13 +454,13 @@ class HDF5Reporter:
         uri_vals = np.array(list(uris.values()))
         uri_fnames = np.array([i.split("::")[0] for i in uris.values()])
         if continue_from is None:
-            continue_from = uri_inds[-1]
+            continue_from = int(uri_inds[-1])
 
         if int(continue_from) not in uris:
             raise ValueError(f"block {continue_from} not in folder")
 
         ind = np.nonzero(uri_inds == continue_from)[0][0]  # position of a starting block in arrays
-        newdata = load_URI(uri_vals[ind])
+        newdata = load_URI(str(uri_vals[ind]))
 
         todelete = np.nonzero(uri_inds >= continue_from)[0]
         if len(todelete) > continue_max_delete:
@@ -475,7 +491,7 @@ class HDF5Reporter:
         if len(self.datas) >= self.max_data_length:
             self.dump_data()
 
-        return uri_inds[ind], newdata
+        return int(uri_inds[ind]), newdata
 
     def report(self, name: str, values: Dict[str, Any]) -> None:
         """

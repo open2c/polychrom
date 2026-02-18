@@ -91,24 +91,30 @@ import tempfile
 import time
 import warnings
 from collections.abc import Iterable
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
-
-try:
-    import openmm
-except Exception:
-    import simtk.openmm as openmm
+import openmm  # if this fails, update openmm
 
 import simtk.unit
+
+nanometer: Any = simtk.unit.nanometer  # type: ignore[attr-defined]
+picosecond: Any = simtk.unit.picosecond  # type: ignore[attr-defined]
+femtosecond: Any = simtk.unit.femtosecond  # type: ignore[attr-defined]
+kelvin: Any = simtk.unit.kelvin  # type: ignore[attr-defined]
+kilojoule_per_mole: Any = simtk.unit.kilojoule_per_mole  # type: ignore[attr-defined]
+BOLTZMANN_CONSTANT_kB: Any = simtk.unit.BOLTZMANN_CONSTANT_kB  # type: ignore[attr-defined]
+AVOGADRO_CONSTANT_NA: Any = simtk.unit.AVOGADRO_CONSTANT_NA  # type: ignore[attr-defined]
+Quantity: Any = simtk.unit.Quantity  # type: ignore[attr-defined]
+unit_sqrt: Any = simtk.unit.sqrt  # type: ignore[attr-defined]
 
 from polychrom import forces
 
 logging.basicConfig(level=logging.INFO)
 
 # updated manually every now and then
-VER_LATEST = "7.7"
-VER_DATE = "2022-03-13"
+VER_LATEST = "8.2"
+VER_DATE = "2026-02-13"
 
 if hasattr(openmm, "__version__"):
     ver_cur = openmm.__version__
@@ -281,7 +287,7 @@ class Simulation(object):
 
         self.temperature = kwargs["temperature"]
 
-        self.collisionRate = kwargs["collision_rate"] * (1 / simtk.unit.picosecond)
+        self.collisionRate = kwargs["collision_rate"] * (1 / picosecond)
 
         self.integrator_type = kwargs["integrator"]
         if isinstance(self.integrator_type, str):
@@ -289,31 +295,31 @@ class Simulation(object):
             if self.integrator_type.lower() == "langevin":
                 self.integrator = openmm.LangevinIntegrator(
                     self.temperature,
-                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
-                    kwargs["timestep"] * simtk.unit.femtosecond,
+                    kwargs["collision_rate"] * (1 / picosecond),
+                    kwargs["timestep"] * femtosecond,
                 )
             elif self.integrator_type.lower() == "variablelangevin":
                 self.integrator = openmm.VariableLangevinIntegrator(
                     self.temperature,
-                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
+                    kwargs["collision_rate"] * (1 / picosecond),
                     kwargs["error_tol"],
                 )
             elif self.integrator_type.lower() == "langevinmiddle":
                 self.integrator = openmm.LangevinMiddleIntegrator(
                     self.temperature,
-                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
-                    kwargs["timestep"] * simtk.unit.femtosecond,
+                    kwargs["collision_rate"] * (1 / picosecond),
+                    kwargs["timestep"] * femtosecond,
                 )
             elif self.integrator_type.lower() == "verlet":
-                self.integrator = openmm.VariableVerletIntegrator(kwargs["timestep"] * simtk.unit.femtosecond)
+                self.integrator = openmm.VariableVerletIntegrator(kwargs["timestep"] * femtosecond)
             elif self.integrator_type.lower() == "variableverlet":
                 self.integrator = openmm.VariableVerletIntegrator(kwargs["error_tol"])
 
             elif self.integrator_type.lower() == "brownian":
                 self.integrator = openmm.BrownianIntegrator(
                     self.temperature,
-                    kwargs["collision_rate"] * (1 / simtk.unit.picosecond),
-                    kwargs["timestep"] * simtk.unit.femtosecond,
+                    kwargs["collision_rate"] * (1 / picosecond),
+                    kwargs["timestep"] * femtosecond,
                 )
         else:
             logging.info("Using the provided integrator object")
@@ -336,17 +342,17 @@ class Simulation(object):
         self.block: int = 0
         self.time: float = 0
 
-        self.nm = simtk.unit.nanometer
+        self.nm = nanometer
 
-        self.kB = simtk.unit.BOLTZMANN_CONSTANT_kB * simtk.unit.AVOGADRO_CONSTANT_NA
-        self.kT = self.kB * self.temperature * simtk.unit.kelvin  # thermal energy
+        self.kB = BOLTZMANN_CONSTANT_kB * AVOGADRO_CONSTANT_NA
+        self.kT = self.kB * self.temperature * kelvin  # thermal energy
 
         # All masses are the same,
         # unless individual mass multipliers are specified in self.load()
-        self.conlen = 1.0 * simtk.unit.nanometer * self.length_scale
+        self.conlen = 1.0 * nanometer * self.length_scale
 
         self.kbondScalingFactor = float(
-            (2 * self.kT / self.conlen**2) / (simtk.unit.kilojoule_per_mole / simtk.unit.nanometer**2)
+            (2 * self.kT / self.conlen**2) / (kilojoule_per_mole / nanometer**2)
         )
 
         self.system: openmm.System = openmm.System()
@@ -371,7 +377,7 @@ class Simulation(object):
 
     def get_data(self):
         """Returns an Nx3 array of positions"""
-        return np.asarray(self.data / simtk.unit.nanometer, dtype=np.float32)
+        return np.asarray(self.data / nanometer, dtype=np.float32)
 
     def get_scaled_data(self):
         """Returns data, scaled back to PBC box"""
@@ -425,7 +431,7 @@ class Simulation(object):
             minvalue = np.min(data, axis=0)
             data -= minvalue
 
-        self.data = simtk.unit.Quantity(data, simtk.unit.nanometer)
+        self.data = Quantity(data, nanometer)
         if report:
             for reporter in self.reporters:
                 reporter.report(
@@ -453,7 +459,7 @@ class Simulation(object):
             raise ValueError("Data is not shaped correctly. Needs (N,3), provided: {0}".format(v.shape))
         if np.isnan(v).any():
             raise ValueError("Data contains NANs")
-        self.velocities = simtk.unit.Quantity(v, simtk.unit.nanometer / simtk.unit.picosecond)
+        self.velocities = Quantity(v, nanometer / picosecond)
         if hasattr(self, "context"):
             self.init_velocities()
 
@@ -593,7 +599,7 @@ class Simulation(object):
         self.init_positions()
         self.init_velocities()
 
-    def local_energy_minimization(self, tolerance=0.3, maxIterations=0, random_offset=0.02):
+    def local_energy_minimization(self, tolerance: float=0.3, maxIterations=0, random_offset=0.02):
         """
         A wrapper to the build-in OpenMM Local Energy Minimization
 
@@ -655,7 +661,7 @@ class Simulation(object):
         locTime = self.state.getTime()
         logging.info("before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
-        openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)
+        openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)  # type: ignore
 
         self.state = self.context.getState(getPositions=True, getEnergy=True)
         eK = self.state.getKineticEnergy() / self.N / self.kT
@@ -676,7 +682,7 @@ class Simulation(object):
 
     def do_block(
         self,
-        steps=None,
+        steps: int,
         check_functions=[],
         get_velocities=False,
         save=True,
@@ -716,17 +722,17 @@ class Simulation(object):
         self.state = self.context.getState(getPositions=True, getVelocities=get_velocities, getEnergy=True)
         b = time.time()
         coords = self.state.getPositions(asNumpy=True)
-        newcoords = coords / simtk.unit.nanometer
+        newcoords = coords / nanometer
         newcoords = np.array(newcoords, dtype=np.float32)
         if self.kwargs["save_decimals"] is not False:
             newcoords = np.round(newcoords, self.kwargs["save_decimals"])
 
-        self.time = self.state.getTime() / simtk.unit.picosecond
+        self.time = self.state.getTime() / picosecond
 
         # calculate energies in KT/particle
         eK = self.state.getKineticEnergy() / self.N / self.kT
         eP = self.state.getPotentialEnergy() / self.N / self.kT
-        curtime = self.state.getTime() / simtk.unit.picosecond
+        curtime = self.state.getTime() / picosecond
 
         msg = "block %4s " % int(self.block)
         msg += "pos[1]=[%.1lf %.1lf %.1lf] " % tuple(newcoords[0])
@@ -748,17 +754,17 @@ class Simulation(object):
         dif = np.sqrt(np.mean(np.sum((newcoords - self.get_data()) ** 2, axis=1)))
         msg += "dr=%.2lf " % (dif,)
         self.data = coords
-        msg += "t=%2.1lfps " % (self.state.getTime() / simtk.unit.picosecond)
+        msg += "t=%2.1lfps " % (self.state.getTime() / picosecond)
         msg += "kin=%.2lf pot=%.2lf " % (eK, eP)
         msg += "Rg=%.3lf " % self.RG()
         msg += "SPS=%.0lf " % (steps / (float(b - a)))
 
         if self.integrator_type.lower() == "variablelangevin" or self.integrator_type.lower() == "variableverlet":
             dt = self.integrator.getStepSize()
-            msg += "dt=%.1lffs " % (dt / simtk.unit.femtosecond)
+            msg += "dt=%.1lffs " % (dt / femtosecond)
             mass = self.system.getParticleMass(0)
-            dx = simtk.unit.sqrt(2.0 * eK * self.kT / mass) * dt
-            msg += "dx=%.2lfpm " % (dx / simtk.unit.nanometer * 1000.0)
+            dx = unit_sqrt(2.0 * eK * self.kT / mass) * dt
+            msg += "dx=%.2lfpm " % (dx / nanometer * 1000.0)
 
         logging.info(msg)
 
@@ -770,7 +776,7 @@ class Simulation(object):
             "block": self.block,
         }
         if get_velocities:
-            result["vel"] = self.state.getVelocities() / (simtk.unit.nanometer / simtk.unit.picosecond)
+            result["vel"] = self.state.getVelocities() / (nanometer / picosecond)
         result.update(save_extras)
         if save:
             for reporter in self.reporters:
@@ -788,12 +794,12 @@ class Simulation(object):
         state = self.context.getState(getPositions=True, getVelocities=True, getEnergy=True)
 
         eP = state.getPotentialEnergy()
-        pos = np.array(state.getPositions() / simtk.unit.nanometer)
+        pos = np.array(state.getPositions() / nanometer)
         bonds = np.sqrt(np.sum(np.diff(pos, axis=0) ** 2, axis=1))
         sbonds = np.sort(bonds)
         vel = state.getVelocities()
         mass = self.system.getParticleMass(0)
-        vkT = np.array(vel / simtk.unit.sqrt(self.kT / mass), dtype=float)
+        vkT = np.array(vel / unit_sqrt(self.kT / mass), dtype=float)
         self.velocs = vkT
         EkPerParticle = 0.5 * np.sum(vkT**2, axis=1)
 
@@ -839,76 +845,3 @@ class Simulation(object):
         print("     Forces are: ", list(self.force_dict.keys()))
         print()
         print("Potential Energy Ep = ", eP / self.N / self.kT)
-
-    def show(self, shifts=[0.0, 0.2, 0.4, 0.6, 0.8], scale="auto"):
-        """shows system in rasmol by drawing spheres
-        draws 4 spheres in between any two points (5 * N spheres total)
-        """
-
-        # if you want to change positions of the spheres along each segment,
-        # change these numbers: e.g. [0,.1, .2 ...  .9] will draw 10 spheres,
-        # and this will look better
-
-        data = self.get_data()
-        if len(data[0]) != 3:
-            data = np.transpose(data)
-        if len(data[0]) != 3:
-            logging.error("wrong data!")
-            return
-        # determining the 95 percentile distance between particles,
-        if scale == "auto":
-            meandist = np.percentile(np.sqrt(np.sum(np.diff(data, axis=0) ** 2, axis=1)), 95)
-            # rescaling the data, so that bonds are of the order of 1.
-            # This is because rasmol spheres are of the fixed diameter.
-            data /= meandist
-        else:
-            data /= scale
-
-        if self.N > 1000:  # system is sufficiently large
-            count = 0
-            for _ in range(100):
-                a, b = np.random.randint(0, self.N, 2)
-                dist = np.sqrt(np.sum((data[a] - data[b]) ** 2))
-                if dist < 1.3:
-                    count += 1
-            if count > 100:
-                raise RuntimeError("Too many particles are close together. " "This will cause rasmol to choke")
-
-        rascript = tempfile.NamedTemporaryFile()
-        # writing the rasmol script. Spacefill controls radius of the sphere.
-        rascript.write(b"""wireframe off
-        color temperature
-        spacefill 100
-        background white
-        """)
-        rascript.flush()
-
-        # creating the array, linearly chanhing from -225 to 225
-        # to serve as an array of colors
-        colors = np.array([int((j * 450.0) / (len(data))) - 225 for j in range(len(data))])
-
-        # creating spheres along the trajectory
-        newData = np.zeros((len(data) * len(shifts) - (len(shifts) - 1), 4))
-        for i in range(len(shifts)):
-            newData[i : -1 : len(shifts), :3] = data[:-1] * shifts[i] + data[1:] * (1 - shifts[i])
-            newData[i : -1 : len(shifts), 3] = colors[:-1]
-        newData[-1, :3] = data[-1]
-        newData[-1, 3] = colors[-1]
-
-        towrite = tempfile.NamedTemporaryFile()
-        towrite.write(("{:d}\n\n".format(int(len(newData))).encode("utf-8")))
-
-        # number of atoms and a blank line after is a requirement of rasmol
-        for i in newData:
-            towrite.write(("CA\t{:f}\t{:f}\t{:f}\t{:d}\n".format(i[0], i[1], i[2], int(i[3]))).encode("utf-8"))
-
-        towrite.flush()
-        "TODO: rewrite using subprocess.popen"
-
-        if os.name == "posix":  # if linux
-            os.system("rasmol -xyz %s -script %s" % (towrite.name, rascript.name))
-        else:  # if windows
-            os.system("C:/RasWin/raswin.exe -xyz %s -script %s" % (towrite.name, rascript.name))
-
-        rascript.close()
-        towrite.close()

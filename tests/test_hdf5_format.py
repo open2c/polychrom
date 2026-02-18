@@ -38,13 +38,13 @@ def test_convert_to_hdf5_array():
     # Test float conversion
     datatype, converted = _convert_to_hdf5_array(3.14)
     assert datatype == "item"
-    assert abs(converted - 3.14) < 1e-10
+    assert abs(converted - 3.14) < 1e-10  # type: ignore
 
     # Test array conversion
     arr = np.array([1, 2, 3, 4])
     datatype, converted = _convert_to_hdf5_array(arr)
     assert datatype == "ndarray"
-    assert np.array_equal(converted, arr)
+    assert np.array_equal(converted, arr)  # type: ignore
 
     # Test 2D array
     arr2d = np.array([[1, 2], [3, 4]])

@@ -119,11 +119,11 @@ class SimulationParams(object):
             monomer radius and rest length of springs. Defaults to 1 nm.
         """
         self.N = N
-        self.timestep = timestep * unit.femtosecond
-        self.collision_rate = collision_rate * (1 / unit.picosecond)
-        self.length_scale = length_scale * unit.nanometer
-        self.temperature = temperature * unit.kelvin
-        self.mass = mass * unit.amu
+        self.timestep = timestep * unit.femtosecond  # type: ignore
+        self.collision_rate = collision_rate * (1 / unit.picosecond)  # type: ignore
+        self.length_scale = length_scale * unit.nanometer  # type: ignore
+        self.temperature = temperature * unit.kelvin  # type: ignore
+        self.mass = mass * unit.amu  # type: ignore
 
     def get_D_from_sim_params(self):
         """Usually the mass, temperature, conlen, and collision_rate of polychrome
@@ -132,7 +132,7 @@ class SimulationParams(object):
         implied by these arbitary choices."""
 
         # convert amu to kilograms -- cannot use this using in_units_of for some reason
-        mass_in_kg = self.mass._value * 1.66 * 10 ** (-27) * unit.kilogram
+        mass_in_kg = self.mass._value * 1.66 * 10 ** (-27) * unit.kilogram  # type: ignore
         kB = unit.BOLTZMANN_CONSTANT_kB
         kT = kB * self.temperature
         D = kT / (mass_in_kg * self.collision_rate)
@@ -140,8 +140,8 @@ class SimulationParams(object):
 
     def get_D_from_measured_Dapp(
         self,
-        Dapp=0.01 * unit.micrometer**2 / unit.second**0.5,
-        b=40 * unit.nanometer,
+        Dapp=0.01 * unit.micrometer**2 / unit.second**0.5,  # type: ignore
+        b=40 * unit.nanometer,  # type: ignore
     ):
         """Extract the monomer diffusion coefficient from a given Kuhn length, b, and a measurement of the anomolus diffusion
         coefficient D_app, where MSD = D_app t^{1/2}. Some measurements of the subdiffusive motion of chromosomal loci indicate that
@@ -152,8 +152,8 @@ class SimulationParams(object):
             raise ValueError("Dapp should be a simtk.Quantity object")
         if not isinstance(b, unit.Quantity):
             raise ValueError("b should be a simtk.Quantity object")
-        D = np.pi * Dapp**2 / (12 * b**2)  # in m^2 / second
-        return D.in_units_of(unit.meter**2 / unit.second)
+        D = np.pi * Dapp**2 / (12 * b**2)  # in m^2 / second    # type: ignore
+        return D.in_units_of(unit.meter**2 / unit.second)  # type: ignore
 
     def get_rouse_time(self, b_nm=None):
         """Compute expected number of timesteps that corresponds to a rouse time for this polymer.
@@ -172,13 +172,13 @@ class SimulationParams(object):
         # N is the number of particles with diameter `self.length_scale` nm
         # Nhat is number of Kuhn lengths
         Nhat = (self.N * self.length_scale._value) / b_nm
-        b = b_nm * unit.nanometer
+        b = b_nm * unit.nanometer  # type: ignore
         # in units of seconds
         rouse_time = (Nhat * b.in_units_of(unit.meter)) ** 2 / (3 * np.pi**2 * D)
         ntimesteps = np.ceil(rouse_time / self.timestep)
         return ntimesteps
 
-    def guess_bondWiggleDistance(L0, b, mean_linker_length, a=None):
+    def guess_bondWiggleDistance(self, L0, b, mean_linker_length, a=None):
         """Return bond wiggle distance based on the amount of DNA per bead (L0), the
         Kuhn length (b) in basepairs, and the mean linker length in basepairs, and the
         expected radius of a monomer in nanometers (a)."""

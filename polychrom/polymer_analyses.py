@@ -35,14 +35,14 @@ for (bins[0].. bins[1]), (bins[1]..bins[2]). Therefore, we have to return bin mi
 
 from math import sqrt
 from typing import Callable, List, Optional, Sequence, Tuple, Union
-
+import warnings
 import numpy as np
 import pandas as pd
 from scipy.spatial import KDTree
 from scipy.ndimage import gaussian_filter1d
 
 try:
-    from . import _polymer_math
+    from . import _polymer_math  # type: ignore
 except Exception:
     pass
 
@@ -223,7 +223,7 @@ def slope_contact_scaling(
 
     slope = np.diff(_smooth_for_slope(np.log(cp), sigma)) / np.diff(_smooth_for_slope(np.log(mids), sigma))
 
-    return mids[1:], slope
+    return np.array(mids[1:]), np.array(slope)
 
 
 def _radius_gyration_helper(len2: int, coms: np.ndarray, coms2: np.ndarray, ring: bool = False) -> float:
@@ -464,10 +464,10 @@ def mutualSimplify(a: np.ndarray, b: np.ndarray, verbose: bool = False) -> Tuple
         la, lb = len(a), len(b)
         if verbose:
             print(len(a), len(b), "before; ", end=" ")
-        a, b = _polymer_math.mutualSimplify(a, b)
+        a, b = _polymer_math.mutualSimplify(a, b)  # type: ignore
         if verbose:
             print(len(a), len(b), "after one; ", end=" ")
-        b, a = _polymer_math.mutualSimplify(b, a)
+        b, a = _polymer_math.mutualSimplify(b, a)  # type: ignore
         if verbose:
             print(len(a), len(b), "after two; ")
 
@@ -543,7 +543,7 @@ def getLinkingNumber(
     """
     if simplify:
         data1, data2 = mutualSimplify(a=data1, b=data2, verbose=verbose)
-    return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)
+    return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)  # type: ignore
 
 
 def simplifyPolymer(data: np.ndarray, verbose: bool = False) -> np.ndarray:
@@ -595,7 +595,7 @@ def simplifyPolymer(data: np.ndarray, verbose: bool = False) -> np.ndarray:
     - For complex knots, the simplified length depends on the knot complexity
     """
     try:
-        import warnings
+
 
         if len(data) < 3:
             raise ValueError("Polymer must have at least 3 monomers")
@@ -606,7 +606,7 @@ def simplifyPolymer(data: np.ndarray, verbose: bool = False) -> np.ndarray:
         if verbose:
             print(f"Simplifying polymer with {len(data)} monomers...")
 
-        result = _polymer_math.simplifyPolymer(data)
+        result = _polymer_math.simplifyPolymer(data)  # type: ignore
 
         if verbose:
             print(f"Simplified to {len(result)} monomers")

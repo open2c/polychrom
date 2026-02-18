@@ -76,6 +76,7 @@ def tonumpyarray(mp_arr):
 
 def findN(filenames, loadFunction, exceptions):
     "Finds length of data in filenames, handling the fact that files could be not loadable"
+    N = -1
     for i in range(30):
         if i == 29:
             raise ValueError("Could not load any of the 30 randomly selected files")
@@ -404,6 +405,10 @@ class filenameContactMap(object):
         """
         self.filenames = filenames
         self.cutoff = cutoff
+        if loadFunction is None:
+            loadFunction = polymerutils.load
+        if contactFunction is None:
+            contactFunction = polymer_analyses.calculate_contacts
         self.exceptionsToIgnore = exceptionsToIgnore
         self.contactFunction = contactFunction
         self.loadFunction = loadFunction
@@ -455,9 +460,9 @@ def monomerResolutionContactMap(
 def contactAction(contacts, myBins):
     contacts = np.asarray(contacts, order="C")
     cshape = contacts.shape
-    contacts.shape = (-1,)
+    contacts = contacts.reshape(-1,)
     contacts = np.searchsorted(myBins[0], contacts) - 1
-    contacts.shape = cshape
+    contacts = contacts.reshape(cshape)
     return contacts
 
 
@@ -532,6 +537,10 @@ class filenameContactMapRepeat(object):
         When initialized, the iterator should store these args properly and create
         all necessary constructs
         """
+        if loadFunction is None:
+            loadFunction = polymerutils.load
+        if contactFunction is None:
+            contactFunction = polymer_analyses.calculate_contacts
         self.filenames = filenames
         self.cutoff = cutoff
         self.exceptionsToIgnore = exceptionsToIgnore

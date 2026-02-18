@@ -125,7 +125,7 @@ def create_constrained_random_walk(
     starting_point=(0, 0, 0),
     step_size=1.0,
     polar_fixed=None,
-) -> bool:
+) -> np.ndarray:
     """
     Creates a constrained freely joined chain of length N with step step_size.
     Each step of a random walk is tested with the constraint function and is
@@ -156,6 +156,7 @@ def create_constrained_random_walk(
     out = np.full((N, 3), np.nan)
     out[0] = starting_point
 
+
     while i < N:
         if j == N:
             theta, u = _random_points_sphere(N).T
@@ -174,7 +175,7 @@ def create_constrained_random_walk(
 
             past_displacement = out[i - 1] - out[i - 2]
 
-            vec_to_rot = d[j]
+            vec_to_rot = d[j]  # type: ignore
             rot_axis = np.cross(past_displacement, np.array([0, 0, 1]))
             rot_axis = rot_axis / np.linalg.norm(rot_axis)
             rot_angle = -np.arccos(np.dot(past_displacement, np.array([0, 0, 1])) / np.linalg.norm(past_displacement))
@@ -188,7 +189,7 @@ def create_constrained_random_walk(
             # Add the rotated point
             new_p = out[i - 1] + next_displacement
         else:
-            new_p = out[i - 1] + d[j]
+            new_p = out[i - 1] + d[j]  # type: ignore
 
         if constraint_f(new_p):
             out[i] = new_p
