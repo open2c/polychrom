@@ -1,4 +1,4 @@
-"""
+r"""
 Simulation parameters and the Rouse model
 -----------------------------------------
 
@@ -156,7 +156,7 @@ class SimulationParams(object):
         return D.in_units_of(unit.meter**2 / unit.second)  # type: ignore
 
     def get_rouse_time(self, b_nm=None):
-        """Compute expected number of timesteps that corresponds to a rouse time for this polymer.
+        r"""Compute expected number of timesteps that corresponds to a rouse time for this polymer.
         This is the expected number of Brownian Dynamics timesteps required to equilibrate the
         entire length of the polymer. The Rouse time is :math:`N^2 b^2 / (3 \pi^2 D)`, where N
         is the number of Kuhn lengths and b is the Kuhn length.

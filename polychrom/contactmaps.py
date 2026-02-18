@@ -1,4 +1,4 @@
-"""
+r"""
 Building contact maps
 =====================
 
