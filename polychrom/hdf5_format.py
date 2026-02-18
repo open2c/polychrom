@@ -95,24 +95,42 @@ autodetermine the type of a trajectory folder. So it will fetch both `/path/to/t
 import glob
 import os
 import warnings
+from typing import Dict, List, Tuple, Optional, Union, Any
 
 import h5py
 import numpy as np
 
-DEFAULT_OPTS = {"compression_opts": 9, "compression": "gzip"}
+DEFAULT_OPTS: Dict[str, Union[int, str]] = {"compression_opts": 9, "compression": "gzip"}
 
 
-def _read_h5_group(gr):
+def _read_h5_group(gr: h5py.Group) -> Dict[str, Any]:
     """
     Reads all attributes of an HDF5 group, and returns a dict of them
+
+    Parameters
+    ----------
+    gr : h5py.Group
+        HDF5 group to read from
+
+    Returns
+    -------
+    Dict[str, Any]
+        Dictionary containing all datasets and attributes from the group
     """
     result = {i: j[:] for i, j in gr.items()}
     for i, j in gr.attrs.items():
-        result[i] = j
+        # Convert bytes to string if it's a bytes string
+        if isinstance(j, bytes):
+            try:
+                result[i] = j.decode('utf-8')
+            except UnicodeDecodeError:
+                result[i] = j
+        else:
+            result[i] = j
     return result
 
 
-def _convert_to_hdf5_array(data):
+def _convert_to_hdf5_array(data: Any) -> Tuple[Optional[str], Optional[Union[np.ndarray, Any]]]:
     """
     Attempts to convert data to HDF5 compatible array
     or to an HDF5 attribute compatible entity (str, number)
@@ -120,11 +138,21 @@ def _convert_to_hdf5_array(data):
     Does its best at determining if this is a "normal"
     object (str, int, float), or an array.
 
-    Right now, if something got converted to a numpy object,
+    Right now, if something got converted to a numpy object dtype,
     it is discarded and not saved in any way.
     We could think about pickling those cases, or JSONing them...
+
+    Parameters
+    ----------
+    data : Any
+        Data to convert to HDF5-compatible format
+
+    Returns
+    -------
+    Tuple[Optional[str], Optional[Union[np.ndarray, Any]]]
+        Tuple of (datatype, converted_data) where datatype is "item", "ndarray", or None
     """
-    if type(data) == str:
+    if isinstance(data, str):
         data = np.array(data, dtype="S")
     data = np.array(data)
 
@@ -137,29 +165,45 @@ def _convert_to_hdf5_array(data):
         return "ndarray", data
 
 
-def _write_group(dataDict, group, dset_opts=None):
+def _write_group(
+    dataDict: Dict[str, Any],
+    group: h5py.Group,
+    dset_opts: Optional[Dict[str, Any]] = None
+) -> None:
     """
     Writes a dictionary of elements to an HDF5 group
     Puts all "items" into attrs, and all ndarrays into datasets
 
-    dset_opts is a dictionary of arguments passed to create_dataset function
-    (compression would be here for example). By default set to DEFAULT_OPTS
+    Parameters
+    ----------
+    dataDict : Dict[str, Any]
+        Dictionary of data to write
+    group : h5py.Group
+        HDF5 group to write to
+    dset_opts : Optional[Dict[str, Any]]
+        Dictionary of arguments passed to create_dataset function
+        (compression would be here for example). By default set to DEFAULT_OPTS
     """
     if dset_opts is None:
         dset_opts = DEFAULT_OPTS
     for name, data in dataDict.items():
         datatype, converted = _convert_to_hdf5_array(data)
         if datatype is None:
-            warnings.warn(f"Could not convert record {name}")
+            warnings.warn(f"Could not convert record {name} of type {type(data)}")
         elif datatype == "item":
-            group.attrs[name] = data
+            group.attrs[name] = converted  # Use converted instead of data
         elif datatype == "ndarray":
-            group.create_dataset(name, data=data, **dset_opts)
+            group.create_dataset(name, data=converted, **dset_opts)  # Use converted
         else:
-            raise ValueError("Unknown datatype")
+            raise ValueError(f"Unknown datatype: {datatype}")
 
 
-def list_URIs(folder, empty_error=True, read_error=True, return_dict=False):
+def list_URIs(
+    folder: str,
+    empty_error: bool = True,
+    read_error: bool = True,
+    return_dict: bool = False
+) -> Union[List[str], Dict[int, str]]:
     """
     Makes a list of URIs (path-like records for each block). for a trajectory folder
     Now we store multiple blocks per file, and URI is a
@@ -206,8 +250,9 @@ def list_URIs(folder, empty_error=True, read_error=True, return_dict=False):
         except Exception:
             if read_error:
                 raise ValueError(f"Cannot read file {file}")
-        sted = os.path.split(file)[-1].split("_")[1].split(".h5")[0]
-        st, end = [int(i) for i in sted.split("-")]
+        # Extract start and end block numbers from filename like "blocks_1-50.h5"
+        filename_parts = os.path.basename(file).split("_")[1].split(".h5")[0]
+        st, end = [int(i) for i in filename_parts.split("-")]
         for i in range(st, end + 1):
             if i in filenames:
                 raise ValueError(f"Block {i} exists more than once")
@@ -218,24 +263,48 @@ def list_URIs(folder, empty_error=True, read_error=True, return_dict=False):
         return {int(i[0]): i[1] for i in sorted(filenames.items(), key=lambda x: int(x[0]))}
 
 
-def load_URI(dset_path):
+def load_URI(dset_path: str) -> Dict[str, Any]:
     """
-    Loads a single block of the simulation using address provided by list_filenames
-    dset_path should be
+    Loads a single block of the simulation using address provided by list_URIs
 
-    /path/to/trajectory/folder/blocks_X-Y.h5::Z
+    Parameters
+    ----------
+    dset_path : str
+        Path in format: /path/to/trajectory/folder/blocks_X-Y.h5::Z
+        where Z is the block number
 
-    where Z is the block number
+    Returns
+    -------
+    Dict[str, Any]
+        Dictionary containing the block data
     """
+    if "::" not in dset_path:
+        raise ValueError(f"Invalid URI format: {dset_path}. Expected format: filename.h5::block_number")
 
     fname, group = dset_path.split("::")
     with h5py.File(fname, mode="r") as myfile:
         return _read_h5_group(myfile[group])
 
 
-def save_hdf5_file(filename, data_dict, dset_opts=None, mode="w"):
+def save_hdf5_file(
+    filename: str,
+    data_dict: Dict[str, Any],
+    dset_opts: Optional[Dict[str, Any]] = None,
+    mode: str = "w"
+) -> None:
     """
     Saves data_dict to filename
+
+    Parameters
+    ----------
+    filename : str
+        Path to the HDF5 file to save
+    data_dict : Dict[str, Any]
+        Dictionary of data to save
+    dset_opts : Optional[Dict[str, Any]]
+        Options for dataset creation (e.g., compression)
+    mode : str
+        File opening mode (default "w")
     """
     if dset_opts is None:
         dset_opts = DEFAULT_OPTS
@@ -243,24 +312,34 @@ def save_hdf5_file(filename, data_dict, dset_opts=None, mode="w"):
         _write_group(data_dict, file, dset_opts=dset_opts)
 
 
-def load_hdf5_file(fname):
+def load_hdf5_file(fname: str) -> Dict[str, Any]:
     """
-    Loads a saved HDF5 files, reading all datasets and attributes.
+    Loads a saved HDF5 file, reading all datasets and attributes.
     We save arrays as datasets, and regular types as attributes in HDF5
+
+    Parameters
+    ----------
+    fname : str
+        Path to the HDF5 file to load
+
+    Returns
+    -------
+    Dict[str, Any]
+        Dictionary containing all data from the file
     """
     with h5py.File(fname, mode="r") as myfile:
         return _read_h5_group(myfile)
 
 
-class HDF5Reporter(object):
+class HDF5Reporter:
     def __init__(
         self,
-        folder,
-        max_data_length=50,
-        h5py_dset_opts=None,
-        overwrite=False,
-        blocks_only=False,
-        check_exists=True,
+        folder: str,
+        max_data_length: int = 50,
+        h5py_dset_opts: Optional[Dict[str, Any]] = None,
+        overwrite: bool = False,
+        blocks_only: bool = False,
+        check_exists: bool = True,
     ):
         """
         Creates a reporter object that saves a trajectory to a folder
@@ -289,7 +368,7 @@ class HDF5Reporter(object):
 
         if h5py_dset_opts is None:
             h5py_dset_opts = DEFAULT_OPTS
-        self.prefixes = [
+        self.prefixes: List[str] = [
             "blocks",
             "applied_forces",
             "initArgs",
@@ -297,15 +376,15 @@ class HDF5Reporter(object):
             "energy_minimization",
             "forcekit_polymer_chains",
         ]  # these are used for inferring if a file belongs to a trajectory or not
-        self.counter = {}  # initializing all the options and dictionaries
-        self.datas = {}
-        self.max_data_length = max_data_length
-        self.h5py_dset_opts = h5py_dset_opts
-        self.folder = folder
-        self.blocks_only = blocks_only
+        self.counter: Dict[str, int] = {}  # initializing all the options and dictionaries
+        self.datas: Dict[int, Dict[str, Any]] = {}
+        self.max_data_length: int = max_data_length
+        self.h5py_dset_opts: Dict[str, Any] = h5py_dset_opts
+        self.folder: str = folder
+        self.blocks_only: bool = blocks_only
 
         if not os.path.exists(folder):
-            os.mkdir(folder)
+            os.makedirs(folder, exist_ok=True)
 
         if overwrite:
             for the_file in os.listdir(folder):
@@ -316,7 +395,8 @@ class HDF5Reporter(object):
                             os.remove(file_path)
                 else:
                     raise IOError(
-                        "Subfolder in traj folder; not deleting. Ensure folder is " "correct and delete manually. "
+                        f"Subfolder {file_path} in traj folder; not deleting. "
+                        "Ensure folder is correct and delete manually."
                     )
 
         if check_exists:
@@ -326,7 +406,11 @@ class HDF5Reporter(object):
                         if the_file.startswith(prefix):
                             raise RuntimeError(f"folder {folder} is not empty: set check_exists=False to ignore")
 
-    def continue_trajectory(self, continue_from=None, continue_max_delete=5):
+    def continue_trajectory(
+        self,
+        continue_from: Optional[int] = None,
+        continue_max_delete: int = 5
+    ) -> Tuple[int, Dict[str, Any]]:
         """
         Continues a simulation in a current folder (i.e. continues from the last block, or the block you specify).
         By default, takes the last block. Otherwise, takes the continue_from block
@@ -376,7 +460,7 @@ class HDF5Reporter(object):
 
         todelete = np.nonzero(uri_inds >= continue_from)[0]
         if len(todelete) > continue_max_delete:
-            raise ValueError("Refusing to delete {uris_delete} blocks - set continue_max_delete accordingly")
+            raise ValueError(f"Refusing to delete {len(todelete)} blocks - set continue_max_delete accordingly")
 
         fnames_delete = np.unique(uri_fnames[todelete])
         inds_tosave = np.nonzero((uri_fnames == uri_fnames[ind]) * (uri_inds <= ind))[0]
@@ -405,7 +489,7 @@ class HDF5Reporter(object):
 
         return uri_inds[ind], newdata
 
-    def report(self, name, values):
+    def report(self, name: str, values: Dict[str, Any]) -> None:
         """
         Semi-internal method to be called when you need to report something
 
@@ -434,7 +518,8 @@ class HDF5Reporter(object):
                 self.dump_data()
         self.counter[name] = count + 1
 
-    def dump_data(self):
+    def dump_data(self) -> None:
+        """Writes accumulated block data to disk and clears the buffer"""
         if len(self.datas) > 0:
             cmin = min(self.datas.keys())
             cmax = max(self.datas.keys())
