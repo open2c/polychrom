@@ -63,7 +63,6 @@ MOCK_MODULES = [
     "simtk.unit",
     "simtk.unit.nanometer",
     "simtk.openmm",
-    "joblib",
     "scipy.interpolate.fitpack2",
 ]
 for mod_name in MOCK_MODULES:

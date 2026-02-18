@@ -6,7 +6,6 @@
 #include <cmath>
 #include <vector>
 #include <ctime>
-#include <omp.h>
 
 using namespace std;
 

@@ -1,9 +1,56 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "cython>=0.29", "numpy>=1.9"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "polychrom"
+version = "0.1.1"
+description = "A library for polymer simulations and their analyses."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    {name = "Mirny Lab", email = "espresso@mit.edu"}
+]
+keywords = ["genomics", "polymer", "Hi-C", "molecular dynamics", "chromosomes"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "cython>=0.29",
+    "numpy>=1.9",
+    "scipy>=0.16",
+    "h5py>=2.5",
+    "pandas>=0.19",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+]
+
+[project.urls]
+Homepage = "https://github.com/open2c/polychrom"
+Repository = "https://github.com/open2c/polychrom"
+
+[project.scripts]
+polychrom = "polychrom.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["polychrom*"]
+exclude = ["utilities*", "build*", "docs*", "examples*"]
+
 [tool.black]
 line-length = 120
 
 [tool.isort]
 profile = "black"
-
-[build-system]
-requires = ["setuptools", "setuptools-scm", "cython"]
-build-backend = "setuptools.build_meta"
