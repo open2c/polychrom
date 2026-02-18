@@ -428,7 +428,8 @@ def test_edge_cases(tmp_path):
     # Test warning for non-convertible data
     with pytest.warns(UserWarning, match="Could not convert record"):
         reporter4 = HDF5Reporter(str(folder / "test3"))
-        _write_group({"bad_data": [object(), object()]}, h5py.File(folder / "test3" / "test.h5", "w"))
+        with h5py.File(folder / "test3" / "test.h5", "w") as f:
+            _write_group({"bad_data": [object(), object()]}, f)
 
 
 if __name__ == "__main__":
