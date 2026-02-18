@@ -100,7 +100,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import h5py
 import numpy as np
 
-DEFAULT_OPTS: Dict[str, Union[int, str]] = {"compression_opts": 9, "compression": "gzip"}
+DEFAULT_OPTS: Dict[str, Union[int, str]] = {"compression_opts": 5, "compression": "gzip"}
 
 
 def _read_h5_group(gr: h5py.Group) -> Dict[str, Any]:
