@@ -95,7 +95,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 import openmm  # if this fails, update openmm
-
 import simtk.unit
 
 nanometer: Any = simtk.unit.nanometer  # type: ignore[attr-defined]
@@ -351,9 +350,7 @@ class Simulation(object):
         # unless individual mass multipliers are specified in self.load()
         self.conlen = 1.0 * nanometer * self.length_scale
 
-        self.kbondScalingFactor = float(
-            (2 * self.kT / self.conlen**2) / (kilojoule_per_mole / nanometer**2)
-        )
+        self.kbondScalingFactor = float((2 * self.kT / self.conlen**2) / (kilojoule_per_mole / nanometer**2))
 
         self.system: openmm.System = openmm.System()
 
@@ -599,7 +596,7 @@ class Simulation(object):
         self.init_positions()
         self.init_velocities()
 
-    def local_energy_minimization(self, tolerance: float=0.3, maxIterations=0, random_offset=0.02):
+    def local_energy_minimization(self, tolerance: float = 0.3, maxIterations=0, random_offset=0.02):
         """
         A wrapper to the build-in OpenMM Local Energy Minimization
 

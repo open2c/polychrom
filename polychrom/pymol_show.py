@@ -3,7 +3,6 @@
 # Legacy code, unlikely to be used these days and may require refactoring
 
 
-
 """This class is a collection of functions for showing data with pymol. Note that the limit of pymol is 100k
 monomers, therefore interpolateData is useful to collapse the 200k-long simulation into a 100k-long conformation."""
 

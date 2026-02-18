@@ -194,21 +194,23 @@ def _write_group(dataDict: Dict[str, Any], group: h5py.Group, dset_opts: Optiona
             raise ValueError(f"Unknown datatype: {datatype}")
 
 
-
 @overload
 def list_URIs(  # type: ignore[overload-overlap]
     folder: str, empty_error: bool = ..., read_error: bool = ..., return_dict: Literal[False] = ...
 ) -> List[str]: ...
+
 
 @overload
 def list_URIs(
     folder: str, empty_error: bool = ..., read_error: bool = ..., return_dict: Literal[True] = ...
 ) -> Dict[int, str]: ...
 
-@overload  # dummy overload 
+
+@overload  # dummy overload
 def list_URIs(
     folder: str, empty_error: bool = ..., read_error: bool = ..., return_dict: bool = ...
 ) -> Union[List[str], Dict[int, str]]: ...
+
 
 def list_URIs(
     folder: str, empty_error: bool = True, read_error: bool = True, return_dict: bool = False

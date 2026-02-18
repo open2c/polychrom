@@ -33,18 +33,19 @@ for (bins[0].. bins[1]), (bins[1]..bins[2]). Therefore, we have to return bin mi
 
 """
 
+import warnings
 from math import sqrt
 from typing import Callable, List, Optional, Sequence, Tuple, Union
-import warnings
+
 import numpy as np
 import pandas as pd
-from scipy.spatial import KDTree
 from scipy.ndimage import gaussian_filter1d
+from scipy.spatial import KDTree
 
 try:
     from . import _polymer_math  # type: ignore
 except Exception:
-    pass
+    _polymer_math = None
 
 
 def calculate_contacts(data: np.ndarray, cutoff: float = 1.7) -> np.ndarray:
@@ -458,6 +459,10 @@ def mutualSimplify(a: np.ndarray, b: np.ndarray, verbose: bool = False) -> Tuple
     simplifyPolymer : Simplify a single polymer ring
     getLinkingNumber : Calculate the linking number between two rings
     """
+    if _polymer_math is None:
+        raise ImportError(
+            "_polymer_math Cython extension is not available. Build it with: python setup.py build_ext --inplace"
+        )
     if verbose:
         print("Starting mutual simplification of polymers")
     while True:
@@ -541,6 +546,10 @@ def getLinkingNumber(
     mutualSimplify : Simplify two polymers while preserving their linking
     simplifyPolymer : Simplify a single polymer ring
     """
+    if _polymer_math is None:
+        raise ImportError(
+            "_polymer_math Cython extension is not available. Build it with: python setup.py build_ext --inplace"
+        )
     if simplify:
         data1, data2 = mutualSimplify(a=data1, b=data2, verbose=verbose)
     return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)  # type: ignore
@@ -595,7 +604,10 @@ def simplifyPolymer(data: np.ndarray, verbose: bool = False) -> np.ndarray:
     - For complex knots, the simplified length depends on the knot complexity
     """
     try:
-
+        if _polymer_math is None:
+            raise ImportError(
+                "_polymer_math Cython extension is not available. Build it with: python setup.py build_ext --inplace"
+            )
 
         if len(data) < 3:
             raise ValueError("Polymer must have at least 3 monomers")

@@ -156,7 +156,6 @@ def create_constrained_random_walk(
     out = np.full((N, 3), np.nan)
     out[0] = starting_point
 
-
     while i < N:
         if j == N:
             theta, u = _random_points_sphere(N).T

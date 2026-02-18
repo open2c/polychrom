@@ -167,4 +167,5 @@ def save(data, filename, mode="txt", pdbGroups=None):
 def rotation_matrix(rotate):
     warnings.warn("rotation_matrix will be moved to polymer_analyses", DeprecationWarning, stacklevel=2)
     from polychrom.polymer_analyses import rotation_matrix as rm
+
     return rm(rotate)

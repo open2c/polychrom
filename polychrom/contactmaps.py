@@ -460,7 +460,7 @@ def monomerResolutionContactMap(
 def contactAction(contacts, myBins):
     contacts = np.asarray(contacts, order="C")
     cshape = contacts.shape
-    contacts = contacts.reshape(-1,)
+    contacts = contacts.reshape(-1)
     contacts = np.searchsorted(myBins[0], contacts) - 1
     contacts = contacts.reshape(cshape)
     return contacts

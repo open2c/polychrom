@@ -5,6 +5,7 @@ try:
     import openmm
 except ImportError:
     import warnings
+
     warnings.warn(
         "\n"
         "OpenMM is not installed. Polychrom requires OpenMM for molecular dynamics simulations.\n"
@@ -15,5 +16,5 @@ except ImportError:
         "\n"
         "Visit https://openmm.org for more information.",
         ImportWarning,
-        stacklevel=2
+        stacklevel=2,
     )

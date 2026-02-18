@@ -5,6 +5,15 @@ Tests for C++ polymer topology functions in _polymer_math module.
 import numpy as np
 import pytest
 
+try:
+    from polychrom import _polymer_math  # noqa: F401
+
+    HAS_POLYMER_MATH = True
+except ImportError:
+    HAS_POLYMER_MATH = False
+
+pytestmark = pytest.mark.skipif(not HAS_POLYMER_MATH, reason="_polymer_math Cython extension not available")
+
 
 def create_circle(center, radius, n_points=100, axis="z"):
     """Create a circular polymer ring."""

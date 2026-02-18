@@ -3,8 +3,10 @@ import os
 import sys
 import tempfile
 import textwrap
-import polychrom.polymerutils as polymerutils
+
 import numpy as np
+
+import polychrom.polymerutils as polymerutils
 
 if len(sys.argv) < 2:
     print(textwrap.dedent("""
