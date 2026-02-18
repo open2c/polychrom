@@ -257,10 +257,12 @@ def list_URIs(
     filenames = {}
     for file in files:
         try:
-            h5py.File(file, "r")
+            with h5py.File(file, "r"):
+                pass
         except Exception:
             if read_error:
                 raise ValueError(f"Cannot read file {file}")
+            continue 
         # Extract start and end block numbers from filename like "blocks_1-50.h5"
         filename_parts = os.path.basename(file).split("_")[1].split(".h5")[0]
         st, end = [int(i) for i in filename_parts.split("-")]
