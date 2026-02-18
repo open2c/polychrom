@@ -219,6 +219,3 @@ class TestConstrainedRandomWalk:
 if __name__ == "__main__":
     # Run tests
     pytest.main([__file__, "-v"])
-
-    # Run benchmark
-    benchmark_grow_cubic()
