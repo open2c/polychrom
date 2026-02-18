@@ -3,22 +3,23 @@ Comprehensive tests for hdf5_format module
 """
 
 import os
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
+
+import h5py
 import numpy as np
 import pytest
-import h5py
 
 from polychrom.hdf5_format import (
     HDF5Reporter,
-    list_URIs,
-    load_URI,
-    save_hdf5_file,
-    load_hdf5_file,
     _convert_to_hdf5_array,
     _read_h5_group,
     _write_group,
+    list_URIs,
+    load_hdf5_file,
+    load_URI,
+    save_hdf5_file,
 )
 
 
@@ -54,6 +55,7 @@ def test_convert_to_hdf5_array():
     # Test object that can't be converted (should return None, None)
     class CustomObject:
         pass
+
     obj = CustomObject()
     datatype, converted = _convert_to_hdf5_array([obj, obj])
     assert datatype is None
@@ -191,11 +193,7 @@ def test_hdf5_reporter_basic(tmp_path):
 
     # Report some data blocks
     for i in range(5):
-        reporter.report("data", {
-            "pos": np.random.random((10, 3)),
-            "time": float(i),
-            "step": i * 100
-        })
+        reporter.report("data", {"pos": np.random.random((10, 3)), "time": float(i), "step": i * 100})
 
     # Force dump of remaining data
     reporter.dump_data()
@@ -267,10 +265,7 @@ def test_hdf5_reporter_continue_trajectory(tmp_path):
     # Create initial trajectory
     reporter1 = HDF5Reporter(str(folder), max_data_length=2)
     for i in range(5):
-        reporter1.report("data", {
-            "pos": np.ones((10, 3)) * i,
-            "step": i
-        })
+        reporter1.report("data", {"pos": np.ones((10, 3)) * i, "step": i})
     reporter1.dump_data()
 
     # Continue trajectory
@@ -283,10 +278,7 @@ def test_hdf5_reporter_continue_trajectory(tmp_path):
 
     # Add more data
     for i in range(5, 8):
-        reporter2.report("data", {
-            "pos": np.ones((10, 3)) * i,
-            "step": i
-        })
+        reporter2.report("data", {"pos": np.ones((10, 3)) * i, "step": i})
     reporter2.dump_data()
 
     # Verify complete trajectory
@@ -319,24 +311,14 @@ def test_hdf5_reporter_non_data_reports(tmp_path):
     reporter = HDF5Reporter(str(folder))
 
     # Report various types of information
-    reporter.report("initArgs", {
-        "N": 1000,
-        "dt": 0.001,
-        "temperature": 300.0,
-        "description": "test simulation"
-    })
+    reporter.report("initArgs", {"N": 1000, "dt": 0.001, "temperature": 300.0, "description": "test simulation"})
 
-    reporter.report("starting_conformation", {
-        "pos": np.random.random((1000, 3)),
-        "source": "random_walk"
-    })
+    reporter.report("starting_conformation", {"pos": np.random.random((1000, 3)), "source": "random_walk"})
 
     # Note: nested dicts cannot be saved to HDF5, use flat structure
-    reporter.report("applied_forces", {
-        "harmonic_bonds_k": 100,
-        "harmonic_bonds_r0": 1.0,
-        "excluded_volume_radius": 0.5
-    })
+    reporter.report(
+        "applied_forces", {"harmonic_bonds_k": 100, "harmonic_bonds_r0": 1.0, "excluded_volume_radius": 0.5}
+    )
 
     # Check files were created
     assert (folder / "initArgs_0.h5").exists()
@@ -365,17 +347,11 @@ def test_hdf5_compression(tmp_path):
 
     # Create reporter with compression
     reporter_compressed = HDF5Reporter(
-        str(folder / "compressed"),
-        max_data_length=1,
-        h5py_dset_opts={"compression": "gzip", "compression_opts": 9}
+        str(folder / "compressed"), max_data_length=1, h5py_dset_opts={"compression": "gzip", "compression_opts": 9}
     )
 
     # Create reporter without compression
-    reporter_uncompressed = HDF5Reporter(
-        str(folder / "uncompressed"),
-        max_data_length=1,
-        h5py_dset_opts={}
-    )
+    reporter_uncompressed = HDF5Reporter(str(folder / "uncompressed"), max_data_length=1, h5py_dset_opts={})
 
     # Create data with repeated values (highly compressible)
     data = {"pos": np.ones((10000, 3)) * 42.0}
@@ -402,12 +378,15 @@ def test_reporter_with_extras(tmp_path):
 
     # Report data with extras
     for i in range(3):
-        reporter.report("data", {
-            "pos": np.random.random((10, 3)),
-            "custom_scalar": i * 1.5,
-            "custom_array": np.arange(5) * i,
-            "custom_string": f"block_{i}"
-        })
+        reporter.report(
+            "data",
+            {
+                "pos": np.random.random((10, 3)),
+                "custom_scalar": i * 1.5,
+                "custom_array": np.arange(5) * i,
+                "custom_string": f"block_{i}",
+            },
+        )
     reporter.dump_data()
 
     # Load and verify

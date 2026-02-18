@@ -876,13 +876,11 @@ class Simulation(object):
 
         rascript = tempfile.NamedTemporaryFile()
         # writing the rasmol script. Spacefill controls radius of the sphere.
-        rascript.write(
-            b"""wireframe off
+        rascript.write(b"""wireframe off
         color temperature
         spacefill 100
         background white
-        """
-        )
+        """)
         rascript.flush()
 
         # creating the array, linearly chanhing from -225 to 225

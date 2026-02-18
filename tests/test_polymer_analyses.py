@@ -1,7 +1,8 @@
+import pickle
+from multiprocessing import Pool
+
 import numpy as np
 import pytest
-from multiprocessing import Pool
-import pickle
 
 import polychrom
 import polychrom.polymer_analyses as polymer_analyses
@@ -11,12 +12,14 @@ import polychrom.starting_conformations
 def test_calculate_contacts():
     """Test basic contact calculation"""
     # Create a simple test case with known contacts
-    data = np.array([
-        [0, 0, 0],
-        [1, 0, 0],  # 1 unit away from [0,0,0]
-        [2, 0, 0],  # 2 units away from [0,0,0], 1 unit from [1,0,0]
-        [5, 0, 0],  # 5 units away from [0,0,0]
-    ])
+    data = np.array(
+        [
+            [0, 0, 0],
+            [1, 0, 0],  # 1 unit away from [0,0,0]
+            [2, 0, 0],  # 2 units away from [0,0,0], 1 unit from [1,0,0]
+            [5, 0, 0],  # 5 units away from [0,0,0]
+        ]
+    )
 
     # With cutoff 1.5, should find contacts between (0,1) and (1,2)
     contacts = polymer_analyses.calculate_contacts(data, cutoff=1.5)
@@ -198,8 +201,8 @@ def test_Rg2_matrix():
 
     # Check some specific values match Rg2 function
     for i in range(5):
-        for j in range(i+2, min(i+10, len(data))):
-            expected = polymer_analyses.Rg2(data[i:j+1])
+        for j in range(i + 2, min(i + 10, len(data))):
+            expected = polymer_analyses.Rg2(data[i : j + 1])
             assert np.isclose(rg_matrix[i, j], expected, rtol=1e-5)
 
 
@@ -218,11 +221,7 @@ def test_kabsch_msd():
 
     # Test with rotated structure
     theta = np.pi / 6
-    R = np.array([
-        [np.cos(theta), -np.sin(theta), 0],
-        [np.sin(theta), np.cos(theta), 0],
-        [0, 0, 1]
-    ])
+    R = np.array([[np.cos(theta), -np.sin(theta), 0], [np.sin(theta), np.cos(theta), 0], [0, 0, 1]])
     Q_rotated = np.dot(P, R)
     msd_rotated = polymer_analyses.kabsch_msd(P, Q_rotated)
     assert np.isclose(msd_rotated, 0, atol=1e-10)
@@ -258,7 +257,7 @@ def test_slope_contact_scaling():
     # Create mock data
     mids = np.logspace(0, 2, 20)
     # Create a power-law like decay
-    cp = 1.0 / (mids ** 1.5)
+    cp = 1.0 / (mids**1.5)
 
     slope_mids, slopes = polymer_analyses.slope_contact_scaling(mids, cp, sigma=1.5)
 
@@ -362,8 +361,7 @@ def test_pickle_compatibility():
         with Pool(2) as pool:
             # Test that we can use these functions in parallel
             results = pool.starmap(
-                polymer_analyses._smooth_for_slope,
-                [(np.array([1, 2, 3, 4, 5]), 1.0) for _ in range(4)]
+                polymer_analyses._smooth_for_slope, [(np.array([1, 2, 3, 4, 5]), 1.0) for _ in range(4)]
             )
             assert len(results) == 4
 

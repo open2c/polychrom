@@ -34,7 +34,7 @@ for (bins[0].. bins[1]), (bins[1]..bins[2]). Therefore, we have to return bin mi
 """
 
 from math import sqrt
-from typing import Tuple, Optional, Callable, Sequence, Union, List
+from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -76,7 +76,7 @@ def smart_contacts(
     data: np.ndarray,
     cutoff: float = 1.7,
     min_cutoff: float = 2.1,
-    percent_func: Callable[[float], float] = lambda x: 1 / x
+    percent_func: Callable[[float], float] = lambda x: 1 / x,
 ) -> np.ndarray:
     """Calculates contacts for a polymer, give the contact radius (cutoff)
     This method takes a random fraction of the monomers that is equal to (
@@ -146,7 +146,7 @@ def contact_scaling(
     bins0: Optional[Union[np.ndarray, Sequence[int]]] = None,
     cutoff: float = 1.1,
     *,
-    ring: bool = False
+    ring: bool = False,
 ) -> Tuple[List[float], np.ndarray]:
     """
     Returns contact probability scaling for a given polymer conformation
@@ -213,9 +213,7 @@ def _smooth_for_slope(x: np.ndarray, sigma: float) -> np.ndarray:
 
 
 def slope_contact_scaling(
-    mids: Union[np.ndarray, List[float]],
-    cp: Union[np.ndarray, List[float]],
-    sigma: float = 2.0
+    mids: Union[np.ndarray, List[float]], cp: Union[np.ndarray, List[float]], sigma: float = 2.0
 ) -> Tuple[np.ndarray, np.ndarray]:
     # P(s) has to be smoothed in logspace, and both P and s have to be smoothed.
     # It is discussed in detail here
@@ -228,12 +226,7 @@ def slope_contact_scaling(
     return mids[1:], slope
 
 
-def _radius_gyration_helper(
-    len2: int,
-    coms: np.ndarray,
-    coms2: np.ndarray,
-    ring: bool = False
-) -> float:
+def _radius_gyration_helper(len2: int, coms: np.ndarray, coms2: np.ndarray, ring: bool = False) -> float:
     """Helper function for Rg2_scaling to calculate radius of gyration.
     Extracted to module level for pickle compatibility.
 
@@ -267,9 +260,7 @@ def _radius_gyration_helper(
 
 
 def Rg2_scaling(
-    data: np.ndarray,
-    bins: Optional[Union[np.ndarray, Sequence[int]]] = None,
-    ring: bool = False
+    data: np.ndarray, bins: Optional[Union[np.ndarray, Sequence[int]]] = None, ring: bool = False
 ) -> Tuple[np.ndarray, List[float]]:
     """Calculates average gyration radius of subchains a function of s
 
@@ -300,9 +291,7 @@ def Rg2_scaling(
 
 
 def R2_scaling(
-    data: np.ndarray,
-    bins: Optional[Union[np.ndarray, Sequence[int]]] = None,
-    ring: bool = False
+    data: np.ndarray, bins: Optional[Union[np.ndarray, Sequence[int]]] = None, ring: bool = False
 ) -> Tuple[np.ndarray, List[float]]:
     """
     Returns end-to-end distance scaling of a given polymer conformation.
@@ -370,7 +359,6 @@ def Rg2_matrix(data: np.ndarray) -> np.ndarray:
     return sums
 
 
-
 def kabsch_msd(P: np.ndarray, Q: np.ndarray) -> float:
     """
     Calculates MSD between two vectors using Kabash alcorithm
@@ -421,11 +409,7 @@ def kabsch_msd(P: np.ndarray, Q: np.ndarray) -> float:
 kabsch_rmsd = kabsch_msd
 
 
-def mutualSimplify(
-    a: np.ndarray,
-    b: np.ndarray,
-    verbose: bool = False
-) -> Tuple[np.ndarray, np.ndarray]:
+def mutualSimplify(a: np.ndarray, b: np.ndarray, verbose: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """
     Simplify two polymer rings while preserving their mutual topology.
 
@@ -494,11 +478,7 @@ def mutualSimplify(
 
 
 def getLinkingNumber(
-    data1: np.ndarray,
-    data2: np.ndarray,
-    simplify: bool = True,
-    randomOffset: bool = True,
-    verbose: bool = False
+    data1: np.ndarray, data2: np.ndarray, simplify: bool = True, randomOffset: bool = True, verbose: bool = False
 ) -> int:
     """
     Calculate the linking number between two closed polymer rings.
@@ -635,9 +615,7 @@ def simplifyPolymer(data: np.ndarray, verbose: bool = False) -> np.ndarray:
 
     except ImportError:
         warnings.warn(
-            "C++ simplification module not available. "
-            "Please compile the Cython extensions.",
-            RuntimeWarning
+            "C++ simplification module not available. " "Please compile the Cython extensions.", RuntimeWarning
         )
         return data
 
@@ -648,7 +626,7 @@ def calculate_cistrans(
     chain_id: int = 0,
     cutoff: float = 5.0,
     pbc_box: bool = False,
-    box_size: Optional[Union[List[float], np.ndarray]] = None
+    box_size: Optional[Union[List[float], np.ndarray]] = None,
 ) -> Tuple[int, int]:
     """
     Analysis of the territoriality of polymer chains from simulations, using the cis/trans ratio.

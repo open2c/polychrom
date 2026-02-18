@@ -8,17 +8,13 @@ import joblib
 import numpy as np
 
 if len(sys.argv) < 2:
-    print(
-        textwrap.dedent(
-            """
+    print(textwrap.dedent("""
             Usage: show filename [start end pace]
                  show filenum [start end pace]
 
                  filenum is a number of files of the type block123.dat
 
-                 start, end, pace will convert data to data[start:end:pace]"""
-        )
-    )
+                 start, end, pace will convert data to data[start:end:pace]"""))
 
 
 def showData(data):
@@ -52,13 +48,11 @@ def showData(data):
 
     # writing the rasmol script. Spacefill controls radius of the sphere.
     rascript = tempfile.NamedTemporaryFile(mode="w")
-    rascript.write(
-        """wireframe off
+    rascript.write("""wireframe off
     color temperature
     spacefill 100
     background white
-    """
-    )
+    """)
     rascript.flush()
 
     # creating the array, linearly chanhing from -225 to 225, to serve as an array of colors

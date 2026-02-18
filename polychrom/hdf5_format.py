@@ -95,7 +95,7 @@ autodetermine the type of a trajectory folder. So it will fetch both `/path/to/t
 import glob
 import os
 import warnings
-from typing import Dict, List, Tuple, Optional, Union, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import h5py
 import numpy as np
@@ -122,7 +122,7 @@ def _read_h5_group(gr: h5py.Group) -> Dict[str, Any]:
         # Convert bytes to string if it's a bytes string
         if isinstance(j, bytes):
             try:
-                result[i] = j.decode('utf-8')
+                result[i] = j.decode("utf-8")
             except UnicodeDecodeError:
                 result[i] = j
         else:
@@ -165,11 +165,7 @@ def _convert_to_hdf5_array(data: Any) -> Tuple[Optional[str], Optional[Union[np.
         return "ndarray", data
 
 
-def _write_group(
-    dataDict: Dict[str, Any],
-    group: h5py.Group,
-    dset_opts: Optional[Dict[str, Any]] = None
-) -> None:
+def _write_group(dataDict: Dict[str, Any], group: h5py.Group, dset_opts: Optional[Dict[str, Any]] = None) -> None:
     """
     Writes a dictionary of elements to an HDF5 group
     Puts all "items" into attrs, and all ndarrays into datasets
@@ -199,10 +195,7 @@ def _write_group(
 
 
 def list_URIs(
-    folder: str,
-    empty_error: bool = True,
-    read_error: bool = True,
-    return_dict: bool = False
+    folder: str, empty_error: bool = True, read_error: bool = True, return_dict: bool = False
 ) -> Union[List[str], Dict[int, str]]:
     """
     Makes a list of URIs (path-like records for each block). for a trajectory folder
@@ -287,10 +280,7 @@ def load_URI(dset_path: str) -> Dict[str, Any]:
 
 
 def save_hdf5_file(
-    filename: str,
-    data_dict: Dict[str, Any],
-    dset_opts: Optional[Dict[str, Any]] = None,
-    mode: str = "w"
+    filename: str, data_dict: Dict[str, Any], dset_opts: Optional[Dict[str, Any]] = None, mode: str = "w"
 ) -> None:
     """
     Saves data_dict to filename
@@ -407,9 +397,7 @@ class HDF5Reporter:
                             raise RuntimeError(f"folder {folder} is not empty: set check_exists=False to ignore")
 
     def continue_trajectory(
-        self,
-        continue_from: Optional[int] = None,
-        continue_max_delete: int = 5
+        self, continue_from: Optional[int] = None, continue_max_delete: int = 5
     ) -> Tuple[int, Dict[str, Any]]:
         """
         Continues a simulation in a current folder (i.e. continues from the last block, or the block you specify).

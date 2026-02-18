@@ -3,8 +3,10 @@ Comprehensive tests for starting_conformations module
 """
 
 import time
+
 import numpy as np
 import pytest
+
 from polychrom import starting_conformations
 
 
@@ -183,9 +185,7 @@ class TestConstrainedRandomWalk:
         def always_true(p):
             return True
 
-        walk = starting_conformations.create_constrained_random_walk(
-            N, always_true, step_size=1.0
-        )
+        walk = starting_conformations.create_constrained_random_walk(N, always_true, step_size=1.0)
         assert len(walk) == N
         assert walk.shape == (N, 3)
 
@@ -197,9 +197,7 @@ class TestConstrainedRandomWalk:
         def confined(p):
             return np.linalg.norm(p) < confinement
 
-        walk = starting_conformations.create_constrained_random_walk(
-            N, confined, starting_point=(0, 0, 0)
-        )
+        walk = starting_conformations.create_constrained_random_walk(N, confined, starting_point=(0, 0, 0))
 
         # Check all points are within confinement
         distances = np.linalg.norm(walk, axis=1)
@@ -213,9 +211,7 @@ class TestConstrainedRandomWalk:
         def always_true(p):
             return True
 
-        walk = starting_conformations.create_constrained_random_walk(
-            N, always_true, starting_point=start
-        )
+        walk = starting_conformations.create_constrained_random_walk(N, always_true, starting_point=start)
 
         assert np.allclose(walk[0], start), "Walk doesn't start at specified point"
 

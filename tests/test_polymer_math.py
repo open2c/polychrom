@@ -6,20 +6,20 @@ import numpy as np
 import pytest
 
 
-def create_circle(center, radius, n_points=100, axis='z'):
+def create_circle(center, radius, n_points=100, axis="z"):
     """Create a circular polymer ring."""
     t = np.linspace(0, 2 * np.pi, n_points, endpoint=False)
-    if axis == 'z':
+    if axis == "z":
         # Circle in xy-plane
         x = center[0] + radius * np.cos(t)
         y = center[1] + radius * np.sin(t)
         z = np.full_like(t, center[2])
-    elif axis == 'x':
+    elif axis == "x":
         # Circle in yz-plane
         x = np.full_like(t, center[0])
         y = center[1] + radius * np.cos(t)
         z = center[2] + radius * np.sin(t)
-    elif axis == 'y':
+    elif axis == "y":
         # Circle in xz-plane
         x = center[0] + radius * np.cos(t)
         y = np.full_like(t, center[1])
@@ -33,18 +33,18 @@ def create_circle(center, radius, n_points=100, axis='z'):
 def create_hopf_link(n_points=100):
     """Create a Hopf link (two linked circles with linking number ±1)."""
     # First ring in xy-plane centered at origin
-    ring1 = create_circle([0, 0, 0], radius=1, n_points=n_points, axis='z')
+    ring1 = create_circle([0, 0, 0], radius=1, n_points=n_points, axis="z")
 
     # Second ring in xz-plane, offset and linked through the first
-    ring2 = create_circle([0.5, 0, 0], radius=1, n_points=n_points, axis='y')
+    ring2 = create_circle([0.5, 0, 0], radius=1, n_points=n_points, axis="y")
 
     return ring1, ring2
 
 
 def create_unlinked_rings(separation=3, n_points=100):
     """Create two unlinked circles."""
-    ring1 = create_circle([0, 0, 0], radius=1, n_points=n_points, axis='z')
-    ring2 = create_circle([separation, 0, 0], radius=1, n_points=n_points, axis='z')
+    ring1 = create_circle([0, 0, 0], radius=1, n_points=n_points, axis="z")
+    ring2 = create_circle([separation, 0, 0], radius=1, n_points=n_points, axis="z")
     return ring1, ring2
 
 
@@ -89,9 +89,7 @@ class TestLinkingNumber:
         L_no_simp = getLinkingNumber(ring1, ring2, simplify=False)
         L_with_simp = getLinkingNumber(ring1, ring2, simplify=True)
 
-        assert L_no_simp == L_with_simp, (
-            f"Simplification changed linking number: {L_no_simp} -> {L_with_simp}"
-        )
+        assert L_no_simp == L_with_simp, f"Simplification changed linking number: {L_no_simp} -> {L_with_simp}"
 
     def test_linking_number_symmetric(self):
         """Test that L(A,B) = L(B,A)."""
@@ -110,19 +108,11 @@ class TestLinkingNumber:
         # Create two properly linked rings
         # First ring in xy-plane
         t1 = np.linspace(0, 2 * np.pi, 100, endpoint=False)
-        ring1 = np.column_stack([
-            2 * np.cos(t1),
-            2 * np.sin(t1),
-            np.zeros_like(t1)
-        ])
+        ring1 = np.column_stack([2 * np.cos(t1), 2 * np.sin(t1), np.zeros_like(t1)])
 
         # Second ring that passes through the first twice
         t2 = np.linspace(0, 2 * np.pi, 100, endpoint=False)
-        ring2 = np.column_stack([
-            np.cos(t2),
-            np.sin(t2),
-            0.5 * np.cos(2 * t2)  # Goes up and down twice
-        ])
+        ring2 = np.column_stack([np.cos(t2), np.sin(t2), 0.5 * np.cos(2 * t2)])  # Goes up and down twice
 
         L = getLinkingNumber(ring1, ring2, simplify=True)
         # Just verify it calculates without error - exact value depends on construction
@@ -158,7 +148,7 @@ class TestMutualSimplify:
 
     def test_simplify_preserves_linking_direct(self):
         """Test that mutual simplification preserves linking number."""
-        from polychrom.polymer_analyses import mutualSimplify, getLinkingNumber
+        from polychrom.polymer_analyses import getLinkingNumber, mutualSimplify
 
         ring1, ring2 = create_hopf_link(n_points=150)
 
@@ -171,9 +161,7 @@ class TestMutualSimplify:
         # Get linking after simplification
         L_after = getLinkingNumber(simp1, simp2, simplify=False)
 
-        assert L_before == L_after, (
-            f"Mutual simplification changed linking: {L_before} -> {L_after}"
-        )
+        assert L_before == L_after, f"Mutual simplification changed linking: {L_before} -> {L_after}"
 
 
 class TestSimplifyPolymer:
@@ -191,9 +179,7 @@ class TestSimplifyPolymer:
         simplified_actual = simplified[nonzero_mask]
 
         # An unknotted circle should simplify to very few points
-        assert len(simplified_actual) < 10, (
-            f"Simple circle didn't simplify enough: {len(simplified_actual)} points"
-        )
+        assert len(simplified_actual) < 10, f"Simple circle didn't simplify enough: {len(simplified_actual)} points"
         assert len(simplified_actual) >= 3, "Need at least 3 points for a valid polygon"
 
     def test_simplify_trefoil(self):
@@ -205,9 +191,7 @@ class TestSimplifyPolymer:
 
         # A knotted polymer should simplify less than an unknotted one
         assert len(simplified) < len(trefoil), "Trefoil should be simplified"
-        assert len(simplified) > 10, (
-            "Trefoil knot should retain some complexity after simplification"
-        )
+        assert len(simplified) > 10, "Trefoil knot should retain some complexity after simplification"
 
     def test_simplify_small_polymer(self):
         """Test that small polymers are handled correctly."""
@@ -245,9 +229,9 @@ class TestSimplifyPolymer:
         # Create a more complex 3D knot-like structure
         t = np.linspace(0, 6 * np.pi, 200, endpoint=False)
         # Trefoil-like parametrization in 3D
-        x = np.sin(t) + 2 * np.sin(2*t)
-        y = np.cos(t) - 2 * np.cos(2*t)
-        z = -np.sin(3*t)
+        x = np.sin(t) + 2 * np.sin(2 * t)
+        y = np.cos(t) - 2 * np.cos(2 * t)
+        z = -np.sin(3 * t)
         knot = np.column_stack([x, y, z])
 
         simplified = simplifyPolymer(knot)
@@ -257,9 +241,7 @@ class TestSimplifyPolymer:
         simplified_actual = simplified[nonzero_mask]
 
         # For a knotted structure, simplification should maintain some complexity
-        assert len(simplified_actual) > 5, (
-            f"Complex 3D knot oversimplified to {len(simplified_actual)} points"
-        )
+        assert len(simplified_actual) > 5, f"Complex 3D knot oversimplified to {len(simplified_actual)} points"
 
         # Check that all three dimensions are utilized
         x_range = simplified_actual[:, 0].max() - simplified_actual[:, 0].min()
@@ -277,7 +259,9 @@ class TestIntegration:
     def test_full_pipeline(self):
         """Test the full pipeline: create, simplify, compute linking."""
         from polychrom.polymer_analyses import (
-            mutualSimplify, getLinkingNumber, simplifyPolymer
+            getLinkingNumber,
+            mutualSimplify,
+            simplifyPolymer,
         )
 
         # Create complex linked structure
@@ -312,9 +296,7 @@ class TestIntegration:
             r2_noise = ring2 + np.random.randn(*ring2.shape) * noise_level
 
             L = getLinkingNumber(r1_noise, r2_noise, simplify=True)
-            assert L == L_base, (
-                f"Linking number changed with noise level {noise_level}: {L} != {L_base}"
-            )
+            assert L == L_base, f"Linking number changed with noise level {noise_level}: {L} != {L_base}"
 
 
 if __name__ == "__main__":
