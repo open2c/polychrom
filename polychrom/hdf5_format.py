@@ -187,9 +187,20 @@ def _write_group(dataDict: Dict[str, Any], group: h5py.Group, dset_opts: Optiona
         if datatype is None:
             warnings.warn(f"Could not convert record {name} of type {type(data)}")
         elif datatype == "item":
-            group.attrs[name] = converted  # Use converted instead of data
+            # The numpy conversion is only a type probe. Strings must be
+            # written as the original Python str so h5py stores them as
+            # variable-length UTF-8: the fixed-length "S" bytes form hits
+            # HDF5's 64KB object-header limit for attributes on older HDF5
+            # runtimes (e.g. applied_forces XML of a large system).
+            group.attrs[name] = data if isinstance(data, str) else converted
         elif datatype == "ndarray":
-            group.create_dataset(name, data=converted, **dset_opts)  # Use converted
+            # Unicode arrays have no direct HDF5 mapping (h5py raises
+            # "No conversion path for dtype('<U*')") — pass the original
+            # data so lists of strings are stored as variable-length strings.
+            if converted.dtype.kind == "U":
+                group.create_dataset(name, data=data, **dset_opts)
+            else:
+                group.create_dataset(name, data=converted, **dset_opts)
         else:
             raise ValueError(f"Unknown datatype: {datatype}")
 
@@ -262,7 +273,11 @@ def list_URIs(
         except Exception:
             if read_error:
                 raise ValueError(f"Cannot read file {file}")
-            continue 
+            warnings.warn(
+                f"Skipping unreadable file {file}: its blocks will be missing from the returned URIs",
+                RuntimeWarning,
+            )
+            continue
         # Extract start and end block numbers from filename like "blocks_1-50.h5"
         filename_parts = os.path.basename(file).split("_")[1].split(".h5")[0]
         st, end = [int(i) for i in filename_parts.split("-")]
@@ -466,16 +481,20 @@ class HDF5Reporter:
         ind = np.nonzero(uri_inds == continue_from)[0][0]  # position of a starting block in arrays
         newdata = load_URI(str(uri_vals[ind]))
 
-        todelete = np.nonzero(uri_inds >= continue_from)[0]
+        # NB: all comparisons below are on block NUMBERS (uri_inds values),
+        # never on array positions - block numbering may have gaps.
+        todelete = np.nonzero(uri_inds > continue_from)[0]  # blocks strictly after the restart point
         if len(todelete) > continue_max_delete:
             raise ValueError(f"Refusing to delete {len(todelete)} blocks - set continue_max_delete accordingly")
 
         fnames_delete = np.unique(uri_fnames[todelete])
-        inds_tosave = np.nonzero((uri_fnames == uri_fnames[ind]) * (uri_inds <= ind))[0]
+        # blocks at or below the restart point that live in files being
+        # deleted are collateral - re-buffer them or they would be destroyed
+        inds_tosave = np.nonzero(np.isin(uri_fnames, fnames_delete) & (uri_inds <= continue_from))[0]
 
-        for saveind in inds_tosave:  # we are saving some data and deleting the whole last file
-            self.datas[uri_inds[saveind]] = load_URI(uri_vals[saveind])
-        self.counter["data"] = ind + 1
+        for saveind in inds_tosave:
+            self.datas[int(uri_inds[saveind])] = load_URI(str(uri_vals[saveind]))
+        self.counter["data"] = int(continue_from) + 1
 
         files = os.listdir(self.folder)  # some heuristics to infer values of counters - not crucial but maybe useful
         for prefix in self.prefixes:

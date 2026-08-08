@@ -32,7 +32,7 @@ python setup.py build_ext --inplace
 **Simulation Module** (`polychrom/simulation.py`)
 - Central `Simulation` class manages the entire simulation lifecycle
 - Handles platform setup (CUDA/OpenCL/CPU), integrators, and parameters
-- Methods: `set_data()` for loading conformations, `add_force()` for adding forces, `doBlock()` for running simulation steps
+- Methods: `set_data()` for loading conformations, `add_force()` for adding forces, `do_block(steps)` for running simulation steps (the `steps` argument is required)
 
 **Forces System** (`polychrom/forces.py`, `polychrom/forcekits.py`)
 - Forces define polymer behavior: connectivity, confinement, crosslinks, tethering
@@ -43,7 +43,7 @@ python setup.py build_ext --inplace
 **Data Storage** (`polychrom/hdf5_format.py`)
 - HDF5Reporter handles simulation output in HDF5 format
 - Backwards compatibility with legacy format via legacy reporter
-- `polymerutils.load()` function reads both new and old formats
+- `polymerutils.load()` is deprecated and only accepts URIs (`/path/blocks_x-y.h5::block_number`); it raises ValueError for plain file paths. Use `hdf5_format.load_URI` for new-format data and `polychrom.legacy` loaders for old formats
 
 **Starting Conformations** (`polychrom/starting_conformations.py`)
 - Functions to generate initial polymer configurations

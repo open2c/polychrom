@@ -128,8 +128,13 @@ def polymer_chains(
                 #     nb_force.addExclusion(int(pair[0]), int(pair[1]))
                 num_exc = nb_force.getNumExclusions()
             else:
-                print("Could not find a way to exclude neighbouring chain particles from {}".format(nb_force.name))
-                num_exc = 0
+                # exclusions were requested but cannot be applied: running
+                # without them silently changes the physics, so refuse
+                raise ValueError(
+                    f"except_bonds was requested, but force {nb_force.name} supports neither "
+                    "addException nor addExclusion. Pass except_bonds=False or use a force "
+                    "that supports exclusions."
+                )
 
             print("Number of exceptions:", num_exc)
 

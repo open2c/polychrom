@@ -685,14 +685,13 @@ class Simulation(object):
         save=True,
         save_extras={},
     ):
-        """performs one block of simulations, doing steps timesteps,
-        or steps_per_block if not specified.
+        """performs one block of simulations, doing `steps` timesteps.
 
         Parameters
         ----------
 
-        steps : int or None
-            Number of timesteps to perform.
+        steps : int
+            Number of timesteps to perform (required).
         increment : bool, optional
             If true, will not increment `self.block` and `self.steps` counters
         check_functions: list of functions, optional

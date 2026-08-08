@@ -83,10 +83,10 @@ class TestLinkingNumber:
 
         ring1, ring2 = create_hopf_link()
         L = getLinkingNumber(ring1, ring2, simplify=False)
-        # The exact linking number depends on orientations, but should be non-zero for linked rings
-        # Our specific construction gives |L| = 2, which is valid
-        assert L != 0, f"Hopf link should have non-zero linking number, got {L}"
-        # For a true Hopf link test, we'd need more careful geometric construction
+        # A Hopf link has linking number exactly +-1 (sign depends on
+        # orientation). The old C code returned -2x the true value: it summed
+        # signed crossings without halving, with an inverted sign convention.
+        assert abs(L) == 1, f"Hopf link must have |linking number| = 1, got {L}"
 
     def test_simplify_preserves_linking(self):
         """Test that simplification preserves linking number."""
@@ -183,13 +183,13 @@ class TestSimplifyPolymer:
         circle = create_circle([0, 0, 0], radius=1, n_points=100)
         simplified = simplifyPolymer(circle)
 
-        # Remove zero-padded rows (artifact of the C++ implementation)
-        nonzero_mask = np.any(simplified != 0, axis=1)
-        simplified_actual = simplified[nonzero_mask]
+        # No stale-buffer garbage rows (regression test for the old
+        # _simplifyCpp bug that leaked zero-padded points into the output)
+        assert np.any(simplified != 0, axis=1).all(), "Output contains garbage zero rows"
 
         # An unknotted circle should simplify to very few points
-        assert len(simplified_actual) < 10, f"Simple circle didn't simplify enough: {len(simplified_actual)} points"
-        assert len(simplified_actual) >= 3, "Need at least 3 points for a valid polygon"
+        assert len(simplified) < 10, f"Simple circle didn't simplify enough: {len(simplified)} points"
+        assert len(simplified) >= 3, "Need at least 3 points for a valid polygon"
 
     def test_simplify_trefoil(self):
         """Test that a trefoil knot simplifies but maintains structure."""
@@ -198,26 +198,21 @@ class TestSimplifyPolymer:
         trefoil = create_trefoil_knot(n_points=200)
         simplified = simplifyPolymer(trefoil)
 
-        # A knotted polymer should simplify less than an unknotted one
+        # A knotted polymer must reduce, but can never drop below the
+        # trefoil's stick number of 6 (the simplification is topology-preserving)
         assert len(simplified) < len(trefoil), "Trefoil should be simplified"
-        assert len(simplified) > 10, "Trefoil knot should retain some complexity after simplification"
+        assert len(simplified) >= 6, "Trefoil cannot be represented by fewer than 6 segments"
+        assert len(simplified) <= 30, f"Trefoil should simplify well below 30 points, got {len(simplified)}"
 
     def test_simplify_small_polymer(self):
         """Test that small polymers are handled correctly."""
         from polychrom.polymer_analyses import simplifyPolymer
 
-        # 3-point polymer (minimum)
+        # 3-point polymer (minimum): a triangle is already the minimal
+        # closed polygon and must come back unchanged
         small = np.array([[0, 0, 0], [1, 0, 0], [0.5, 0.5, 0]])
         simplified = simplifyPolymer(small)
-
-        # Remove zero-padded rows
-        nonzero_mask = np.any(simplified != 0, axis=1)
-        simplified_actual = simplified[nonzero_mask]
-
-        # Small polymer may simplify but should have at least 1 point (degenerate case)
-        # The C++ code can simplify very aggressively
-        assert len(simplified_actual) >= 1, f"Got {len(simplified_actual)} points, need at least 1"
-        assert len(simplified_actual) <= 3, f"3-point polymer shouldn't expand: {len(simplified_actual)} points"
+        assert len(simplified) == 3, f"Minimal triangle must be returned unchanged, got {len(simplified)} points"
 
     def test_simplify_input_validation(self):
         """Test input validation for simplifyPolymer."""

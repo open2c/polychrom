@@ -48,6 +48,14 @@ except Exception:
     _polymer_math = None
 
 
+def _require_polymer_math() -> None:
+    """Raise if the _polymer_math Cython extension failed to import."""
+    if _polymer_math is None:
+        raise ImportError(
+            "_polymer_math Cython extension is not available. Build it with: python setup.py build_ext --inplace"
+        )
+
+
 def calculate_contacts(data: np.ndarray, cutoff: float = 1.7) -> np.ndarray:
     """Calculates contacts between points give the contact radius (cutoff)
 
@@ -360,6 +368,132 @@ def Rg2_matrix(data: np.ndarray) -> np.ndarray:
     return sums
 
 
+def ndarray_groupby_aggregate(
+    df,
+    ndarray_cols,
+    aggregate_cols,
+    value_cols=[],
+    sample_cols=[],
+    preset="sum",
+    ndarray_agg=lambda x: np.sum(x, axis=0),
+    value_agg=lambda x: x.sum(),
+):
+    """
+    A version of pd.groupby that is aware of numpy arrays as values of columns
+
+    * aggregates columns ndarray_cols using ndarray_agg aggregator,
+    * aggregates value_cols using value_agg aggregator,
+    * takes the first element in sample_cols,
+    * aggregates over aggregate_cols
+
+    It has presets for sum, mean and nanmean.
+    """
+
+    if preset == "sum":
+        ndarray_agg = lambda x: np.sum(x, axis=0)
+        value_agg = lambda x: x.sum()
+    elif preset == "mean":
+        ndarray_agg = lambda x: np.mean(x, axis=0)
+        value_agg = lambda x: x.mean()
+    elif preset == "nanmean":
+        ndarray_agg = lambda x: np.nanmean(x, axis=0)
+        value_agg = lambda x: x.mean()
+
+    def combine_values(in_df):
+        """
+        splits into ndarrays, 'normal' values, and samples;
+        performs aggregation, and returns a Series
+        """
+        average_arrs = pd.Series(
+            index=ndarray_cols,
+            data=[ndarray_agg([np.asarray(j) for j in in_df[i].values]) for i in ndarray_cols],
+        )
+        average_values = value_agg(in_df[value_cols])
+        sample_values = in_df[sample_cols].iloc[0]
+        agg_series = pd.concat([average_arrs, average_values, sample_values])
+        return agg_series
+
+    return df.groupby(aggregate_cols).apply(combine_values)
+
+
+def streaming_ndarray_agg(
+    in_stream,
+    ndarray_cols,
+    aggregate_cols,
+    value_cols=[],
+    sample_cols=[],
+    chunksize=30000,
+    add_count_col=False,
+    divide_by_count=False,
+):
+    """
+    Takes in_stream of dataframes
+
+    Applies ndarray-aware groupby-sum or groupby-mean: treats ndarray_cols as numpy arrays,
+    value_cols as normal values, for sample_cols takes the first element.
+
+    Does groupby over aggregate_cols
+
+    if add_count_col is True, adds column "count", if it's a string - adds column with add_count_col name
+
+    if divide_by_counts is True, divides result by column "count".
+    If it's a string, divides by divide_by_count column
+
+    This function can be used for automatically aggregating P(s), R(s) etc.
+    for a set of conformations that is so large that all P(s) won't fit in RAM,
+    and when averaging needs to be done over so many parameters
+    that for-loops are not an issue. Examples may include simulations in which sweep
+    over many parameters has been performed.
+
+    """
+    value_cols_orig = [i for i in value_cols]
+    ndarray_cols, value_cols = list(ndarray_cols), list(value_cols)
+    aggregate_cols, sample_cols = list(aggregate_cols), list(sample_cols)
+    if add_count_col is not False:
+        if add_count_col is True:
+            add_count_col = "count"
+        value_cols.append(add_count_col)
+
+    def agg_one(dfs, aggregate):
+        """takes a list of DataFrames and old aggregate
+        performs groupby and aggregation  and returns new aggregate"""
+        if add_count_col is not False:
+            for i in dfs:
+                i[add_count_col] = 1
+
+        df = pd.concat(dfs + ([aggregate] if aggregate is not None else []), sort=False)
+        aggregate = ndarray_groupby_aggregate(
+            df,
+            ndarray_cols=ndarray_cols,
+            aggregate_cols=aggregate_cols,
+            value_cols=value_cols,
+            sample_cols=sample_cols,
+            preset="sum",
+        )
+        return aggregate.reset_index()
+
+    aggregate = None
+    cur = []
+    count = 0
+    for i in in_stream:
+        cur.append(i)
+        count += len(i)
+        if count > chunksize:
+            aggregate = agg_one(cur, aggregate)
+            cur = []
+            count = 0
+    if len(cur) > 0:
+        aggregate = agg_one(cur, aggregate)
+
+    if divide_by_count is not False:
+        if divide_by_count is True:
+            divide_by_count = "count"
+        for i in ndarray_cols + value_cols_orig:
+            aggregate[i] = aggregate[i] / aggregate[divide_by_count]
+
+    return aggregate
+
+
 def kabsch_msd(P: np.ndarray, Q: np.ndarray) -> float:
     """
     Calculates MSD between two vectors using Kabash alcorithm
@@ -459,10 +593,7 @@ def mutualSimplify(a: np.ndarray, b: np.ndarray, verbose: bool = False) -> Tuple
     simplifyPolymer : Simplify a single polymer ring
     getLinkingNumber : Calculate the linking number between two rings
     """
-    if _polymer_math is None:
-        raise ImportError(
-            "_polymer_math Cython extension is not available. Build it with: python setup.py build_ext --inplace"
-        )
+    _require_polymer_math()
     if verbose:
         print("Starting mutual simplification of polymers")
     while True:
@@ -546,10 +677,7 @@ def getLinkingNumber(
     mutualSimplify : Simplify two polymers while preserving their linking
     simplifyPolymer : Simplify a single polymer ring
     """
-    if _polymer_math is None:
-        raise ImportError(
-            "_polymer_math Cython extension is not available. Build it with: python setup.py build_ext --inplace"
-        )
+    _require_polymer_math()
     if simplify:
         data1, data2 = mutualSimplify(a=data1, b=data2, verbose=verbose)
     return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)  # type: ignore
@@ -603,33 +731,23 @@ def simplifyPolymer(data: np.ndarray, verbose: bool = False) -> np.ndarray:
     - For unknotted polymers, the result will typically be very short (3-4 monomers)
     - For complex knots, the simplified length depends on the knot complexity
     """
-    try:
-        if _polymer_math is None:
-            raise ImportError(
-                "_polymer_math Cython extension is not available. Build it with: python setup.py build_ext --inplace"
-            )
+    _require_polymer_math()
 
-        if len(data) < 3:
-            raise ValueError("Polymer must have at least 3 monomers")
+    if len(data) < 3:
+        raise ValueError("Polymer must have at least 3 monomers")
 
-        if data.shape[1] != 3:
-            raise ValueError("Data must be Nx3 array of 3D coordinates")
+    if data.shape[1] != 3:
+        raise ValueError("Data must be Nx3 array of 3D coordinates")
 
-        if verbose:
-            print(f"Simplifying polymer with {len(data)} monomers...")
+    if verbose:
+        print(f"Simplifying polymer with {len(data)} monomers...")
 
-        result = _polymer_math.simplifyPolymer(data)  # type: ignore
+    result = _polymer_math.simplifyPolymer(data)  # type: ignore
 
-        if verbose:
-            print(f"Simplified to {len(result)} monomers")
+    if verbose:
+        print(f"Simplified to {len(result)} monomers")
 
-        return result
-
-    except ImportError:
-        warnings.warn(
-            "C++ simplification module not available. " "Please compile the Cython extensions.", RuntimeWarning
-        )
-        return data
+    return result
 
 
 def calculate_cistrans(

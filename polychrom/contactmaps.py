@@ -76,6 +76,7 @@ def tonumpyarray(mp_arr):
 
 def findN(filenames, loadFunction, exceptions):
     "Finds length of data in filenames, handling the fact that files could be not loadable"
+    exceptions = tuple(exceptions) if exceptions else ()
     N = -1
     for i in range(30):
         if i == 29:
@@ -409,7 +410,7 @@ class filenameContactMap(object):
             loadFunction = polymerutils.load
         if contactFunction is None:
             contactFunction = polymer_analyses.calculate_contacts
-        self.exceptionsToIgnore = exceptionsToIgnore
+        self.exceptionsToIgnore = tuple(exceptionsToIgnore) if exceptionsToIgnore else ()
         self.contactFunction = contactFunction
         self.loadFunction = loadFunction
         self.i = 0
@@ -474,7 +475,7 @@ def binnedContactMap(
     n=8,  # Num threads
     contactFinder=polymer_analyses.calculate_contacts,
     loadFunction=polymerutils.load,
-    exceptionsToIgnore=None,
+    exceptionsToIgnore=[],
     useFmap=False,
 ):
     n = min(n, len(filenames))
@@ -543,7 +544,7 @@ class filenameContactMapRepeat(object):
             contactFunction = polymer_analyses.calculate_contacts
         self.filenames = filenames
         self.cutoff = cutoff
-        self.exceptionsToIgnore = exceptionsToIgnore
+        self.exceptionsToIgnore = tuple(exceptionsToIgnore) if exceptionsToIgnore else ()
         self.mapStarts = mapStarts
         self.mapN = mapN
         self.contactFunction = contactFunction

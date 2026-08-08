@@ -434,3 +434,61 @@ def test_edge_cases(tmp_path):
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def test_string_records_roundtrip(tmp_path):
+    """Strings and lists of strings survive save/load (regression: the numpy
+    'S'/'U' conversion must stay a type probe, not the stored value)."""
+    from polychrom.hdf5_format import load_hdf5_file, save_hdf5_file
+
+    test_file = str(tmp_path / "strings.h5")
+    big_xml = "<forces>" + "x" * 200_000 + "</forces>"  # > 64KB attr
+    data = {
+        "names": ["chr1", "chr22", "chrX"],
+        "xml": big_xml,
+        "note": "hello",
+        "num": 42,
+    }
+    save_hdf5_file(test_file, data)
+    out = load_hdf5_file(test_file)
+    # h5py returns vlen strings as bytes (same as on master)
+    assert [s.decode() if isinstance(s, bytes) else str(s) for s in np.asarray(out["names"]).tolist()] == data["names"]
+    assert str(out["xml"]) == big_xml
+    assert str(out["note"]) == "hello"
+
+
+def test_continue_trajectory_gapped_blocks(tmp_path):
+    """continue_trajectory must not destroy blocks in non-contiguous
+    trajectories (regression: block numbers were conflated with positions)."""
+    folder = str(tmp_path / "gapped")
+    rep = HDF5Reporter(folder=folder, max_data_length=11)
+    for i in range(11):  # blocks 0-10, dumped as one file
+        rep.report("data", {"pos": np.full((5, 3), float(i)), "block": i})
+    assert len(rep.datas) == 0
+    rep.counter["data"] = 20  # simulate a gap (e.g. partially deleted run)
+    for i in range(20, 31):  # blocks 20-30, second file
+        rep.report("data", {"pos": np.full((5, 3), float(i)), "block": i})
+
+    expected = set(range(11)) | set(range(20, 31))
+    assert set(list_URIs(folder, return_dict=True)) == expected
+
+    # continue from the last block: nothing may be deleted
+    rep2 = HDF5Reporter(folder=folder, check_exists=False)
+    block, data = rep2.continue_trajectory()
+    assert block == 30
+    assert data["pos"][0][0] == 30.0
+    assert set(list_URIs(folder, return_dict=True)) == expected
+    assert rep2.counter["data"] == 31
+
+    # continue from inside the second file: only blocks > 25 disappear,
+    # blocks 20-25 must be preserved (re-buffered from the deleted file)
+    rep3 = HDF5Reporter(folder=folder, max_data_length=100, check_exists=False)
+    block, data = rep3.continue_trajectory(continue_from=25, continue_max_delete=10)
+    assert block == 25
+    rep3.dump_data()
+    uris = list_URIs(folder, return_dict=True)
+    assert set(uris) == set(range(11)) | set(range(20, 26))
+    from polychrom.hdf5_format import load_URI
+
+    for i in [20, 23, 25]:
+        assert load_URI(uris[i])["pos"][0][0] == float(i)
