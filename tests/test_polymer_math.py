@@ -305,3 +305,42 @@ class TestIntegration:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestAlexanderInvariants:
+    """Tests for polymer_analyses.alexander_invariants."""
+
+    def test_reference_knots(self):
+        from polychrom.polymer_analyses import alexander_invariants
+
+        rng = np.random.default_rng(0)
+        s = np.linspace(0, 2 * np.pi, 600, endpoint=False)
+
+        def torus_knot(p, q):
+            r = 2 + np.cos(q * s)
+            return np.stack([r * np.cos(p * s), r * np.sin(p * s), -np.sin(q * s)], axis=1)
+
+        circle = np.stack([np.cos(s), np.sin(s), 0 * s], axis=1)
+        fig8 = np.stack(
+            [(2 + np.cos(2 * s)) * np.cos(3 * s), (2 + np.cos(2 * s)) * np.sin(3 * s), np.sin(4 * s)], axis=1
+        )
+        assert alexander_invariants(circle, rng=rng) == (1, 1)
+        assert alexander_invariants(torus_knot(2, 3), rng=rng) == (3, 7)
+        assert alexander_invariants(fig8, rng=rng) == (5, 11)
+        assert alexander_invariants(torus_knot(2, 5), rng=rng) == (5, 31)
+
+    def test_grow_cubic_rings_unknotted(self):
+        """grow_cubic rings are unknotted by construction: no false positives."""
+        from polychrom.polymer_analyses import alexander_invariants
+        from polychrom.starting_conformations import grow_cubic
+
+        rng = np.random.default_rng(1)
+        for _ in range(3):
+            ring = np.array(grow_cubic(400, 9), dtype=float)
+            assert alexander_invariants(ring, rng=rng) == (1, 1)
+
+    def test_input_validation(self):
+        from polychrom.polymer_analyses import alexander_invariants
+
+        with pytest.raises(ValueError):
+            alexander_invariants(np.zeros((10, 2)))

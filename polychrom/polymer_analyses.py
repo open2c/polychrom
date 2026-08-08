@@ -820,3 +820,238 @@ def rotation_matrix(rotate):
     Ry = np.array([[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]])
     Rz = np.array([[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]])
     return np.dot(Rx, np.dot(Ry, Rz))
+
+
+# -------------------- Knot detection: Alexander invariants  ------------------
+
+
+class _DegenerateProjection(Exception):
+    pass
+
+
+def _bareiss_det(M: List[List[int]]) -> int:
+    """Exact integer determinant via fraction-free Gaussian elimination."""
+    A = [[int(x) for x in row] for row in M]
+    n = len(A)
+    if n == 0:
+        return 1
+    sign = 1
+    prev = 1
+    for k in range(n - 1):
+        if A[k][k] == 0:
+            for i in range(k + 1, n):
+                if A[i][k] != 0:
+                    A[k], A[i] = A[i], A[k]
+                    sign = -sign
+                    break
+            else:
+                return 0
+        for i in range(k + 1, n):
+            for j in range(k + 1, n):
+                A[i][j] = (A[i][j] * A[k][k] - A[i][k] * A[k][j]) // prev
+            A[i][k] = 0
+        prev = A[k][k]
+    return sign * A[n - 1][n - 1]
+
+
+def _project_and_find_crossings(pts: np.ndarray, rng: np.random.Generator) -> list:
+    """Randomly rotate, project to xy, return the crossing diagram.
+
+    Raises _DegenerateProjection on any ambiguous geometry (crossing at a
+    vertex, near-parallel overlapping segments, coinciding heights) so the
+    caller can retry with a different rotation.
+    """
+    n = len(pts)
+    q = rng.normal(size=4)
+    q /= np.linalg.norm(q)
+    w, x, y, z = q
+    R = np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+            [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+            [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
+        ]
+    )
+    p = pts @ R.T
+    a = p
+    b = p[(np.arange(n) + 1) % n]
+    d = b - a
+
+    crossings = []  # (seg_i, t_i, seg_j, t_j, i_over, sign)
+    EPS = 1e-9
+    for i in range(n):
+        for j in range(i + 1, n):
+            if (j - i) % n in (0, 1) or (i - j) % n in (0, 1):
+                continue
+            denom = d[i, 0] * d[j, 1] - d[i, 1] * d[j, 0]
+            scale = max(abs(d[i, 0]) + abs(d[i, 1]), EPS) * max(abs(d[j, 0]) + abs(d[j, 1]), EPS)
+            rx, ry = a[j, 0] - a[i, 0], a[j, 1] - a[i, 1]
+            if abs(denom) < 1e-7 * scale:
+                ci = (rx * d[i, 0] + ry * d[i, 1]) / max(d[i, 0] ** 2 + d[i, 1] ** 2, EPS)
+                perp = np.hypot(rx - ci * d[i, 0], ry - ci * d[i, 1])
+                if perp < 1e-5 and -0.5 < ci < 1.5:
+                    raise _DegenerateProjection()
+                continue
+            ti = (rx * d[j, 1] - ry * d[j, 0]) / denom
+            tj = (rx * d[i, 1] - ry * d[i, 0]) / denom
+            if not (-1e-7 < ti < 1 + 1e-7 and -1e-7 < tj < 1 + 1e-7):
+                continue
+            if min(ti, 1 - ti, tj, 1 - tj) < 1e-6:
+                raise _DegenerateProjection()  # crossing at a vertex
+            zi = a[i, 2] + ti * d[i, 2]
+            zj = a[j, 2] + tj * d[j, 2]
+            if abs(zi - zj) < 1e-9 * (1 + abs(zi) + abs(zj)):
+                raise _DegenerateProjection()
+            i_over = zi > zj
+            if i_over:
+                s = 1 if denom > 0 else -1
+            else:
+                s = 1 if -denom > 0 else -1
+            crossings.append((i, ti, j, tj, i_over, s))
+    return crossings
+
+
+def _alexander_once(pts: np.ndarray, rng: np.random.Generator, max_tries: int) -> Tuple[int, int]:
+    import bisect
+
+    for _ in range(max_tries):
+        try:
+            cr = _project_and_find_crossings(pts, rng)
+            if len(cr) == 0:
+                return 1, 1
+            events = []
+            for cid, (i, ti, j, tj, i_over, s) in enumerate(cr):
+                if i_over:
+                    events.append((j + tj, cid, "under"))
+                else:
+                    events.append((i + ti, cid, "under"))
+            unders = sorted(events)
+            ncr = len(cr)
+            under_order = {cid: k for k, (pos, cid, _) in enumerate(unders)}
+            under_pos = sorted(pos for pos, cid, _ in unders)
+
+            def arc_of(position: float) -> int:
+                return bisect.bisect_right(under_pos, position) % ncr
+
+            rows = []
+            for cid, (i, ti, j, tj, i_over, s) in enumerate(cr):
+                k = under_order[cid]
+                over_arc = arc_of((i + ti) if i_over else (j + tj))
+                rows.append((k, (k + 1) % ncr, over_arc, s))
+
+            def alex_det(t: int) -> int:
+                M = [[0] * ncr for _ in range(ncr)]
+                for r, (kin, kout, ov, s) in enumerate(rows):
+                    if ov == kin or ov == kout:
+                        M[r][kin] += 1
+                        M[r][kout] += -1
+                    elif s > 0:
+                        M[r][kin] += 1
+                        M[r][kout] += -t
+                        M[r][ov] += t - 1
+                    else:
+                        M[r][kin] += -t
+                        M[r][kout] += 1
+                        M[r][ov] += t - 1
+                minor = [row[: ncr - 1] for row in M[: ncr - 1]]
+                return abs(_bareiss_det(minor))
+
+            d1 = alex_det(-1)
+            d2 = alex_det(-2)
+            while d2 > 0 and d2 % 2 == 0:
+                d2 //= 2
+            return d1, d2
+        except _DegenerateProjection:
+            continue
+    raise RuntimeError("Could not find a generic projection of the ring")
+
+
+def _min_nonadjacent_clearance(P: np.ndarray) -> float:
+    """Minimum distance between non-adjacent edges of closed polygon P."""
+    n = len(P)
+    if n < 4:
+        return np.inf
+    A, B = P, np.roll(P, -1, axis=0)
+    best = np.inf
+    for i in range(n - 2):
+        js = np.arange(i + 2, n if i > 0 else n - 1)
+        if len(js) == 0:
+            continue
+        d1 = B[i] - A[i]
+        d2 = B[js] - A[js]
+        r = A[i] - A[js]
+        a_ = d1 @ d1
+        e_ = (d2 * d2).sum(1)
+        f_ = (d2 * r).sum(1)
+        c_ = d1 @ r.T
+        b_ = d2 @ d1
+        den = a_ * e_ - b_ * b_
+        s = np.where(den > 1e-300, np.clip((b_ * f_ - c_ * e_) / np.where(den > 1e-300, den, 1), 0, 1), 0.0)
+        t = np.clip((b_ * s + f_) / np.where(e_ > 1e-300, e_, 1), 0, 1)
+        s = np.clip((b_ * t - c_) / max(a_, 1e-300), 0, 1)
+        diff = (A[i] + s[:, None] * d1) - (A[js] + t[:, None] * d2)
+        best = min(best, float(np.sqrt((diff**2).sum(1).min())))
+    return best
+
+
+def alexander_invariants(
+    ring: np.ndarray,
+    simplify: bool = True,
+    rng: Optional[np.random.Generator] = None,
+    max_tries: int = 20,
+) -> Tuple[int, int]:
+    r"""Knot invariants of a closed ring: |Alexander(-1)| and odd part of
+    |Alexander(-2)|, computed exactly with integer arithmetic.
+
+    Returns (1, 1) for an unknotted ring. Reference values: trefoil 3_1 ->
+    (3, 7), figure-eight 4_1 -> (5, 11), 5_1 -> (5, 31), 7_1 -> (7, 127).
+    Any value different from (1, 1) means the ring is knotted — for a
+    simulation started from an unknotted conformation (e.g. grow_cubic)
+    with a topology-preserving force set, this detects chain crossings.
+
+    The ring is treated as closed: point N-1 connects back to point 0.
+    Evaluating at two points (t = -1 and t = -2) discriminates knots that
+    share one invariant; a handful of exotic knot pairs still coincide,
+    but not the unknot vs anything.
+
+    Parameters
+    ----------
+    ring : Nx3 array
+        Closed-ring coordinates (do not repeat the first point at the end).
+    simplify : bool, optional
+        Reduce the ring with the topology-preserving simplifyPolymer first
+        (requires the compiled extension). Strongly recommended: the
+        Alexander matrix is O(crossings^3) and raw melt conformations have
+        thousands of crossings. Default True.
+    rng : np.random.Generator, optional
+        Source of randomness for projections (pass for reproducibility).
+    max_tries : int, optional
+        Projections to attempt before giving up on degenerate geometry.
+
+    Notes
+    -----
+    Two independent random projections must agree before a value is
+    returned (a third and further break ties). The pre-projection jitter is
+    scaled to stay far below the tightest strand-strand clearance of the
+    polygon — perturbing more than that can itself change the topology.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    base = np.asarray(ring, dtype=float)
+    if base.ndim != 2 or base.shape[1] != 3:
+        raise ValueError("ring must be an Nx3 array")
+    if simplify:
+        base = np.asarray(simplifyPolymer(base), dtype=float)
+    edge = float(np.median(np.linalg.norm(np.roll(base, -1, axis=0) - base, axis=1)))
+    clearance = _min_nonadjacent_clearance(base)
+    scale = max(min(1e-4 * edge, 0.02 * clearance), 1e-13 * max(edge, 1.0))
+    results: List[Tuple[int, int]] = []
+    while True:
+        pts = base + rng.normal(scale=scale, size=base.shape)
+        results.append(_alexander_once(pts, rng, max_tries))
+        if len(results) >= 2 and results[-1] == results[-2]:
+            return results[-1]
+        if len(results) >= 5:
+            from collections import Counter
+
+            return Counter(results).most_common(1)[0][0]
