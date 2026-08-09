@@ -1,0 +1,1 @@
+This folder contains legacy code for the 2016 loop extrusion paper. Not for use in production. 

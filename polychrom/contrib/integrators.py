@@ -44,6 +44,7 @@ be initialized to zero using the Simulation class's `set_velocities()` function.
 integrators use 0.1 or below).
 
 """
+
 import numpy as np
 import openmm as mm
 from openmmtools import utils

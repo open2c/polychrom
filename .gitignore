@@ -9,3 +9,4 @@ polychrom/_polymer_math.cpp
 .idea
 dist
 polychrom/*.so
+.vscode

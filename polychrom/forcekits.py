@@ -127,9 +127,83 @@ def polymer_chains(
                 # for pair in exc:
                 #     nb_force.addExclusion(int(pair[0]), int(pair[1]))
                 num_exc = nb_force.getNumExclusions()
+            else:
+                # exclusions were requested but cannot be applied: running
+                # without them silently changes the physics, so refuse
+                raise ValueError(
+                    f"except_bonds was requested, but force {nb_force.name} supports neither "
+                    "addException nor addExclusion. Pass except_bonds=False or use a force "
+                    "that supports exclusions."
+                )
 
             print("Number of exceptions:", num_exc)
 
         force_list.append(nb_force)
 
     return force_list
+
+
+def grosberg_polymer_chains(
+    sim_object,
+    chains=[(0, None, True)],
+    fene_k=30,
+    angle_k=1.5,
+    extra_bonds=None,
+    extra_triplets=None,
+    override_checks=False,
+):
+    r"""Kremer-Grest / Halverson-Grosberg chains or rings: the standard
+    topology-preserving force set (FENE bonds + WCA repulsion + mild bending).
+
+    This is polymer_chains preconfigured with the "grosberg" forces and,
+    critically, except_bonds=False: the FENE bond has its minimum at r = 0,
+    and the ~0.97 sigma bond length arises from the WCA repulsion between
+    bonded neighbors — excluding bonded pairs from the nonbonded force
+    (the polymer_chains default) silently breaks the model.
+
+    With defaults (fene_k=30, angle_k=1.5, trunc=None) chains cannot cross
+    (barrier ~70 kT) and the entanglement length is Ne ~ 28 (Halverson et
+    al., JCP 134, 204904 (2011)). Validated numerics for this force set at
+    monomer density 0.85 / sigma^3 (LJ units; in polychrom default units
+    sigma = 1 nm, m = 100 amu, T = 300 K => tau_LJ = 6.33 ps):
+
+    * integrator="langevinMiddle", timestep <= 82 fs (0.013 tau; the
+      canonical 0.01 tau is 63 fs), collision_rate = 0.079 /ps (0.5/tau).
+      timestep = 95 fs (0.015 tau) is metastable: it survives ~1000 tau
+      but explodes on longer runs.
+    * variable-timestep integrators ("variableLangevin") explode with this
+      stiff force set at any error tolerance — use fixed timestep.
+    * start from an energy-minimized conformation and warm up a few hundred
+      tau at a smaller timestep (e.g. 30 fs) before switching to production.
+    * topology should be verified, not assumed: see
+      polymer_analyses.alexander_invariants (knots) and
+      polymer_analyses.getLinkingNumber (links).
+
+    Parameters
+    ----------
+    chains : list of (start, end, isRing) tuples
+        Same as polymer_chains; default is one ring over all particles.
+    fene_k : float
+        FENE spring constant, kT/sigma^2. Default 30 (Kremer-Grest).
+    angle_k : float
+        Bending stiffness, kT. Default 1.5 (Halverson, Ne ~ 28).
+    Note there is deliberately no `trunc` parameter: truncated (crossable)
+    repulsion combined with FENE bonds does not merely leak topology — it
+    collapses the bonds (FENE alone has its minimum at r = 0) and the
+    simulation NaNs. For a crossable soft system use polymer_chains with
+    harmonic bonds and a truncated repulsive force instead.
+    """
+    return polymer_chains(
+        sim_object,
+        chains=chains,
+        bond_force_func=forces.grosberg_polymer_bonds,
+        bond_force_kwargs={"k": fene_k},
+        angle_force_func=forces.grosberg_angle,
+        angle_force_kwargs={"k": angle_k},
+        nonbonded_force_func=forces.grosberg_repulsive_force,
+        nonbonded_force_kwargs={"trunc": None},
+        except_bonds=False,
+        extra_bonds=extra_bonds,
+        extra_triplets=extra_triplets,
+        override_checks=override_checks,
+    )

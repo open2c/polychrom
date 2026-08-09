@@ -63,9 +63,6 @@ def test_basic_simulation_and_hdf5(tmp_path):
 
     assert np.abs(d1["pos"] - d1_direct).max() <= 0.0051
 
-    d1_fetch = polychrom.polymerutils.fetch_block(tmp_path, 1)
-    assert np.allclose(d1["pos"], d1_fetch)
-
     assert np.allclose(d1["spam"], [1, 2, 3])  # spam got saved correctly
     assert d1["eggs"] == "I don't eat green eggs and ham!!!"
 

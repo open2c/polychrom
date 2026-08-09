@@ -22,6 +22,7 @@ Run this script using
 >>> python corr_noise.py [gpuid]
 
 """
+
 import os
 import sys
 import time

@@ -1,4 +1,4 @@
-"""
+r"""
 Building contact maps
 =====================
 
@@ -47,6 +47,7 @@ import multiprocessing as mp
 import random
 import warnings
 from contextlib import closing
+from functools import partial
 
 import numpy as np
 
@@ -75,6 +76,8 @@ def tonumpyarray(mp_arr):
 
 def findN(filenames, loadFunction, exceptions):
     "Finds length of data in filenames, handling the fact that files could be not loadable"
+    exceptions = tuple(exceptions) if exceptions else ()
+    N = -1
     for i in range(30):
         if i == 29:
             raise ValueError("Could not load any of the 30 randomly selected files")
@@ -281,6 +284,10 @@ def worker(x):
                 return
 
 
+def identity(x):
+    return x
+
+
 def averageContacts(contactIterator, inValues, N, **kwargs):
     """
     A main workhorse for averaging contacts on multiple cores into one shared contact
@@ -352,7 +359,7 @@ def averageContacts(contactIterator, inValues, N, **kwargs):
     contactBlock = kwargs.get("contactBlock", 5000000)
     classInitArgs = kwargs.get("classInitArgs", [])
     classInitKwargs = kwargs.get("classInitKwargs", {})
-    contactProcessing = kwargs.get("contactProcessing", lambda x: x)
+    contactProcessing = kwargs.get("contactProcessing", identity)
     finalSize = N * (N + 1) // 2
     boundaries = np.linspace(0, finalSize, bucketNum + 1, dtype=int)
     chunks = zip(boundaries[:-1], boundaries[1:])
@@ -399,7 +406,11 @@ class filenameContactMap(object):
         """
         self.filenames = filenames
         self.cutoff = cutoff
-        self.exceptionsToIgnore = exceptionsToIgnore
+        if loadFunction is None:
+            loadFunction = polymerutils.load
+        if contactFunction is None:
+            contactFunction = polymer_analyses.calculate_contacts
+        self.exceptionsToIgnore = tuple(exceptionsToIgnore) if exceptionsToIgnore else ()
         self.contactFunction = contactFunction
         self.loadFunction = loadFunction
         self.i = 0
@@ -447,6 +458,15 @@ def monomerResolutionContactMap(
     )
 
 
+def contactAction(contacts, myBins):
+    contacts = np.asarray(contacts, order="C")
+    cshape = contacts.shape
+    contacts = contacts.reshape(-1)
+    contacts = np.searchsorted(myBins[0], contacts) - 1
+    contacts = contacts.reshape(cshape)
+    return contacts
+
+
 def binnedContactMap(
     filenames,
     chains=None,
@@ -455,7 +475,7 @@ def binnedContactMap(
     n=8,  # Num threads
     contactFinder=polymer_analyses.calculate_contacts,
     loadFunction=polymerutils.load,
-    exceptionsToIgnore=None,
+    exceptionsToIgnore=[],
     useFmap=False,
 ):
     n = min(n, len(filenames))
@@ -480,14 +500,6 @@ def binnedContactMap(
     chromosomeStarts = np.cumsum(chainBinNums)
     chromosomeStarts = np.hstack((0, chromosomeStarts))
 
-    def contactAction(contacts, myBins=[bins]):
-        contacts = np.asarray(contacts, order="C")
-        cshape = contacts.shape
-        contacts.shape = (-1,)
-        contacts = np.searchsorted(myBins[0], contacts) - 1
-        contacts.shape = cshape
-        return contacts
-
     args = [cutoff, loadFunction, exceptionsToIgnore, contactFinder]
     values = [filenames[i::n] for i in range(n)]
     mymap = averageContacts(
@@ -496,7 +508,7 @@ def binnedContactMap(
         Nbase,
         classInitArgs=args,
         useFmap=useFmap,
-        contactProcessing=contactAction,
+        contactProcessing=partial(contactAction, myBins=[bins]),
         nproc=n,
     )
     return mymap, chromosomeStarts
@@ -526,9 +538,13 @@ class filenameContactMapRepeat(object):
         When initialized, the iterator should store these args properly and create
         all necessary constructs
         """
+        if loadFunction is None:
+            loadFunction = polymerutils.load
+        if contactFunction is None:
+            contactFunction = polymer_analyses.calculate_contacts
         self.filenames = filenames
         self.cutoff = cutoff
-        self.exceptionsToIgnore = exceptionsToIgnore
+        self.exceptionsToIgnore = tuple(exceptionsToIgnore) if exceptionsToIgnore else ()
         self.mapStarts = mapStarts
         self.mapN = mapN
         self.contactFunction = contactFunction

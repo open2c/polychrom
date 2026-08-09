@@ -1,5 +1,7 @@
 import numpy as np
 
+np.random.seed(42)
+
 import polychrom.polymer_analyses as polymer_analyses
 from polychrom.contactmaps import (
     averageContacts,
@@ -25,6 +27,15 @@ class DummyContactMap(object):
         return self.a
 
 
+# setting up seed because we are going to spawn from here -> reimport is going to happen
+np.random.seed(42)
+ars = [np.random.random((60, 3)) * 4 for _ in range(16)]
+
+
+def load_function(x):
+    return ars[x]
+
+
 def test_contactmaps():
     """
     This function performs several tests of contactmaps. It uses an artificial class
@@ -36,7 +47,7 @@ def test_contactmaps():
     contactmap finder.
 
     """
-    ars = [np.random.random((60, 3)) * 4 for _ in range(16)]
+
     conts = polymer_analyses.calculate_contacts(ars[0], 1)
     args = np.repeat(np.arange(4, dtype=int), 4)
     cmap1 = averageContacts(DummyContactMap, args, 100, classInitArgs=[conts], nproc=4)
@@ -53,11 +64,11 @@ def test_contactmaps():
     assert np.allclose(cmap1, cmap3)
 
     for n in [1, 4]:
-        cmap6 = monomerResolutionContactMap(range(8), cutoff=1, loadFunction=lambda x: ars[x], n=n)
+        cmap6 = monomerResolutionContactMap(range(8), cutoff=1, loadFunction=load_function, n=n)
         cmap5 = cmapPureMap(
             range(8),
             cutoff=1,
-            loadFunction=lambda x: ars[x],
+            loadFunction=load_function,
             n=n,
             printProbability=0.000001,
         )
@@ -69,7 +80,7 @@ def test_contactmaps():
             chains=[(0, 27), (27, 60)],
             binSize=2,
             cutoff=1,
-            loadFunction=lambda x: ars[x],
+            loadFunction=load_function,
             n=n,
         )[0]
 
@@ -78,7 +89,7 @@ def test_contactmaps():
             chains=[(0, 27), (27, 60)],
             binSize=2,
             cutoff=1,
-            loadFunction=lambda x: ars[x],
+            loadFunction=load_function,
             n=n,
             printProbability=0.000001,
         )[0]

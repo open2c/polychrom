@@ -167,7 +167,11 @@ long int _getLinkingNumberCpp(int M, double *olddata, int N) {
         }
     }
 
-    return L;
+    // L is the full signed crossing sum between the two curves in projection;
+    // the linking number is half of that, and intersectValue's sign convention
+    // is opposite to the standard (Gauss integral) one. Verified against an
+    // independent Gauss-integral implementation: raw L = -2 * lk.
+    return -L/2;
 }
 
 
@@ -343,6 +347,7 @@ int _simplifyCpp (double *datax, double *datay, double *dataz, int N)
     for (i=0;i<N;i++) todelete[i] == -2;
     for (int xxx = 0; xxx < 1000; xxx++)
         {
+        if (N <= 3) break;  // a triangle is the minimal closed polygon
         maxdist = 0;
         for (i=0;i<N-1;i++)
         {
@@ -408,16 +413,20 @@ int _simplifyCpp (double *datax, double *datay, double *dataz, int N)
                 newposition[s++] = position[j];
                 }
             }
+        N = s;  // shrink the working chain: later sweeps must not read the
+                // stale tail of the buffer (it holds garbage points, and the
+                // wrap-around N-1 -> 0 closure edge would be lost otherwise);
+                // _mutualSimplifyCpp already does this via N1 = s
         M = 0;
         t = 0;
         position = newposition;
     }
 
-    for (i=0;i<s;i++)
+    for (i=0;i<N;i++)
     {
         datax[i]  = position[i].x;
         datay[i]  = position[i].y;
         dataz[i]  = position[i].z;
     }
-    return s;
+    return N;  // N, not s: s is 0 if the first sweep deleted nothing
 }

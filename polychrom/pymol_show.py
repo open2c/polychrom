@@ -1,8 +1,11 @@
 # Code written by: Maksim Imakaev (imakaev@mit.edu)
 #                  Anton Goloborodko (golobor@mit.edu)
+# Legacy code, unlikely to be used these days and may require refactoring
+
 
 """This class is a collection of functions for showing data with pymol. Note that the limit of pymol is 100k
-monomers, therefore interpolateData is useful to collapse the 200k-long simulation into a 100k-long conformation. """
+monomers, therefore interpolateData is useful to collapse the 200k-long simulation into a 100k-long conformation."""
+
 import os
 import shutil
 import subprocess
@@ -51,12 +54,12 @@ def interpolateData(data, targetN=90000, colorArrays=[]):
     splined = np.zeros((len(targetRange), numDim), float)
     colorsSplined = []
     for coor in range(numDim):
-        spline = InterpolatedUnivariateSpline(evaluateRange, data[:, coor], k=3)
+        spline = InterpolatedUnivariateSpline(evaluateRange, data[:, coor], k=3)  # type: ignore
         evaled = spline(targetRange)
         splined[:, coor] = evaled
 
     for color in colorArrays:
-        spline = InterpolatedUnivariateSpline(evaluateRange, color, k=2)
+        spline = InterpolatedUnivariateSpline(evaluateRange, color, k=2)  # type: ignore
         evaled = spline(targetRange)
         colorsSplined.append(evaled)
 
@@ -118,7 +121,6 @@ def do_coloring(
     force=False,
     miscArguments="",
 ):
-
     """
     !!! Please read this completely. Otherwise you'll suck :( !!!
 
@@ -213,7 +215,7 @@ def do_coloring(
 
     if not hasattr(subchainRadius, "__iter__"):
         subchainRadius = [subchainRadius for _ in regions]
-    subchainRadius = [i * multiplier for i in subchainRadius]
+    subchainRadius = [i * multiplier for i in subchainRadius]  # type: ignore
 
     tmpPdbFile = tempfile.NamedTemporaryFile(mode="w", suffix=".pdb")
     tmpPdbFilename = tmpPdbFile.name
@@ -302,7 +304,7 @@ def do_coloring(
             raise ValueError("please select showChain to be 'worm' or 'spheres' or 'none'")
 
     for i in spherePositions:
-        out.write("select {0} and  {1}\n".format(name, getSelectionString(i, i)))
+        out.write("select {0} and  {1}\n".format(name, getSelectionString(i, i)))  # type: ignore
         out.write("show spheres, sele\n")
         out.write("alter sele, vdw={0}\n".format(1.5 * sphereRadius))
         out.write("set sphere_color, {0}, sele \n".format(sphereColor))
@@ -364,7 +366,6 @@ def new_coloring(
     force=False,
     miscArguments="",
 ):
-
     """
     !!! Please read this completely. Otherwise you'll suck :( !!!
 
@@ -435,7 +436,7 @@ def new_coloring(
 
     if not hasattr(subchainRadius, "__iter__"):
         subchainRadius = [subchainRadius for _ in regions]
-    subchainRadius = [i * multiplier for i in subchainRadius]
+    subchainRadius = [i * multiplier for i in subchainRadius]  # type: ignore
 
     tmpPdbFile = tempfile.NamedTemporaryFile(mode="w", suffix=".pdb")
     tmpPdbFilename = tmpPdbFile.name
@@ -627,7 +628,7 @@ def makeMoviePymol(
 
     rotationCode = ""
     if rotationPeriod > 0:
-        for i in range(numFrames // rotationPeriod + 1):
+        for i in range(numFrames // rotationPeriod + 1):  # type: ignore
             rotationCode += "util.mroll {0},{1},0\n".format(i * rotationPeriod + 1, (i + 1) * rotationPeriod)
 
     if pymolScript is None:

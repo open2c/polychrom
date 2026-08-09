@@ -33,20 +33,30 @@ for (bins[0].. bins[1]), (bins[1]..bins[2]). Therefore, we have to return bin mi
 
 """
 
+import warnings
 from math import sqrt
+from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from scipy.spatial import KDTree
 from scipy.ndimage import gaussian_filter1d
+from scipy.spatial import KDTree
 
 try:
-    from . import _polymer_math
+    from . import _polymer_math  # type: ignore
 except Exception:
-    pass
+    _polymer_math = None
 
 
-def calculate_contacts(data, cutoff=1.7):
+def _require_polymer_math() -> None:
+    """Raise if the _polymer_math Cython extension failed to import."""
+    if _polymer_math is None:
+        raise ImportError(
+            "_polymer_math Cython extension is not available. Build it with: python setup.py build_ext --inplace"
+        )
+
+
+def calculate_contacts(data: np.ndarray, cutoff: float = 1.7) -> np.ndarray:
     """Calculates contacts between points give the contact radius (cutoff)
 
     Parameters
@@ -71,7 +81,12 @@ def calculate_contacts(data, cutoff=1.7):
     return pairs
 
 
-def smart_contacts(data, cutoff=1.7, min_cutoff=2.1, percent_func=lambda x: 1 / x):
+def smart_contacts(
+    data: np.ndarray,
+    cutoff: float = 1.7,
+    min_cutoff: float = 2.1,
+    percent_func: Callable[[float], float] = lambda x: 1 / x,
+) -> np.ndarray:
     """Calculates contacts for a polymer, give the contact radius (cutoff)
     This method takes a random fraction of the monomers that is equal to (
     1/cutoff).
@@ -125,7 +140,7 @@ def smart_contacts(data, cutoff=1.7, min_cutoff=2.1, percent_func=lambda x: 1 / 
         return calculate_contacts(data, cutoff)
 
 
-def generate_bins(N, start=4, bins_per_order_magn=10):
+def generate_bins(N: int, start: int = 4, bins_per_order_magn: int = 10) -> np.ndarray:
     lstart = np.log10(start)
     lend = np.log10(N - 1) + 1e-6
     num = int(np.ceil((lend - lstart) * bins_per_order_magn))
@@ -135,7 +150,13 @@ def generate_bins(N, start=4, bins_per_order_magn=10):
     return bins
 
 
-def contact_scaling(data, bins0=None, cutoff=1.1, *, ring=False):
+def contact_scaling(
+    data: np.ndarray,
+    bins0: Optional[Union[np.ndarray, Sequence[int]]] = None,
+    cutoff: float = 1.1,
+    *,
+    ring: bool = False,
+) -> Tuple[List[float], np.ndarray]:
     """
     Returns contact probability scaling for a given polymer conformation
     Contact between monomers X and X+1 is counted as s=1
@@ -194,22 +215,62 @@ def contact_scaling(data, bins0=None, cutoff=1.1, *, ring=False):
     return a, connumbers
 
 
-def slope_contact_scaling(mids, cp, sigma=2):
-    def smooth(x):
-        return gaussian_filter1d(x, sigma)
+def _smooth_for_slope(x: np.ndarray, sigma: float) -> np.ndarray:
+    """Helper function for slope_contact_scaling to smooth data.
+    Extracted to module level for pickle compatibility."""
+    return gaussian_filter1d(x, sigma)
 
+
+def slope_contact_scaling(
+    mids: Union[np.ndarray, List[float]], cp: Union[np.ndarray, List[float]], sigma: float = 2.0
+) -> Tuple[np.ndarray, np.ndarray]:
     # P(s) has to be smoothed in logspace, and both P and s have to be smoothed.
     # It is discussed in detail here
     # https://gist.github.com/mimakaev/4becf1310ba6ee07f6b91e511c531e73
 
     # Values sigma=1.5-2 look reasonable for reasonable simulations
 
-    slope = np.diff(smooth(np.log(cp))) / np.diff(smooth(np.log(mids)))
+    slope = np.diff(_smooth_for_slope(np.log(cp), sigma)) / np.diff(_smooth_for_slope(np.log(mids), sigma))
 
-    return mids[1:], slope
+    return np.array(mids[1:]), np.array(slope)
 
 
-def Rg2_scaling(data, bins=None, ring=False):
+def _radius_gyration_helper(len2: int, coms: np.ndarray, coms2: np.ndarray, ring: bool = False) -> float:
+    """Helper function for Rg2_scaling to calculate radius of gyration.
+    Extracted to module level for pickle compatibility.
+
+    Parameters
+    ----------
+    len2 : int
+        Length of the subchain
+    coms : ndarray
+        Cumulative sum of locations to calculate COM
+    coms2 : ndarray
+        Cumulative sum of locations^2 to calculate RG
+    ring : bool
+        Whether to treat polymer as a ring
+    """
+    if ring:
+        comsadd = coms[1:len2, :].copy()
+        coms2add = coms2[1:len2, :].copy()
+        comsadd += coms[-1, :][None, :]
+        coms2add += coms2[-1, :][None, :]
+        comsw = np.concatenate([coms, comsadd], axis=0)
+        coms2w = np.concatenate([coms2, coms2add], axis=0)
+    else:
+        comsw = coms
+        coms2w = coms2
+
+    coms2d = (-coms2w[:-len2, :] + coms2w[len2:, :]) / len2
+    comsd = ((comsw[:-len2, :] - comsw[len2:, :]) / len2) ** 2
+    diffs = coms2d - comsd
+    sums = np.sum(diffs, 1)
+    return np.mean(sums)
+
+
+def Rg2_scaling(
+    data: np.ndarray, bins: Optional[Union[np.ndarray, Sequence[int]]] = None, ring: bool = False
+) -> Tuple[np.ndarray, List[float]]:
     """Calculates average gyration radius of subchains a function of s
 
     Parameters
@@ -232,31 +293,15 @@ def Rg2_scaling(data, bins=None, ring=False):
     coms = np.cumsum(data, 0)  # cumulative sum of locations to calculate COM
     coms2 = np.cumsum(data**2, 0)  # cumulative sum of locations^2 to calculate RG
 
-    def radius_gyration(len2):
-        if ring:
-            comsadd = coms[1:len2, :].copy()
-            coms2add = coms2[1:len2, :].copy()
-            comsadd += coms[-1, :][None, :]
-            coms2add += coms2[-1, :][None, :]
-            comsw = np.concatenate([coms, comsadd], axis=0)
-            coms2w = np.concatenate([coms2, coms2add], axis=0)
-        else:
-            comsw = coms
-            coms2w = coms2
-
-        coms2d = (-coms2w[:-len2, :] + coms2w[len2:, :]) / len2
-        comsd = ((comsw[:-len2, :] - comsw[len2:, :]) / len2) ** 2
-        diffs = coms2d - comsd
-        sums = np.sum(diffs, 1)
-        return np.mean(sums)
-
     rads = [0.0 for _ in range(len(bins))]
     for i in range(len(bins)):
-        rads[i] = radius_gyration(int(bins[i]))
+        rads[i] = _radius_gyration_helper(int(bins[i]), coms, coms2, ring=ring)
     return np.array(bins), rads
 
 
-def R2_scaling(data, bins=None, ring=False):
+def R2_scaling(
+    data: np.ndarray, bins: Optional[Union[np.ndarray, Sequence[int]]] = None, ring: bool = False
+) -> Tuple[np.ndarray, List[float]]:
     """
     Returns end-to-end distance scaling of a given polymer conformation.
     ..warning:: This method averages end-to-end scaling over all possible
@@ -290,7 +335,7 @@ def R2_scaling(data, bins=None, ring=False):
     return np.array(bins), rads
 
 
-def Rg2(data):
+def Rg2(data: np.ndarray) -> float:
     """
     Simply calculates gyration radius of a polymer chain.
     """
@@ -299,7 +344,7 @@ def Rg2(data):
     return np.mean((data - np.mean(data, axis=0)) ** 2) * 3
 
 
-def Rg2_matrix(data):
+def Rg2_matrix(data: np.ndarray) -> np.ndarray:
     """
     Uses dynamic programming and vectorizing to calculate Rg for each subchain of the polymer.
     Returns a matrix for which an element [i,j] is Rg of a subchain from i to j including  i and j
@@ -449,7 +494,7 @@ def streaming_ndarray_agg(
     return aggregate
 
 
-def kabsch_msd(P, Q):
+def kabsch_msd(P: np.ndarray, Q: np.ndarray) -> float:
     """
     Calculates MSD between two vectors using Kabash alcorithm
     Borrowed from https://github.com/charnley/rmsd  with some changes
@@ -499,27 +544,66 @@ def kabsch_msd(P, Q):
 kabsch_rmsd = kabsch_msd
 
 
-def mutualSimplify(a, b, verbose=False):
+def mutualSimplify(a: np.ndarray, b: np.ndarray, verbose: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Ported here from openmmlib.
+    Simplify two polymer rings while preserving their mutual topology.
 
-    Given two polymer rings, it attempts to reduce the number of monomers in each of
-    them while preserving the linking between them. It does so by trying to remove
-    monomers one-by-one. If no other bonds pass through the triangle formed by the 2
-    old bonds and 1 new bond, it accepts removal of the monomer. It does so until no
-    monomers in either of the rings can be removed.
+    This function performs topology-preserving simplification of two interlinked polymer
+    rings simultaneously. It reduces the number of monomers in both polymers while
+    maintaining their linking number and individual knot types.
 
+    The algorithm works by iteratively attempting to remove monomers from each polymer.
+    A monomer can be removed if doing so doesn't change the linking between the two
+    polymers. This is checked by verifying that no segments from either polymer pass
+    through the triangle formed by removing the monomer.
+
+    Parameters
+    ----------
+    a : np.ndarray
+        First polymer ring as an Nx3 array of 3D coordinates.
+    b : np.ndarray
+        Second polymer ring as an Mx3 array of 3D coordinates.
+    verbose : bool, optional
+        If True, print progress during simplification. Default is False.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Simplified versions of both input polymers that preserve their
+        mutual topology (linking number and individual knot types).
+
+    Examples
+    --------
+    >>> # Create two linked rings
+    >>> ring1 = create_ring(center=[0, 0, 0], radius=1, n_points=100)
+    >>> ring2 = create_ring(center=[0.5, 0, 0], radius=1, n_points=100)
+    >>> simp1, simp2 = mutualSimplify(ring1, ring2)
+    >>> # The simplified rings will have the same linking number
+
+    Notes
+    -----
+    - The simplification alternates between the two polymers to ensure balanced reduction
+    - Small random perturbations are added internally to avoid numerical degeneracies
+    - The function is particularly useful before calculating linking numbers, as it can
+      dramatically reduce computation time
+    - Originally ported from openmmlib
+
+    See Also
+    --------
+    simplifyPolymer : Simplify a single polymer ring
+    getLinkingNumber : Calculate the linking number between two rings
     """
+    _require_polymer_math()
     if verbose:
         print("Starting mutual simplification of polymers")
     while True:
         la, lb = len(a), len(b)
         if verbose:
             print(len(a), len(b), "before; ", end=" ")
-        a, b = _polymer_math.mutualSimplify(a, b)
+        a, b = _polymer_math.mutualSimplify(a, b)  # type: ignore
         if verbose:
             print(len(a), len(b), "after one; ", end=" ")
-        b, a = _polymer_math.mutualSimplify(b, a)
+        b, a = _polymer_math.mutualSimplify(b, a)  # type: ignore
         if verbose:
             print(len(a), len(b), "after two; ")
 
@@ -529,17 +613,151 @@ def mutualSimplify(a, b, verbose=False):
             return a, b
 
 
-def getLinkingNumber(data1, data2, simplify=True, randomOffset=True, verbose=False):
+def getLinkingNumber(
+    data1: np.ndarray, data2: np.ndarray, simplify: bool = True, randomOffset: bool = True, verbose: bool = False
+) -> int:
     """
-    Ported here from openmmlib as well.
+    Calculate the linking number between two closed polymer rings.
 
+    The linking number is a topological invariant that measures how many times
+    two closed curves wind around each other. It is always an integer and remains
+    constant under continuous deformations that don't break the curves.
+
+    The algorithm computes the linking number using the Gauss linking integral,
+    counting signed crossings when one curve is projected onto a plane perpendicular
+    to segments of the other curve.
+
+    Parameters
+    ----------
+    data1 : np.ndarray
+        First polymer ring as an Nx3 array of 3D coordinates.
+    data2 : np.ndarray
+        Second polymer ring as an Mx3 array of 3D coordinates.
+    simplify : bool, optional
+        If True, simplify both polymers before calculating linking number.
+        This can dramatically speed up the calculation. Default is True.
+    randomOffset : bool, optional
+        If True, add small random perturbations to avoid numerical degeneracies
+        when polymer segments are exactly coplanar. Default is True.
+    verbose : bool, optional
+        If True, print progress information during calculation. Default is False.
+
+    Returns
+    -------
+    int
+        The linking number between the two polymer rings.
+        Positive values indicate right-handed linking, negative for left-handed.
+
+    Examples
+    --------
+    >>> # Create two unlinked rings
+    >>> ring1 = create_ring([0, 0, 0], radius=1)
+    >>> ring2 = create_ring([3, 0, 0], radius=1)  # far apart
+    >>> L = getLinkingNumber(ring1, ring2)
+    >>> print(L)  # Should be 0
+    0
+
+    >>> # Create Hopf link (two linked rings)
+    >>> ring1 = create_ring([0, 0, 0], radius=1, axis='z')
+    >>> ring2 = create_ring([0.5, 0, 0], radius=1, axis='x')
+    >>> L = getLinkingNumber(ring1, ring2)
+    >>> print(abs(L))  # Should be 1
+    1
+
+    Notes
+    -----
+    - The polymers must be closed rings (the last point connects to the first)
+    - The sign of the linking number depends on the orientation of the curves
+    - Simplification is highly recommended for long polymers to reduce computation time
+    - The linking number is undefined for open chains
+    - Originally ported from openmmlib
+
+    See Also
+    --------
+    mutualSimplify : Simplify two polymers while preserving their linking
+    simplifyPolymer : Simplify a single polymer ring
     """
+    _require_polymer_math()
     if simplify:
         data1, data2 = mutualSimplify(a=data1, b=data2, verbose=verbose)
-    return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)
+    return _polymer_math.getLinkingNumber(data1, data2, randomOffset=randomOffset)  # type: ignore
 
 
-def calculate_cistrans(data, chains, chain_id=0, cutoff=5, pbc_box=False, box_size=None):
+def simplifyPolymer(data: np.ndarray, verbose: bool = False) -> np.ndarray:
+    """
+    Simplify a polymer ring while preserving its topology.
+
+    This function uses a topology-preserving simplification algorithm to reduce the number
+    of monomers in a polymer ring while maintaining its knot type. The algorithm iteratively
+    removes monomers that can be deleted without changing the topology by checking for
+    intersections with the remaining polymer segments.
+
+    The algorithm works by:
+    1. Testing each monomer to see if it can be removed
+    2. Checking if removing it would cause any segment intersections
+    3. If no intersections, replacing the monomer with the midpoint of its neighbors
+    4. Repeating until no more simplifications are possible
+
+    This is particularly useful for:
+    - Speeding up topological calculations like Alexander polynomial
+    - Reducing computational cost of linking number calculations
+    - Visualizing complex knots with fewer segments
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Nx3 array of polymer coordinates representing a closed ring.
+        The polymer is assumed to be a closed loop (first and last points are connected).
+    verbose : bool, optional
+        If True, print simplification progress. Default is False.
+
+    Returns
+    -------
+    np.ndarray
+        Simplified polymer coordinates with shape (M, 3) where M <= N.
+        The simplified polymer has the same topology as the input.
+
+    Examples
+    --------
+    >>> # Simplify a complex knot for faster analysis
+    >>> polymer = np.random.randn(1000, 3)
+    >>> simplified = simplifyPolymer(polymer)
+    >>> print(f"Reduced from {len(polymer)} to {len(simplified)} monomers")
+
+    Notes
+    -----
+    - The function adds small random perturbations to avoid numerical degeneracies
+    - The simplification is deterministic up to the random perturbations
+    - For unknotted polymers, the result will typically be very short (3-4 monomers)
+    - For complex knots, the simplified length depends on the knot complexity
+    """
+    _require_polymer_math()
+
+    if len(data) < 3:
+        raise ValueError("Polymer must have at least 3 monomers")
+
+    if data.shape[1] != 3:
+        raise ValueError("Data must be Nx3 array of 3D coordinates")
+
+    if verbose:
+        print(f"Simplifying polymer with {len(data)} monomers...")
+
+    result = _polymer_math.simplifyPolymer(data)  # type: ignore
+
+    if verbose:
+        print(f"Simplified to {len(result)} monomers")
+
+    return result
+
+
+def calculate_cistrans(
+    data: np.ndarray,
+    chains: Optional[List[List[int]]],
+    chain_id: int = 0,
+    cutoff: float = 5.0,
+    pbc_box: bool = False,
+    box_size: Optional[Union[List[float], np.ndarray]] = None,
+) -> Tuple[int, int]:
     """
     Analysis of the territoriality of polymer chains from simulations, using the cis/trans ratio.
     Cis signal is computed for the marked chain ('chain_id') as amount of contacts of the chain with itself
@@ -602,3 +820,238 @@ def rotation_matrix(rotate):
     Ry = np.array([[np.cos(ty), 0, -np.sin(ty)], [0, 1, 0], [np.sin(ty), 0, np.cos(ty)]])
     Rz = np.array([[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]])
     return np.dot(Rx, np.dot(Ry, Rz))
+
+
+# -------------------- Knot detection: Alexander invariants  ------------------
+
+
+class _DegenerateProjection(Exception):
+    pass
+
+
+def _bareiss_det(M: List[List[int]]) -> int:
+    """Exact integer determinant via fraction-free Gaussian elimination."""
+    A = [[int(x) for x in row] for row in M]
+    n = len(A)
+    if n == 0:
+        return 1
+    sign = 1
+    prev = 1
+    for k in range(n - 1):
+        if A[k][k] == 0:
+            for i in range(k + 1, n):
+                if A[i][k] != 0:
+                    A[k], A[i] = A[i], A[k]
+                    sign = -sign
+                    break
+            else:
+                return 0
+        for i in range(k + 1, n):
+            for j in range(k + 1, n):
+                A[i][j] = (A[i][j] * A[k][k] - A[i][k] * A[k][j]) // prev
+            A[i][k] = 0
+        prev = A[k][k]
+    return sign * A[n - 1][n - 1]
+
+
+def _project_and_find_crossings(pts: np.ndarray, rng: np.random.Generator) -> list:
+    """Randomly rotate, project to xy, return the crossing diagram.
+
+    Raises _DegenerateProjection on any ambiguous geometry (crossing at a
+    vertex, near-parallel overlapping segments, coinciding heights) so the
+    caller can retry with a different rotation.
+    """
+    n = len(pts)
+    q = rng.normal(size=4)
+    q /= np.linalg.norm(q)
+    w, x, y, z = q
+    R = np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+            [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+            [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
+        ]
+    )
+    p = pts @ R.T
+    a = p
+    b = p[(np.arange(n) + 1) % n]
+    d = b - a
+
+    crossings = []  # (seg_i, t_i, seg_j, t_j, i_over, sign)
+    EPS = 1e-9
+    for i in range(n):
+        for j in range(i + 1, n):
+            if (j - i) % n in (0, 1) or (i - j) % n in (0, 1):
+                continue
+            denom = d[i, 0] * d[j, 1] - d[i, 1] * d[j, 0]
+            scale = max(abs(d[i, 0]) + abs(d[i, 1]), EPS) * max(abs(d[j, 0]) + abs(d[j, 1]), EPS)
+            rx, ry = a[j, 0] - a[i, 0], a[j, 1] - a[i, 1]
+            if abs(denom) < 1e-7 * scale:
+                ci = (rx * d[i, 0] + ry * d[i, 1]) / max(d[i, 0] ** 2 + d[i, 1] ** 2, EPS)
+                perp = np.hypot(rx - ci * d[i, 0], ry - ci * d[i, 1])
+                if perp < 1e-5 and -0.5 < ci < 1.5:
+                    raise _DegenerateProjection()
+                continue
+            ti = (rx * d[j, 1] - ry * d[j, 0]) / denom
+            tj = (rx * d[i, 1] - ry * d[i, 0]) / denom
+            if not (-1e-7 < ti < 1 + 1e-7 and -1e-7 < tj < 1 + 1e-7):
+                continue
+            if min(ti, 1 - ti, tj, 1 - tj) < 1e-6:
+                raise _DegenerateProjection()  # crossing at a vertex
+            zi = a[i, 2] + ti * d[i, 2]
+            zj = a[j, 2] + tj * d[j, 2]
+            if abs(zi - zj) < 1e-9 * (1 + abs(zi) + abs(zj)):
+                raise _DegenerateProjection()
+            i_over = zi > zj
+            if i_over:
+                s = 1 if denom > 0 else -1
+            else:
+                s = 1 if -denom > 0 else -1
+            crossings.append((i, ti, j, tj, i_over, s))
+    return crossings
+
+
+def _alexander_once(pts: np.ndarray, rng: np.random.Generator, max_tries: int) -> Tuple[int, int]:
+    import bisect
+
+    for _ in range(max_tries):
+        try:
+            cr = _project_and_find_crossings(pts, rng)
+            if len(cr) == 0:
+                return 1, 1
+            events = []
+            for cid, (i, ti, j, tj, i_over, s) in enumerate(cr):
+                if i_over:
+                    events.append((j + tj, cid, "under"))
+                else:
+                    events.append((i + ti, cid, "under"))
+            unders = sorted(events)
+            ncr = len(cr)
+            under_order = {cid: k for k, (pos, cid, _) in enumerate(unders)}
+            under_pos = sorted(pos for pos, cid, _ in unders)
+
+            def arc_of(position: float) -> int:
+                return bisect.bisect_right(under_pos, position) % ncr
+
+            rows = []
+            for cid, (i, ti, j, tj, i_over, s) in enumerate(cr):
+                k = under_order[cid]
+                over_arc = arc_of((i + ti) if i_over else (j + tj))
+                rows.append((k, (k + 1) % ncr, over_arc, s))
+
+            def alex_det(t: int) -> int:
+                M = [[0] * ncr for _ in range(ncr)]
+                for r, (kin, kout, ov, s) in enumerate(rows):
+                    if ov == kin or ov == kout:
+                        M[r][kin] += 1
+                        M[r][kout] += -1
+                    elif s > 0:
+                        M[r][kin] += 1
+                        M[r][kout] += -t
+                        M[r][ov] += t - 1
+                    else:
+                        M[r][kin] += -t
+                        M[r][kout] += 1
+                        M[r][ov] += t - 1
+                minor = [row[: ncr - 1] for row in M[: ncr - 1]]
+                return abs(_bareiss_det(minor))
+
+            d1 = alex_det(-1)
+            d2 = alex_det(-2)
+            while d2 > 0 and d2 % 2 == 0:
+                d2 //= 2
+            return d1, d2
+        except _DegenerateProjection:
+            continue
+    raise RuntimeError("Could not find a generic projection of the ring")
+
+
+def _min_nonadjacent_clearance(P: np.ndarray) -> float:
+    """Minimum distance between non-adjacent edges of closed polygon P."""
+    n = len(P)
+    if n < 4:
+        return np.inf
+    A, B = P, np.roll(P, -1, axis=0)
+    best = np.inf
+    for i in range(n - 2):
+        js = np.arange(i + 2, n if i > 0 else n - 1)
+        if len(js) == 0:
+            continue
+        d1 = B[i] - A[i]
+        d2 = B[js] - A[js]
+        r = A[i] - A[js]
+        a_ = d1 @ d1
+        e_ = (d2 * d2).sum(1)
+        f_ = (d2 * r).sum(1)
+        c_ = d1 @ r.T
+        b_ = d2 @ d1
+        den = a_ * e_ - b_ * b_
+        s = np.where(den > 1e-300, np.clip((b_ * f_ - c_ * e_) / np.where(den > 1e-300, den, 1), 0, 1), 0.0)
+        t = np.clip((b_ * s + f_) / np.where(e_ > 1e-300, e_, 1), 0, 1)
+        s = np.clip((b_ * t - c_) / max(a_, 1e-300), 0, 1)
+        diff = (A[i] + s[:, None] * d1) - (A[js] + t[:, None] * d2)
+        best = min(best, float(np.sqrt((diff**2).sum(1).min())))
+    return best
+
+
+def alexander_invariants(
+    ring: np.ndarray,
+    simplify: bool = True,
+    rng: Optional[np.random.Generator] = None,
+    max_tries: int = 20,
+) -> Tuple[int, int]:
+    r"""Knot invariants of a closed ring: |Alexander(-1)| and odd part of
+    |Alexander(-2)|, computed exactly with integer arithmetic.
+
+    Returns (1, 1) for an unknotted ring. Reference values: trefoil 3_1 ->
+    (3, 7), figure-eight 4_1 -> (5, 11), 5_1 -> (5, 31), 7_1 -> (7, 127).
+    Any value different from (1, 1) means the ring is knotted — for a
+    simulation started from an unknotted conformation (e.g. grow_cubic)
+    with a topology-preserving force set, this detects chain crossings.
+
+    The ring is treated as closed: point N-1 connects back to point 0.
+    Evaluating at two points (t = -1 and t = -2) discriminates knots that
+    share one invariant; a handful of exotic knot pairs still coincide,
+    but not the unknot vs anything.
+
+    Parameters
+    ----------
+    ring : Nx3 array
+        Closed-ring coordinates (do not repeat the first point at the end).
+    simplify : bool, optional
+        Reduce the ring with the topology-preserving simplifyPolymer first
+        (requires the compiled extension). Strongly recommended: the
+        Alexander matrix is O(crossings^3) and raw melt conformations have
+        thousands of crossings. Default True.
+    rng : np.random.Generator, optional
+        Source of randomness for projections (pass for reproducibility).
+    max_tries : int, optional
+        Projections to attempt before giving up on degenerate geometry.
+
+    Notes
+    -----
+    Two independent random projections must agree before a value is
+    returned (a third and further break ties). The pre-projection jitter is
+    scaled to stay far below the tightest strand-strand clearance of the
+    polygon — perturbing more than that can itself change the topology.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    base = np.asarray(ring, dtype=float)
+    if base.ndim != 2 or base.shape[1] != 3:
+        raise ValueError("ring must be an Nx3 array")
+    if simplify:
+        base = np.asarray(simplifyPolymer(base), dtype=float)
+    edge = float(np.median(np.linalg.norm(np.roll(base, -1, axis=0) - base, axis=1)))
+    clearance = _min_nonadjacent_clearance(base)
+    scale = max(min(1e-4 * edge, 0.02 * clearance), 1e-13 * max(edge, 1.0))
+    results: List[Tuple[int, int]] = []
+    while True:
+        pts = base + rng.normal(scale=scale, size=base.shape)
+        results.append(_alexander_once(pts, rng, max_tries))
+        if len(results) >= 2 and results[-1] == results[-2]:
+            return results[-1]
+        if len(results) >= 5:
+            from collections import Counter
+
+            return Counter(results).most_common(1)[0][0]
