@@ -233,7 +233,7 @@ class Simulation(object):
 
         """
         default_args = {
-            "platform": "CUDA",
+            "platform": "CPU",
             "GPU": "0",
             "integrator": "variablelangevin",
             "temperature": 300,
