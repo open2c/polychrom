@@ -84,9 +84,20 @@ class TestLinkingNumber:
         ring1, ring2 = create_hopf_link()
         L = getLinkingNumber(ring1, ring2, simplify=False)
         # A Hopf link has linking number exactly +-1 (sign depends on
-        # orientation). The old C code returned -2x the true value: it summed
-        # signed crossings without halving, with an inverted sign convention.
+        # orientation). The old C code returned 2x the true value: it summed
+        # signed crossings without halving.
         assert abs(L) == 1, f"Hopf link must have |linking number| = 1, got {L}"
+
+    def test_hopf_link_sign(self):
+        """Test the Hopf link sign against the right-hand rule."""
+        from polychrom.polymer_analyses import getLinkingNumber
+
+        # ring1 runs counter-clockwise seen from +z, so its disk has normal +z.
+        # ring2 = (0.5 + cos t, 0, sin t) pierces that disk once, at t = pi
+        # (x = -0.5), moving along -z. The Gauss linking number is therefore -1.
+        ring1, ring2 = create_hopf_link()
+        assert getLinkingNumber(ring1, ring2, simplify=False) == -1
+        assert getLinkingNumber(ring1, ring2[::-1], simplify=False) == 1
 
     def test_simplify_preserves_linking(self):
         """Test that simplification preserves linking number."""
