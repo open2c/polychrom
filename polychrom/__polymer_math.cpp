@@ -56,7 +56,7 @@ long int intersectValue(double *p1, double *v1, double *p2, double *v2) {
     double t1 = (v2xp2[2]-v2xp1[2])/v2xv1[2];
     double t2 = (v1xp1[2]-v1xp2[2])/v1xv2[2];
     if(t1<0 || t1>1 || t2<0 || t2>1) {
-        free(v2xp2);free(v2xp1);free(v2xv1);free(v1xp1);free(v1xp2);free(v1xv2);
+        delete[] v2xp2; delete[] v2xp1; delete[] v2xv1; delete[] v1xp1; delete[] v1xp2; delete[] v1xv2;
         return 0;
     }
     else {
@@ -67,7 +67,8 @@ long int intersectValue(double *p1, double *v1, double *p2, double *v2) {
     double z1 = inter1[2];
     double z2 = inter2[2];
 
-    free(v2xp2);free(v2xp1);free(v2xv1);free(v1xp1);free(v1xp2);free(v1xv2);free(inter1);free(inter2);
+    delete[] v2xp2; delete[] v2xp1; delete[] v2xv1; delete[] v1xp1; delete[] v1xp2; delete[] v1xv2;
+    delete[] inter1; delete[] inter2;
     if(z1>=z2) return x;
     else return -x;
 }
@@ -163,15 +164,18 @@ long int _getLinkingNumberCpp(int M, double *olddata, int N) {
             if(j<N-1) v2 = linearCombo(data[j+1],data[j],1,-1);
             else v2 = linearCombo(data[M],data[N-1],1,-1);
             L+=intersectValue(data[i],v1,data[j],v2);
-            free(v1);free(v2);
+            delete[] v1; delete[] v2;
         }
     }
 
-    // L is the full signed crossing sum between the two curves in projection;
-    // the linking number is half of that, and intersectValue's sign convention
-    // is opposite to the standard (Gauss integral) one. Verified against an
-    // independent Gauss-integral implementation: raw L = -2 * lk.
-    return -L/2;
+    for(i=0;i<N;i++) delete[] data[i];
+    delete[] data;
+
+    // L is the signed crossing sum of the two curves in the z-projection. Each
+    // crossing is counted once, with sign (over x under).z, which is the standard
+    // crossing sign: L = 2 * lk in the Gauss convention
+    // lk = 1/(4 pi) oint oint (x - y).(dx x dy)/|x - y|^3.
+    return L/2;
 }
 
 
