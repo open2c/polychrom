@@ -18,7 +18,7 @@ N = 10000
 
 reporter = HDF5Reporter(folder="trajectory", max_data_length=5, overwrite=True)
 sim = simulation.Simulation(
-    platform="CUDA",
+    platform="CPU",
     integrator="variableLangevin",
     error_tol=0.003,
     GPU="1",
