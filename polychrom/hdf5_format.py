@@ -90,6 +90,31 @@ filenames and new-style URIs, there is a function :py:func:`polychrom.polymeruti
 autodetermine the type of a trajectory folder. So it will fetch both `/path/to/the/trajectory/block42.dat` and
 `/path/to/the/trajectory/blocks_x-y.h5::42` automatically
 
+
+Compressed storage of conformations ("chain_delta_v1")
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If a record contains both ``pos`` (an (N, 3) array) and ``pos_precision`` (a positive number), ``pos`` is
+stored in a compact encoding instead of a plain float32 dataset. :py:class:`polychrom.simulation.Simulation`
+adds ``pos_precision`` automatically (its ``save_precision`` argument, 1/25 by default).
+
+1. Every coordinate is snapped to an integer grid with step ``pos_precision``. This is the only lossy step:
+   the maximum error is ``pos_precision / 2`` for every monomer.
+2. Differences between consecutive monomers are taken on the integer grid and stored as int8
+   (dataset ``pos_delta``, shape (3, N): x-row, y-row, z-row, one compressed chunk). Because these are exact
+   integer differences, the error does **not** accumulate along the chain.
+3. Monomer 0 and any monomer whose difference does not fit into int8 (chain breaks, very stretched bonds)
+   are "anchors": their exact grid coordinates are stored in ``pos_anchor_idx`` (int32, K) and
+   ``pos_anchor_pos`` (int32, (K, 3)).
+
+For a typical bond length of 1, this takes about 6-8 bits per coordinate, i.e. 2.5-3.5 times less than
+float32 rounded to 2 decimals. Loading functions in this module (:py:func:`load_URI`,
+:py:func:`load_hdf5_file`) decode it transparently and return ``pos`` as float32, plus ``pos_precision``.
+Files without the encoding are read as before.
+
+Files are written with ``libver=("v110", "latest")``, which reduces HDF5 metadata overhead
+(~4 KB -> ~0.8 KB per conformation) and requires HDF5 >= 1.10 to read.
+
 """
 
 import glob
@@ -101,6 +126,94 @@ import h5py
 import numpy as np
 
 DEFAULT_OPTS: Dict[str, Union[int, str]] = {"compression_opts": 5, "compression": "gzip"}
+
+# HDF5 file format bounds: v110 cuts per-dataset metadata overhead ~5x vs "earliest"; readable by HDF5 >= 1.10
+LIBVER = ("v110", "latest")
+
+POS_ENCODING = "chain_delta_v1"
+_INT8_MAX = 127
+MAX_ANCHOR_FRACTION = 0.05  # warn if more than this fraction of monomers have to be stored as anchors
+MIN_BOND_STEPS = 5  # warn if the 10th percentile of bond length is below this many grid steps
+
+
+def encode_positions(pos: np.ndarray, precision: float) -> Dict[str, np.ndarray]:
+    """
+    Encodes an (N, 3) array of coordinates with the "chain_delta_v1" encoding (see module docs).
+
+    Parameters
+    ----------
+    pos : np.ndarray
+        (N, D) array of coordinates (D is normally 3)
+    precision : float
+        Grid step. Maximum error of every coordinate after decoding is precision / 2.
+
+    Returns
+    -------
+    Dict[str, np.ndarray]
+        ``pos_delta`` (int8, (D, N)), ``pos_anchor_idx`` (int32, K), ``pos_anchor_pos`` (int32, (K, D))
+    """
+    pos = np.asarray(pos, dtype=np.float64)
+    if not precision > 0:
+        raise ValueError(f"pos_precision must be a positive number, got {precision}")
+    if pos.ndim != 2:
+        raise ValueError(f"pos must be an (N, 3) array to use pos_precision, got shape {pos.shape}")
+    if not np.isfinite(pos).all():
+        raise ValueError("pos contains non-finite values")
+    q = np.round(pos / precision)
+    if len(q) and np.abs(q).max() >= 2**31:
+        raise ValueError(f"Coordinates too large for an int32 grid with pos_precision={precision}")
+    q = q.astype(np.int64)
+    d = np.diff(q, axis=0, prepend=np.zeros((1, q.shape[1]), np.int64))
+    is_anchor = np.abs(d).max(axis=1, initial=0) > _INT8_MAX
+    if len(is_anchor):
+        is_anchor[0] = True
+    _check_precision(d, is_anchor, precision)
+    anchor_idx = np.flatnonzero(is_anchor)
+    anchor_pos = q[anchor_idx]
+    d[anchor_idx] = 0
+    return {
+        "pos_delta": np.ascontiguousarray(d.T.astype(np.int8)),
+        "pos_anchor_idx": anchor_idx.astype(np.int32),
+        "pos_anchor_pos": anchor_pos.astype(np.int32),
+    }
+
+
+def decode_positions(
+    pos_delta: np.ndarray, pos_anchor_idx: np.ndarray, pos_anchor_pos: np.ndarray, precision: float
+) -> np.ndarray:
+    """Inverse of :py:func:`encode_positions`. Returns an (N, D) float32 array."""
+    d = np.asarray(pos_delta).T.astype(np.int64)
+    c = np.cumsum(d, axis=0)  # running sum; anchors contribute 0 here
+    anchor_idx = np.asarray(pos_anchor_idx, dtype=np.int64).ravel()
+    if len(d) and (len(anchor_idx) == 0 or anchor_idx[0] != 0):
+        raise ValueError("Corrupted chain_delta encoding: monomer 0 must be an anchor")
+    offset = np.asarray(pos_anchor_pos, dtype=np.int64).reshape(len(anchor_idx), d.shape[1]) - c[anchor_idx]
+    seglen = np.diff(np.append(anchor_idx, len(d)))
+    q = c + np.repeat(offset, seglen, axis=0)
+    return (q * float(precision)).astype(np.float32)
+
+
+def _check_precision(d: np.ndarray, is_anchor: np.ndarray, precision: float) -> None:
+    """Cheap checks that precision suits the data. d: (N, 3) grid differences (d[0] is absolute)."""
+    if len(d) < 20:
+        return
+    frac = is_anchor.mean()
+    if frac > MAX_ANCHOR_FRACTION:
+        warnings.warn(
+            f"{frac:.1%} of monomers have a bond component longer than {_INT8_MAX} grid steps "
+            f"({_INT8_MAX * precision:.3g} distance units) and were stored as anchors. "
+            f"Storage will be inefficient; consider a coarser pos_precision than {precision}.",
+            stacklevel=4,
+        )
+    bond = np.sqrt((d[1:].astype(np.float64) ** 2).sum(axis=1))
+    p10 = np.percentile(bond, 10)
+    if p10 < MIN_BOND_STEPS:
+        warnings.warn(
+            f"10% of bonds are shorter than {p10:.1f} grid steps ({p10 * precision:.3g} distance units) "
+            f"at pos_precision={precision}: rounding error (up to {precision / 2:.3g} per coordinate) "
+            f"is large relative to bond length. Consider a finer pos_precision.",
+            stacklevel=4,
+        )
 
 
 def _read_h5_group(gr: h5py.Group) -> Dict[str, Any]:
@@ -118,7 +231,21 @@ def _read_h5_group(gr: h5py.Group) -> Dict[str, Any]:
         Dictionary containing all datasets and attributes from the group
     """
     result = {i: j[:] for i, j in gr.items()}
+    if "pos_delta" in result:
+        encoding = gr.attrs.get("pos_encoding", b"")
+        if isinstance(encoding, bytes):
+            encoding = encoding.decode()
+        if encoding != POS_ENCODING:
+            raise ValueError(f"Unknown pos_encoding {encoding!r}; a newer version of polychrom may be needed")
+        result["pos"] = decode_positions(
+            result.pop("pos_delta"),
+            result.pop("pos_anchor_idx"),
+            result.pop("pos_anchor_pos"),
+            gr.attrs["pos_precision"],
+        )
     for i, j in gr.attrs.items():
+        if i == "pos_encoding":
+            continue
         # Convert bytes to string if it's a bytes string
         if isinstance(j, bytes):
             try:
@@ -182,6 +309,15 @@ def _write_group(dataDict: Dict[str, Any], group: h5py.Group, dset_opts: Optiona
     """
     if dset_opts is None:
         dset_opts = DEFAULT_OPTS
+    precision = dataDict.get("pos_precision", False)
+    if "pos" in dataDict and precision is not False and precision is not None:
+        dataDict = dict(dataDict)  # do not modify the caller's dict
+        encoded = encode_positions(dataDict.pop("pos"), precision)
+        delta = encoded.pop("pos_delta")
+        group.create_dataset("pos_delta", data=delta, **({**dset_opts, "chunks": delta.shape} if delta.size else {}))
+        for name, data in encoded.items():
+            group.create_dataset(name, data=data)
+        group.attrs["pos_encoding"] = POS_ENCODING
     for name, data in dataDict.items():
         datatype, converted = _convert_to_hdf5_array(data)
         if datatype is None:
@@ -333,7 +469,7 @@ def save_hdf5_file(
     """
     if dset_opts is None:
         dset_opts = DEFAULT_OPTS
-    with h5py.File(filename, mode=mode) as file:
+    with h5py.File(filename, mode=mode, libver=LIBVER) as file:
         _write_group(data_dict, file, dset_opts=dset_opts)
 
 
@@ -536,7 +672,7 @@ class HDF5Reporter:
         if name not in ["data"]:
             if not self.blocks_only:
                 filename = f"{name}_{count}.h5"
-                with h5py.File(os.path.join(self.folder, filename), mode="w") as file:
+                with h5py.File(os.path.join(self.folder, filename), mode="w", libver=LIBVER) as file:
                     _write_group(values, file, dset_opts=self.h5py_dset_opts)
 
         else:
@@ -551,7 +687,7 @@ class HDF5Reporter:
             cmin = min(self.datas.keys())
             cmax = max(self.datas.keys())
             filename = f"blocks_{cmin}-{cmax}.h5"
-            with h5py.File(os.path.join(self.folder, filename), mode="w") as file:
+            with h5py.File(os.path.join(self.folder, filename), mode="w", libver=LIBVER) as file:
                 for count, values in self.datas.items():
                     gr = file.create_group(str(count))
                     _write_group(values, gr, dset_opts=self.h5py_dset_opts)

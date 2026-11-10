@@ -30,7 +30,7 @@ Simulation class. :py:meth:`polychrom.simulation.Simulation.__init__` . This inc
 * particle mass, temperature and length scale
 * kinetic energy at which to raise an error
 * OpenMM precision
-* Rounding before saving (default is to 0.01)
+* Precision of saved conformations (default is a grid step of 1/25, i.e. max error 0.02)
 
 Starting conformation is loaded using :meth:`polychrom.simulation.Simulation.set_data` method.
 Many tools for creating starting conformations are in :mod:`polychrom.starting_conformations`
@@ -221,12 +221,18 @@ class Simulation(object):
             single is the default now, because mixed is much slower on 3080 and other new GPUs
             If you are using double precision, it will be slower by a factor of 10 or so.
 
-        save_decimals: int or False, optional
-            Round to this number of decimals before saving. ``False`` is no rounding.
-            Default is 2. It gives maximum error of 0.005, which is nearly always harmless
-            but saves up to 40% of storage space (0.6 of the original)
-            Using one decimal is safe most of the time, and reduces storage to 40% of int32.
-            NOTE that using periodic boundary conditions will make storage advantage less.
+        save_precision: float or False, optional
+            Grid step to which saved coordinates are snapped (default 1/25 = 0.04, i.e. maximum
+            error of 0.02 for every coordinate). Positions returned by do_block are snapped too,
+            and reporters receive ``pos_precision`` so that HDF5Reporter can store conformations
+            compactly (see :py:mod:`polychrom.hdf5_format`); error does not accumulate along the chain.
+            Use 0.01 to reproduce the old ``save_decimals=2`` accuracy (about 30% larger files).
+            ``False`` saves unrounded float32 coordinates.
+
+        save_decimals: int or False, optional (legacy)
+            ``save_decimals=2`` or ``1`` is translated to ``save_precision=0.01`` or ``0.1``.
+            Any other value (e.g. 3, or False) falls back to the old behavior - rounding to that many
+            decimals and storing plain float32 - with a warning. Cannot be combined with save_precision.
 
         reporters: list, optional
             List of reporters to use in the simulation.
@@ -243,7 +249,7 @@ class Simulation(object):
             "reporters": [],
             "max_Ek": 10,
             "precision": "single",
-            "save_decimals": 2,
+            "save_precision": 1 / 25,
             "verbose": False,
         }
         valid_names = list(default_args.keys()) + [
@@ -251,6 +257,7 @@ class Simulation(object):
             "error_tol",
             "collision_rate",
             "timestep",
+            "save_decimals",
         ]
         for i in kwargs.keys():
             if i not in valid_names:
@@ -258,6 +265,24 @@ class Simulation(object):
 
         if None in kwargs.values():
             raise ValueError("None is not allowed in arguments due to HDF5 incompatiliblity. Use False instead.")
+        if "save_decimals" in kwargs:
+            if "save_precision" in kwargs:
+                raise ValueError("Pass either save_precision or save_decimals, not both")
+            decimals = kwargs["save_decimals"]
+            if not isinstance(decimals, bool) and decimals in (1, 2):
+                kwargs["save_precision"] = 10.0 ** (-decimals)
+            else:
+                warnings.warn(
+                    f"save_decimals={decimals} is not 1 or 2: falling back to legacy storage "
+                    "(float32 rounded to save_decimals, much larger files). "
+                    "Use save_precision to control the precision of saved conformations."
+                )
+                kwargs["save_precision"] = False
+        else:
+            kwargs["save_decimals"] = False
+        precision = kwargs.get("save_precision", default_args["save_precision"])
+        if precision is not False and (isinstance(precision, bool) or not precision > 0):
+            raise ValueError(f"save_precision must be a positive number or False, got {precision}")
         default_args.update(kwargs)
         kwargs = default_args
         self.kwargs = kwargs
@@ -718,10 +743,14 @@ class Simulation(object):
         self.state = self.context.getState(getPositions=True, getVelocities=get_velocities, getEnergy=True)
         b = time.time()
         coords = self.state.getPositions(asNumpy=True)
-        newcoords = coords / nanometer
-        newcoords = np.array(newcoords, dtype=np.float32)
-        if self.kwargs["save_decimals"] is not False:
+        newcoords = np.asarray(coords / nanometer, dtype=np.float64)
+        save_precision = self.kwargs["save_precision"]
+        if save_precision is not False:
+            # snap to the storage grid, so that returned data equals what will be loaded from disk
+            newcoords = np.round(newcoords / save_precision) * save_precision
+        elif self.kwargs["save_decimals"] is not False:
             newcoords = np.round(newcoords, self.kwargs["save_decimals"])
+        newcoords = newcoords.astype(np.float32)
 
         self.time = self.state.getTime() / picosecond
 
@@ -771,6 +800,8 @@ class Simulation(object):
             "time": curtime,
             "block": self.block,
         }
+        if save_precision is not False:
+            result["pos_precision"] = save_precision
         if get_velocities:
             result["vel"] = self.state.getVelocities() / (nanometer / picosecond)
         result.update(save_extras)
