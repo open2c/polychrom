@@ -138,23 +138,33 @@ def test_caller_dict_not_modified(tmp_path):
     assert np.allclose(load_hdf5_file(tmp_path / "f.h5")["pos"], 1)
 
 
-def test_simulation_save_precision_arguments():
+def _make_sim(**kw):
     from polychrom.simulation import Simulation
 
-    def make(**kw):
-        return Simulation(
-            N=10, platform="reference", integrator="variableLangevin", error_tol=0.01, collision_rate=0.1, **kw
-        )
+    base = dict(N=10, platform="reference", integrator="variableLangevin", error_tol=0.01, collision_rate=0.1)
+    return Simulation(**{**base, **kw})
 
-    assert make().kwargs["save_precision"] == pytest.approx(0.04)
-    assert make(save_precision=0.01).kwargs["save_precision"] == 0.01
-    assert make(save_decimals=2).kwargs["save_precision"] == pytest.approx(0.01)
-    assert make(save_decimals=1).kwargs["save_precision"] == pytest.approx(0.1)
-    for legacy in (3, 0, False):
-        with pytest.warns(UserWarning, match="legacy"):
-            sim = make(save_decimals=legacy)
-        assert sim.kwargs["save_precision"] is False and sim.kwargs["save_decimals"] is legacy
+
+def test_simulation_save_precision_arguments():
+    assert _make_sim().kwargs["save_precision"] == pytest.approx(0.04)
+    assert _make_sim(save_precision=0.01).kwargs["save_precision"] == 0.01
+    # save_decimals is a pure alias, and is not stored
+    for decimals, precision in [(2, 0.01), (1, 0.1), (3, 0.001), (0, 1.0), (False, False), (np.int64(2), 0.01)]:
+        kw = _make_sim(save_decimals=decimals).kwargs
+        assert kw["save_precision"] == pytest.approx(precision) and "save_decimals" not in kw
+    assert _make_sim(save_decimals=np.False_).kwargs["save_precision"] is False  # old initArgs file
     with pytest.raises(ValueError):
-        make(save_decimals=2, save_precision=0.01)
+        _make_sim(save_decimals=2, save_precision=0.01)
     with pytest.raises(ValueError):
-        make(save_precision=-1)
+        _make_sim(save_precision=-1)
+
+
+@pytest.mark.parametrize("kw", [{}, {"save_precision": 0.01}, {"save_precision": False}, {"save_decimals": 2}])
+def test_simulation_kwargs_replay(kw, tmp_path):
+    """Simulation(**sim.kwargs) and arguments loaded back from initArgs_*.h5 must reproduce the settings."""
+    sim = _make_sim(**kw, reporters=[HDF5Reporter(folder=tmp_path)])
+    expected = sim.kwargs["save_precision"]
+    assert _make_sim(**sim.kwargs).kwargs["save_precision"] == expected
+    from_disk = _make_sim(**load_hdf5_file(str(tmp_path / "initArgs_0.h5")))  # numpy scalars, e.g. np.False_
+    assert from_disk.kwargs["save_precision"] == expected
+    assert bool(from_disk.kwargs["save_precision"]) == bool(expected)

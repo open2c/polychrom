@@ -230,9 +230,7 @@ class Simulation(object):
             ``False`` saves unrounded float32 coordinates.
 
         save_decimals: int or False, optional (legacy)
-            ``save_decimals=2`` or ``1`` is translated to ``save_precision=0.01`` or ``0.1``.
-            Any other value (e.g. 3, or False) falls back to the old behavior - rounding to that many
-            decimals and storing plain float32 - with a warning. Cannot be combined with save_precision.
+            Alias: ``save_decimals=d`` is the same as ``save_precision=10**-d`` (False stays False).
 
         reporters: list, optional
             List of reporters to use in the simulation.
@@ -265,23 +263,14 @@ class Simulation(object):
 
         if None in kwargs.values():
             raise ValueError("None is not allowed in arguments due to HDF5 incompatiliblity. Use False instead.")
-        if "save_decimals" in kwargs:
+        if "save_decimals" in kwargs:  # legacy alias, translated and dropped so only save_precision is stored
             if "save_precision" in kwargs:
-                raise ValueError("Pass either save_precision or save_decimals, not both")
-            decimals = kwargs["save_decimals"]
-            if not isinstance(decimals, bool) and decimals in (1, 2):
-                kwargs["save_precision"] = 10.0 ** (-decimals)
-            else:
-                warnings.warn(
-                    f"save_decimals={decimals} is not 1 or 2: falling back to legacy storage "
-                    "(float32 rounded to save_decimals, much larger files). "
-                    "Use save_precision to control the precision of saved conformations."
-                )
-                kwargs["save_precision"] = False
-        else:
-            kwargs["save_decimals"] = False
+                raise ValueError("Pass save_precision only; save_decimals is a legacy alias for it")
+            decimals = kwargs.pop("save_decimals")
+            no_rounding = isinstance(decimals, (bool, np.bool_))  # np.False_ when replayed from an old initArgs file
+            kwargs["save_precision"] = False if no_rounding else 10.0 ** (-int(decimals))
         precision = kwargs.get("save_precision", default_args["save_precision"])
-        if precision is not False and (isinstance(precision, bool) or not precision > 0):
+        if precision and not precision > 0:
             raise ValueError(f"save_precision must be a positive number or False, got {precision}")
         default_args.update(kwargs)
         kwargs = default_args
@@ -745,11 +734,9 @@ class Simulation(object):
         coords = self.state.getPositions(asNumpy=True)
         newcoords = np.asarray(coords / nanometer, dtype=np.float64)
         save_precision = self.kwargs["save_precision"]
-        if save_precision is not False:
+        if save_precision:
             # snap to the storage grid, so that returned data equals what will be loaded from disk
             newcoords = np.round(newcoords / save_precision) * save_precision
-        elif self.kwargs["save_decimals"] is not False:
-            newcoords = np.round(newcoords, self.kwargs["save_decimals"])
         newcoords = newcoords.astype(np.float32)
 
         self.time = self.state.getTime() / picosecond
@@ -800,8 +787,8 @@ class Simulation(object):
             "time": curtime,
             "block": self.block,
         }
-        if save_precision is not False:
-            result["pos_precision"] = save_precision
+        if save_precision:
+            result["pos_precision"] = float(save_precision)
         if get_velocities:
             result["vel"] = self.state.getVelocities() / (nanometer / picosecond)
         result.update(save_extras)

@@ -308,7 +308,7 @@ def _write_group(dataDict: Dict[str, Any], group: h5py.Group, dset_opts: Optiona
     if dset_opts is None:
         dset_opts = DEFAULT_OPTS
     precision = dataDict.get("pos_precision", False)
-    if "pos" in dataDict and precision is not False and precision is not None:
+    if "pos" in dataDict and precision:
         dataDict = dict(dataDict)  # do not modify the caller's dict
         encoded = encode_positions(dataDict.pop("pos"), precision)
         delta = encoded.pop("pos_delta")
