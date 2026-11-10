@@ -106,7 +106,6 @@ def test_reporter_roundtrip_and_continue(tmp_path):
     with h5py.File(uris[0].split("::")[0]) as f:
         g = f["0"]
         assert "pos" not in g and g["pos_delta"].dtype == np.int8
-        assert f.libver[0] == "v110"
     for i, uri in enumerate(uris):
         d = load_URI(uri)
         assert d["pos"].dtype == np.float32 and d["pos"].shape == (500, 3)

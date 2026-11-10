@@ -112,7 +112,7 @@ float32 rounded to 2 decimals. Loading functions in this module (:py:func:`load_
 :py:func:`load_hdf5_file`) decode it transparently and return ``pos`` as float32, plus ``pos_precision``.
 Files without the encoding are read as before.
 
-Files are written with ``libver=("v110", "latest")``, which reduces HDF5 metadata overhead
+Files are written with ``libver="v110"``, which reduces HDF5 metadata overhead
 (~4 KB -> ~0.8 KB per conformation) and requires HDF5 >= 1.10 to read.
 
 """
@@ -127,8 +127,6 @@ import numpy as np
 
 DEFAULT_OPTS: Dict[str, Union[int, str]] = {"compression_opts": 5, "compression": "gzip"}
 
-# HDF5 file format bounds: v110 cuts per-dataset metadata overhead ~5x vs "earliest"; readable by HDF5 >= 1.10
-LIBVER = ("v110", "latest")
 
 POS_ENCODING = "chain_delta_v1"
 _INT8_MAX = 127
@@ -469,7 +467,7 @@ def save_hdf5_file(
     """
     if dset_opts is None:
         dset_opts = DEFAULT_OPTS
-    with h5py.File(filename, mode=mode, libver=LIBVER) as file:
+    with h5py.File(filename, mode=mode, libver="v110") as file:
         _write_group(data_dict, file, dset_opts=dset_opts)
 
 
@@ -672,7 +670,7 @@ class HDF5Reporter:
         if name not in ["data"]:
             if not self.blocks_only:
                 filename = f"{name}_{count}.h5"
-                with h5py.File(os.path.join(self.folder, filename), mode="w", libver=LIBVER) as file:
+                with h5py.File(os.path.join(self.folder, filename), mode="w", libver="v110") as file:
                     _write_group(values, file, dset_opts=self.h5py_dset_opts)
 
         else:
@@ -687,7 +685,7 @@ class HDF5Reporter:
             cmin = min(self.datas.keys())
             cmax = max(self.datas.keys())
             filename = f"blocks_{cmin}-{cmax}.h5"
-            with h5py.File(os.path.join(self.folder, filename), mode="w", libver=LIBVER) as file:
+            with h5py.File(os.path.join(self.folder, filename), mode="w", libver="v110") as file:
                 for count, values in self.datas.items():
                     gr = file.create_group(str(count))
                     _write_group(values, gr, dset_opts=self.h5py_dset_opts)
