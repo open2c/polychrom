@@ -27,7 +27,7 @@ dependencies = [
     "cython>=0.29",
     "numpy>=1.9",
     "scipy>=0.16",
-    "h5py>=2.5",
+    "h5py>=2.10",
     "pandas>=0.19",
     
 ]
