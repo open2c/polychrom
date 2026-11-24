@@ -10,3 +10,4 @@ polychrom/_polymer_math.cpp
 dist
 polychrom/*.so
 .vscode
+polychrom/_native_engine.cpp
