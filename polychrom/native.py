@@ -679,7 +679,9 @@ class NativeContext:
         if not isinstance(integrator, NativeIntegrator):
             raise TypeError("the native platform needs a NativeIntegrator")
         if system.getNumForces() != len(forces):
-            raise NotImplementedError("forces added directly to Simulation.system are not supported by the native platform")
+            raise NotImplementedError(
+                "forces added directly to Simulation.system are not supported by the native platform"
+            )
         self._system = system
         self._integrator = integrator
         self._forces = list(forces)
@@ -841,9 +843,7 @@ class NativeContext:
             keys = [_param_tuple(p, npar) for p in particles]
             uniq = sorted(set(keys))
             if len(uniq) > MAX_TABLES:
-                raise NotImplementedError(
-                    f"force {name}: more than {MAX_TABLES} distinct per-particle parameter sets"
-                )
+                raise NotImplementedError(f"force {name}: more than {MAX_TABLES} distinct per-particle parameter sets")
             index = {key: t for t, key in enumerate(uniq)}
             types = np.array([index[k] for k in keys], dtype=np.intc)
             if first:
@@ -871,7 +871,7 @@ class NativeContext:
 
     def _add_external(self, f, name):
         energy = _strip_prefix(f.getEnergyFunction(), name)
-        globals_ = self._globals(f)
+        self._globals(f)  # registers the force's global parameters, read through g() below
         n = f.getNumParticles()
         particles = np.empty(n, dtype=np.intc)
         params = np.empty((n, f.getNumPerParticleParameters()))

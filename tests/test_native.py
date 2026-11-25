@@ -248,13 +248,14 @@ def test_fast_set_forces(PBCbox):
     bonds) move more than half the skin; their pair forces come from the direct
     search, not the lists.  Compare with Reference at the same positions."""
     N = 400
-    rng = np.random.default_rng(3)
     data = polychrom.starting_conformations.grow_cubic(N, 12)
     pulls = [(i, i + 60) for i in range(0, N - 60, 37)]
 
     def build(sim):
         sim.add_force(forcekits.polymer_chains(sim, nonbonded_force_kwargs={"trunc": 3.0}))
-        sim.add_force(forces.harmonic_bonds(sim, pulls, bondWiggleDistance=0.3, bondLength=0.5, name="pull", override_checks=True))
+        sim.add_force(
+            forces.harmonic_bonds(sim, pulls, bondWiggleDistance=0.3, bondLength=0.5, name="pull", override_checks=True)
+        )
 
     nat = _make("native", N, data, build, PBCbox)
     eng = nat.context.engine
