@@ -294,7 +294,7 @@ class Engine {
         f.assign(3 * (size_t)N, 0.0);
         x_ref.assign(3 * (size_t)N, 0.0);
         xw.assign(3 * (size_t)N, 0.0);
-        img.assign(3 * (size_t)N, 0.0);
+        img.assign(3 * (size_t)N, 0);
         mass.assign(N, 100.0);
         inv_mass.assign(N, 0.01);
         uniform_sqrt_inv_mass = std::sqrt(inv_mass[0]);
@@ -644,8 +644,8 @@ class Engine {
     bool mass_uniform = true;            // all masses equal: inv_mass[0] is used, not loaded per particle
     double uniform_sqrt_inv_mass = 0.0;  // sqrt(1 / mass) if all masses are equal, else 0
     std::vector<double> x_ref;  // positions at the last neighbour-list build
-    std::vector<double> img;    // periodic image offset at the last build (multiple of box)
-    std::vector<double> xw;     // x - img, refreshed every force evaluation
+    std::vector<int32_t> img;   // periodic image at the last build: offset img * box (PBC only)
+    std::vector<double> xw;     // x - img * box (PBC only), updated by the integrator
 
     std::vector<BondSet> bonds;
     std::vector<AngleSet> angles;
@@ -845,15 +845,16 @@ class Engine {
                         fl += 1.0;
                     }
                     if (w < 0) w = 0;
-                    img[3 * p + d] = fl * box[d];
+                    if (!(std::fabs(fl) < 2e9)) {  // also NaN
+                        set_error("particle too far from the periodic box (simulation exploded?)");
+                        fl = 0;
+                    }
+                    img[3 * p + d] = (int32_t)fl;
                     xw[3 * p + d] = w;
                 }
         } else {
 #pragma omp for schedule(static)
-            for (size_t c = 0; c < 3 * (size_t)N; ++c) {
-                img[c] = 0.0;
-                xw[c] = x[c];
-            }
+            for (size_t c = 0; c < 3 * (size_t)N; ++c) xw[c] = x[c];
         }
         // 2. grid geometry and counting sort into cells
 #pragma omp single
@@ -1262,11 +1263,12 @@ class Engine {
                 fast_list.clear();
             }
         }
-        // xw = x - img (wrapped coordinates, PBC only) is kept up to date by
-        // the integrator; after a rebuild, img has changed.
+        // xw = x - img * box (wrapped coordinates, PBC only) is kept up to date
+        // by the integrator; after a rebuild, img has changed.
         if (rebuild_all && pbc) {
 #pragma omp for schedule(static)
-            for (size_t c = 0; c < 3 * (size_t)N; ++c) xw[c] = x[c] - img[c];
+            for (int p = 0; p < N; ++p)
+                for (int d = 0; d < 3; ++d) xw[3 * p + d] = x[3 * p + d] - img[3 * p + d] * box[d];
         }
         const double* const XW = pbc ? xw.data() : x.data();
 
@@ -1536,7 +1538,8 @@ class Engine {
         double* __restrict V = v.data();
         double* __restrict XW = xw.data();
         const double* __restrict F = f.data();
-        const double* __restrict IMG = img.data();
+        const int32_t* __restrict IMG = img.data();
+        const double box_d[3] = {box[0], box[1], box[2]};
         const double* __restrict XREF = x_ref.data();
         const double* __restrict IM = inv_mass.data();
         const bool brownian = integrator == BROWNIAN, wrap = pbc;
@@ -1566,7 +1569,7 @@ class Engine {
                     V[c] = vv;
                 }
                 X[c] = xx;
-                if (wrap) XW[c] = xx - IMG[c];
+                if (wrap) XW[c] = xx - IMG[c] * box_d[d];
                 const double dd = xx - XREF[c];
                 d2 += dd * dd;
             }
