@@ -61,7 +61,9 @@ def test_basic_simulation_and_hdf5(tmp_path):
     d1 = load_URI(files[1])
     d1_direct = datas[1]
 
-    assert np.abs(d1["pos"] - d1_direct).max() <= 0.0051
+    # default save_precision is 1/25 -> max error 0.02
+    assert d1["pos_precision"] == sim.kwargs["save_precision"]
+    assert np.abs(d1["pos"] - d1_direct).max() <= 1 / 25 / 2 + 1e-5
 
     assert np.allclose(d1["spam"], [1, 2, 3])  # spam got saved correctly
     assert d1["eggs"] == "I don't eat green eggs and ham!!!"
@@ -73,7 +75,7 @@ def test_basic_simulation_and_hdf5(tmp_path):
     ind, data = rep.continue_trajectory()
 
     # continuing from the last trajectory
-    assert np.abs(data["pos"] - datas[-1]).max() <= 0.0054
+    assert np.abs(data["pos"] - datas[-1]).max() <= 1 / 25 / 2 + 1e-5
 
 
 def run():
