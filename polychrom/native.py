@@ -259,23 +259,28 @@ class _Batch:
     def __init__(self, root, kind, params, spacing):
         self.kind = kind
         self.spacing = spacing
-        root = copy.deepcopy(root)
         M = self.SLOTS
+        # Copy everything but the (possibly huge) per-particle/bond/angle lists.
+        big, tag = {
+            "pair": (("Particles", "Exclusions", "InteractionGroups"), "Particle"),
+            "bond": (("Bonds",), "Bond"),
+            "angle": (("Angles",), "Angle"),
+        }[kind]
+        small = ET.Element(root.tag, dict(root.attrib))
+        for child in root:
+            if child.tag in big:
+                ET.SubElement(small, child.tag)
+            else:
+                small.append(copy.deepcopy(child))
+        root = small
         if kind == "pair":
             root.set("method", "1")  # CutoffNonPeriodic
             root.set("useLongRangeCorrection", "0")
             container, per = root.find("Particles"), 2
-            for tag in ("Exclusions", "InteractionGroups"):
-                el = root.find(tag)
-                if el is not None:
-                    for child in list(el):
-                        el.remove(child)
         else:
             root.set("usesPeriodic", "0")
             container, per = root.find("Bonds" if kind == "bond" else "Angles"), 2 if kind == "bond" else 3
-        proto = container[0].tag
-        for child in list(container):
-            container.remove(child)
+        proto = tag
         for k in range(M):
             if kind == "pair":
                 for prm in params:
