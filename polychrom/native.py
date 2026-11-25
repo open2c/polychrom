@@ -38,7 +38,9 @@ implementations.  Random numbers differ from OpenMM's, so trajectories agree
 statistically, not bit by bit.
 
 Threads: ``POLYCHROM_NATIVE_THREADS``, else ``OMP_NUM_THREADS``, else
-``OPENMM_CPU_THREADS``, else all cores.
+``OPENMM_CPU_THREADS``, else one thread per 500 particles up to the number of
+CPUs available to the process.  On shared machines, set it explicitly to the
+number of cores you have to yourself.
 """
 
 import copy
@@ -82,12 +84,24 @@ def _array(x, unit):
     return np.asarray([list(v) for v in x] if isinstance(x, (list, tuple)) else x, dtype=np.float64)
 
 
-def _thread_count():
+PARTICLES_PER_THREAD = 500
+
+
+def _thread_count(N):
+    """Threads for N particles: POLYCHROM_NATIVE_THREADS, OMP_NUM_THREADS or
+    OPENMM_CPU_THREADS if set, else one per PARTICLES_PER_THREAD particles, up to
+    the number of CPUs this process may use.  Small systems do not gain from more
+    threads, and on a busy shared machine every time step waits for the slowest
+    thread at each barrier."""
     for var in ("POLYCHROM_NATIVE_THREADS", "OMP_NUM_THREADS", "OPENMM_CPU_THREADS"):
         v = os.environ.get(var)
         if v:
             return int(v)
-    return 0  # OpenMP default
+    try:
+        ncpu = len(os.sched_getaffinity(0))
+    except AttributeError:  # not on Linux
+        ncpu = os.cpu_count() or 1
+    return max(1, min(ncpu, N // PARTICLES_PER_THREAD))
 
 
 class NativePlatform:
@@ -652,9 +666,7 @@ class NativeContext:
         self._params = {}  # current values of global parameters, by name
         self._handlers = {}  # id(force) -> update function
         self._engine = _native_engine.NativeEngine(self._N)
-        nthreads = _thread_count()
-        if nthreads > 0:
-            self._engine.set_threads(nthreads)
+        self._engine.set_threads(_thread_count(self._N))
         masses = np.array([_val(system.getParticleMass(i), u.dalton) for i in range(self._N)])
         self._engine.set_masses(masses)
         if self._pbc:
