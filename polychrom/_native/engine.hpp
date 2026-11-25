@@ -9,9 +9,12 @@
 //
 //  * one OpenMP parallel region per ``step(n)`` call; the phases of a time step
 //    are work-sharing loops separated by barriers, not separate fork/joins;
-//  * Verlet neighbour lists with a skin, rebuilt when a particle has moved more
-//    than half the skin.  Entries are packed into 32 bits (particle index and
-//    periodic image code), so the inner loop needs no rounding;
+//  * Verlet neighbour lists with a skin.  Entries are packed into 32 bits
+//    (particle index and periodic image code), so the inner loop needs no
+//    rounding.  Particles that have moved more than half the skin since the
+//    last build (the "fast set", e.g. beads pulled by a freshly placed loop
+//    extrusion bond) get their interactions from a direct search every step;
+//    lists are rebuilt only when the fast set grows beyond max(64, N/32);
 //  * full (i, j and j, i) neighbour lists, so pair forces are accumulated by the
 //    owning thread without atomics or per-thread force buffers;
 //  * bonded terms evaluated in parallel into a contribution buffer and gathered
@@ -623,8 +626,22 @@ class Engine {
 
     bool forces_valid = false;
     double epot = 0.0;
-    double max_disp2 = std::numeric_limits<double>::infinity();
     bool rebuild_all = true;
+    // Fast set: particles that moved more than half the skin since the last build.
+    std::vector<uint8_t> fast;  // per particle
+    std::vector<int> fast_list;
+    int nfast = 0;
+    double fast_lim2 = 0.0;  // (skin / 2)^2
+    int fast_max = 64;
+    struct Contribution {
+        int q;
+        double fx, fy, fz;
+    };
+    struct FastSpan {  // contributions of fast_list[a]: thr_scratch[tid].contrib[start, start + count)
+        int tid;
+        size_t start, count;
+    };
+    std::vector<FastSpan> fast_span;
 
     IntegratorType integrator = LANGEVIN_MIDDLE;
     double T = 300.0, gamma = 1.0, dt_ = 0.001, error_tol_ = 0.01;
@@ -643,6 +660,8 @@ class Engine {
         std::vector<double> bx, by, bz;
         std::vector<uint32_t> be, tmp, ent;
         std::vector<std::pair<int, size_t>> seg;  // (particle, offset in ent)
+        std::vector<int> fast;                    // fast particles found by this thread
+        std::vector<Contribution> contrib;        // forces on other particles from the fast set
     };
     std::vector<ThreadScratch> thr_scratch;
 
@@ -650,7 +669,7 @@ class Engine {
     std::vector<int> cell_of, cell_start, cell_list, nb_count, fill, occupied;
     double shifts[27][3];
     double grid_lo[3], grid_edge[3];
-    int grid_nc[3];
+    int grid_nc[3] = {1, 1, 1};
 
     std::atomic<int> error_flag{0};
     std::string error_msg;
@@ -662,7 +681,6 @@ class Engine {
 
     void invalidate() {
         forces_valid = false;
-        max_disp2 = std::numeric_limits<double>::infinity();
         for (auto& pf : pairs) pf.need_rebuild = true;
     }
 
@@ -698,6 +716,16 @@ class Engine {
                     throw std::invalid_argument("cutoff must be smaller than half the periodic box");
                 if (pf.cutoff + pf.skin >= 0.5 * lmin) pf.skin = std::max(0.0, 0.499 * lmin - pf.cutoff);
             }
+        if ((int)fast.size() != N) {
+            fast.assign(N, 0);
+            fast_list.clear();
+            nfast = 0;
+            for (auto& pf : pairs) pf.need_rebuild = true;
+        }
+        double smin = std::numeric_limits<double>::infinity();
+        for (auto& pf : pairs) smin = std::min(smin, pf.skin);
+        fast_lim2 = pairs.empty() ? std::numeric_limits<double>::infinity() : 0.25 * smin * smin;
+        fast_max = std::max(64, N / 32);
         for (int a = 0; a < 27; ++a) {
             const int sx = a / 9 - 1, sy = (a / 3) % 3 - 1, sz = a % 3 - 1;
             shifts[a][0] = sx * box[0];
@@ -936,6 +964,99 @@ class Engine {
         }
     }
 
+    // Pair interactions of the fast set (called by all threads of a team, after
+    // the list-based pair loop).  Fast-slow pairs are found through the cell
+    // grid of the last build: a slow particle moved less than skin/2, so it is
+    // within the 27-cell stencil around the fast particle's current cell.
+    // Fast-fast pairs are checked directly.  Each pair is computed once; forces
+    // on the partner are buffered and applied by one thread, in the order of the
+    // fast list, so that the result does not depend on which thread handled
+    // which particle.
+    void fast_set_forces(double& e) {
+        const int tid = thread_id();
+        const PairForce& pf = pairs[0];
+        const double rc2 = pf.cutoff * pf.cutoff;
+        const int nc0 = grid_nc[0], nc1 = grid_nc[1], nc2 = grid_nc[2];
+        std::vector<Contribution>& out = thr_scratch[tid].contrib;
+        out.clear();
+        auto pair = [&](int p, int q, double& fx, double& fy, double& fz) {
+            double dx = x[3 * p] - x[3 * q], dy = x[3 * p + 1] - x[3 * q + 1], dz = x[3 * p + 2] - x[3 * q + 2];
+            if (pbc) min_image(dx, dy, dz);
+            const double r2 = dx * dx + dy * dy + dz * dz;
+            if (r2 >= rc2) return;
+            const int* ex_b = pf.excl.data() + pf.excl_start[p];
+            const int* ex_e = pf.excl.data() + pf.excl_start[p + 1];
+            if (ex_b != ex_e && std::binary_search(ex_b, ex_e, q)) return;
+            const double r = std::sqrt(r2);
+            double en, de;
+            pf.tables[(size_t)pf.type[p] * pf.ntypes + pf.type[q]].eval_in_range(r, en, de);
+            e += en;
+            const double sc = r > 0 ? -de / r : 0.0;
+            fx += sc * dx;
+            fy += sc * dy;
+            fz += sc * dz;
+            out.push_back({q, -sc * dx, -sc * dy, -sc * dz});
+        };
+#pragma omp single
+        fast_span.resize(nfast);
+#pragma omp for schedule(dynamic, 4)
+        for (int a = 0; a < nfast; ++a) {
+            const int p = fast_list[a];
+            const size_t out0 = out.size();
+            double fx = 0, fy = 0, fz = 0;
+            int ci[3];
+            for (int d = 0; d < 3; ++d) {
+                double xx = x[3 * p + d];
+                if (pbc) xx -= std::floor(xx / box[d]) * box[d];
+                double cd = (xx - grid_lo[d]) / grid_edge[d];
+                cd = cd > 0 ? cd : 0;
+                ci[d] = cd < grid_nc[d] - 1 ? (int)cd : grid_nc[d] - 1;
+            }
+            for (int ox = -1; ox <= 1; ++ox) {
+                int ca = ci[0] + ox;
+                if (ca < 0 || ca >= nc0) {
+                    if (!pbc) continue;
+                    ca = (ca + nc0) % nc0;
+                }
+                for (int oy = -1; oy <= 1; ++oy) {
+                    int cb = ci[1] + oy;
+                    if (cb < 0 || cb >= nc1) {
+                        if (!pbc) continue;
+                        cb = (cb + nc1) % nc1;
+                    }
+                    for (int oz = -1; oz <= 1; ++oz) {
+                        int cc = ci[2] + oz;
+                        if (cc < 0 || cc >= nc2) {
+                            if (!pbc) continue;
+                            cc = (cc + nc2) % nc2;
+                        }
+                        const int cell = (ca * nc1 + cb) * nc2 + cc;
+                        for (int s = cell_start[cell]; s < cell_start[cell + 1]; ++s) {
+                            const int q = cell_list[s];
+                            if (fast[q]) continue;  // includes q == p
+                            pair(p, q, fx, fy, fz);
+                        }
+                    }
+                }
+            }
+            for (int b = a + 1; b < nfast; ++b) pair(p, fast_list[b], fx, fy, fz);
+            f[3 * p] += fx;
+            f[3 * p + 1] += fy;
+            f[3 * p + 2] += fz;
+            fast_span[a] = {tid, out0, out.size() - out0};
+        }
+#pragma omp single
+        for (int a = 0; a < nfast; ++a) {
+            const FastSpan& sp = fast_span[a];
+            const Contribution* c = thr_scratch[sp.tid].contrib.data() + sp.start;
+            for (size_t k = 0; k < sp.count; ++k) {
+                f[3 * c[k].q] += c[k].fx;
+                f[3 * c[k].q + 1] += c[k].fy;
+                f[3 * c[k].q + 2] += c[k].fz;
+            }
+        }
+    }
+
     // ---- forces (called by all threads of a team) ------------------------------------
     void forces_inner() {
         if (forces_valid) return;  // shared flag, consistent after the last barrier
@@ -947,12 +1068,21 @@ class Engine {
         {
             rebuild_all = false;
             for (auto& pf : pairs)
-                if (pf.need_rebuild || max_disp2 > 0.25 * pf.skin * pf.skin) rebuild_all = true;
+                if (pf.need_rebuild) rebuild_all = true;
+            // the direct search for the fast set uses the grid of the (single)
+            // pair force and needs >= 3 cells per periodic dimension
+            const bool escape_ok = pairs.size() == 1 && (!pbc || (grid_nc[0] >= 3 && grid_nc[1] >= 3 && grid_nc[2] >= 3));
+            if (nfast > (escape_ok ? fast_max : 0)) rebuild_all = true;
         }
         if (rebuild_all) {
             for (auto& pf : pairs) build_list_inner(pf);
+#pragma omp for schedule(static)
+            for (int p = 0; p < N; ++p) fast[p] = 0;
 #pragma omp single
-            max_disp2 = 0.0;
+            {
+                nfast = 0;
+                fast_list.clear();
+            }
         }
         if (pbc) {
 #pragma omp for schedule(static)
@@ -963,11 +1093,13 @@ class Engine {
         }
 
         double e = 0.0;
-        // pair forces + external forces, owner computes
+        const uint8_t* is_fast = nfast > 0 ? fast.data() : nullptr;
+        // pair forces + external forces, owner computes; the fast set is handled below
 #pragma omp for schedule(dynamic, 64)
         for (int p = 0; p < N; ++p) {
             double fx = 0, fy = 0, fz = 0, ep = 0;
             const double px = xw[3 * p], py = xw[3 * p + 1], pz = xw[3 * p + 2];
+            if (!is_fast || !is_fast[p])
             for (const PairForce& pf : pairs) {
                 const double rc2 = pf.cutoff * pf.cutoff;
                 const Table* row = &pf.tables[(size_t)pf.type[p] * pf.ntypes];
@@ -976,6 +1108,7 @@ class Engine {
                 for (int s = pf.nb_start[p], se = pf.nb_start[p + 1]; s < se; ++s) {
                     const uint32_t ent = nb[s];
                     const int q = (int)(ent & NB_INDEX_MASK);
+                    if (is_fast && is_fast[q]) continue;
                     const double* sh = shifts[ent >> NB_SHIFT_BITS];
                     const double dx = px - xw[3 * q] - sh[0], dy = py - xw[3 * q + 1] - sh[1],
                                  dz = pz - xw[3 * q + 2] - sh[2];
@@ -996,6 +1129,7 @@ class Engine {
             f[3 * p + 1] = fy;
             f[3 * p + 2] = fz;
         }
+        if (nfast > 0) fast_set_forces(e);
         for (const SphericalConfinement& sc : spheres) {
             const int n = (int)sc.particles.size();
 #pragma omp for schedule(static)
@@ -1194,7 +1328,9 @@ class Engine {
         const double vscale = std::exp(-dt * gamma);
         const double noisescale = std::sqrt(kT * (1 - vscale * vscale));
         const uint64_t base = mix64(seed ^ mix64((uint64_t)nsteps));
-        double md2 = 0.0;
+        std::vector<int>& my_fast = thr_scratch[tid].fast;
+        my_fast.clear();
+        bool bad = false;
 
 #pragma omp for schedule(static)
         for (int p = 0; p < N; ++p) {
@@ -1223,17 +1359,19 @@ class Engine {
                 const double dd = x[c] - x_ref[c];
                 d2 += dd * dd;
             }
-            if (!(d2 <= std::numeric_limits<double>::max())) d2 = std::numeric_limits<double>::infinity();  // NaN
-            md2 = std::max(md2, d2);
+            if (!(d2 <= std::numeric_limits<double>::max())) bad = true;  // NaN or inf
+            const bool fp = d2 > fast_lim2;
+            fast[p] = fp;
+            if (fp) my_fast.push_back(p);
         }
-        thr[(size_t)PAD * tid] = md2;
+        thr[(size_t)PAD * tid] = bad ? 1.0 : 0.0;
 #pragma omp barrier
 #pragma omp single
         {
-            double m = 0;
-            for (size_t t = 0; t + PAD <= thr.size(); t += PAD) m = std::max(m, thr[t]);
-            max_disp2 = m;
-            if (!std::isfinite(m)) set_error("non-finite coordinates (simulation exploded?)");
+            if (thr_sum() != 0.0) set_error("non-finite coordinates (simulation exploded?)");
+            fast_list.clear();
+            for (const ThreadScratch& ts : thr_scratch) fast_list.insert(fast_list.end(), ts.fast.begin(), ts.fast.end());
+            nfast = (int)fast_list.size();
             time_ += dt;
             nsteps++;
             forces_valid = false;
