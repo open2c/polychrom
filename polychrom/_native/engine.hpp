@@ -42,6 +42,9 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#ifdef __AVX2__
+#include <immintrin.h>
+#endif
 
 namespace pcn {
 
@@ -967,11 +970,11 @@ class Engine {
             }
             // One buffer per cell, so that each particle runs a single filter
             // loop (separate short loops per run cost a branch miss each).
-            if ((int)ts.bx.size() < ncand) {
-                ts.bx.resize(2 * ncand);
-                ts.by.resize(2 * ncand);
-                ts.bz.resize(2 * ncand);
-                ts.be.resize(2 * ncand);
+            if ((int)ts.bx.size() < ncand + 3) {  // + padding to a multiple of 4
+                ts.bx.resize(2 * ncand + 3);
+                ts.by.resize(2 * ncand + 3);
+                ts.bz.resize(2 * ncand + 3);
+                ts.be.resize(2 * ncand + 3);
             }
             double* const BX = ts.bx.data();
             double* const BY = ts.by.data();
@@ -992,17 +995,16 @@ class Engine {
                 }
                 nbuf += len;
             }
+            for (int k = nbuf; k < ((nbuf + 3) & ~3); ++k) {  // far away: never within rl
+                BX[k] = BY[k] = BZ[k] = 1e300;
+                BE[k] = 0;
+            }
             for (int si = cell_start[c]; si < cell_start[c + 1]; ++si) {
                 const int p = CL[si];
                 const double px = SX[si], py = SY[si], pz = SZ[si];
-                if (ts.ent.size() < nent + nbuf) ts.ent.resize(2 * (nent + nbuf));
+                if (ts.ent.size() < nent + nbuf + 4) ts.ent.resize(2 * (nent + nbuf + 4));
                 uint32_t* const out = ts.ent.data() + nent;
-                int n = 0;
-                for (int k = 0; k < nbuf; ++k) {
-                    const double dx = px - BX[k], dy = py - BY[k], dz = pz - BZ[k];
-                    out[n] = BE[k];
-                    n += (dx * dx + dy * dy + dz * dz < rl2);
-                }
+                const int n = filter_candidates(px, py, pz, BX, BY, BZ, BE, nbuf, rl2, out);
                 // drop p itself and its exclusions (compared branch-free if few)
                 const int* ex_b = pf.excl.data() + pf.excl_start[p];
                 const int nex = pf.excl_start[p + 1] - pf.excl_start[p];
@@ -1050,6 +1052,52 @@ class Engine {
             pf.need_rebuild = false;
             pf.n_builds++;
         }
+    }
+
+    // Entries BE[k] of the candidates within sqrt(rl2) of (px, py, pz), in order,
+    // to out[0, n); returns n.  BX, BY, BZ, BE are padded to a multiple of 4 with
+    // far-away candidates, and out has room for 3 entries beyond n.
+    static inline int filter_candidates(double px, double py, double pz, const double* BX, const double* BY,
+                                        const double* BZ, const uint32_t* BE, int nbuf, double rl2, uint32_t* out) {
+        int n = 0;
+#ifdef __AVX2__
+        // 4 candidates at a time; the accepted entries are moved to the front
+        // with a byte shuffle chosen by the comparison mask.  Same arithmetic
+        // (no FMA, same order) as the scalar loop, so the same lists.
+        alignas(16) static const uint8_t compress[16][16] = {
+#define PCN_L(a) 4 * a, 4 * a + 1, 4 * a + 2, 4 * a + 3
+            {PCN_L(0), PCN_L(0), PCN_L(0), PCN_L(0)}, {PCN_L(0), PCN_L(0), PCN_L(0), PCN_L(0)},
+            {PCN_L(1), PCN_L(0), PCN_L(0), PCN_L(0)}, {PCN_L(0), PCN_L(1), PCN_L(0), PCN_L(0)},
+            {PCN_L(2), PCN_L(0), PCN_L(0), PCN_L(0)}, {PCN_L(0), PCN_L(2), PCN_L(0), PCN_L(0)},
+            {PCN_L(1), PCN_L(2), PCN_L(0), PCN_L(0)}, {PCN_L(0), PCN_L(1), PCN_L(2), PCN_L(0)},
+            {PCN_L(3), PCN_L(0), PCN_L(0), PCN_L(0)}, {PCN_L(0), PCN_L(3), PCN_L(0), PCN_L(0)},
+            {PCN_L(1), PCN_L(3), PCN_L(0), PCN_L(0)}, {PCN_L(0), PCN_L(1), PCN_L(3), PCN_L(0)},
+            {PCN_L(2), PCN_L(3), PCN_L(0), PCN_L(0)}, {PCN_L(0), PCN_L(2), PCN_L(3), PCN_L(0)},
+            {PCN_L(1), PCN_L(2), PCN_L(3), PCN_L(0)}, {PCN_L(0), PCN_L(1), PCN_L(2), PCN_L(3)},
+#undef PCN_L
+        };
+        const __m256d PX = _mm256_set1_pd(px), PY = _mm256_set1_pd(py), PZ = _mm256_set1_pd(pz);
+        const __m256d RL2 = _mm256_set1_pd(rl2);
+        for (int k = 0; k < nbuf; k += 4) {
+            const __m256d dx = _mm256_sub_pd(PX, _mm256_loadu_pd(BX + k));
+            const __m256d dy = _mm256_sub_pd(PY, _mm256_loadu_pd(BY + k));
+            const __m256d dz = _mm256_sub_pd(PZ, _mm256_loadu_pd(BZ + k));
+            const __m256d d2 = _mm256_add_pd(_mm256_add_pd(_mm256_mul_pd(dx, dx), _mm256_mul_pd(dy, dy)),
+                                             _mm256_mul_pd(dz, dz));
+            const int m = _mm256_movemask_pd(_mm256_cmp_pd(d2, RL2, _CMP_LT_OQ));
+            const __m128i e = _mm_loadu_si128((const __m128i*)(BE + k));
+            _mm_storeu_si128((__m128i*)(out + n),
+                             _mm_shuffle_epi8(e, _mm_load_si128((const __m128i*)compress[m])));
+            n += __builtin_popcount(m);
+        }
+#else
+        for (int k = 0; k < nbuf; ++k) {
+            const double dx = px - BX[k], dy = py - BY[k], dz = pz - BZ[k];
+            out[n] = BE[k];
+            n += (dx * dx + dy * dy + dz * dz < rl2);
+        }
+#endif
+        return n;
     }
 
     // Pair interactions of the fast set (called by all threads of a team, after
