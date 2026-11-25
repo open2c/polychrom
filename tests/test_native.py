@@ -213,6 +213,7 @@ def test_trajectory_independent_of_threads(integrator):
         for _ in range(60):
             sim.integrator.step(5)
             fast = max(fast, eng.get_fast_count())
+            sim.context.getState(getEnergy=True)  # next step starts with valid forces
         assert fast > 8, "test does not exercise the fast set"
         out.append(sim.context.getState(getPositions=True).getPositions(asNumpy=True)._value)
     for o in out[1:]:

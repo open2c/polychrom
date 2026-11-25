@@ -600,6 +600,7 @@ class Engine {
     void compute() {
         if (forces_valid) return;
         prepare();
+        stepping = false;
 #pragma omp parallel
         forces_inner();
         check_error();
@@ -608,6 +609,8 @@ class Engine {
     void step(int n) {
         if (n <= 0) return;
         prepare();
+        stepping = true;
+        dt_selected = false;
 #pragma omp parallel
         {
             for (int s = 0; s < n; ++s) {
@@ -616,6 +619,7 @@ class Engine {
                 if (error_flag.load(std::memory_order_relaxed)) break;  // same value on all threads after barrier
             }
         }
+        stepping = false;
         check_error();
     }
 
@@ -661,6 +665,9 @@ class Engine {
     IntegratorType integrator = LANGEVIN_MIDDLE;
     double T = 300.0, gamma = 1.0, dt_ = 0.001, error_tol_ = 0.01;
     double max_dt = std::numeric_limits<double>::infinity();
+    double vl_err = 0.0;       // variable Langevin: sum of (f/m)^2 over all coordinates
+    bool stepping = false;     // inside step(): select the step size together with the forces
+    bool dt_selected = false;  // step size of the current step already selected
     double time_ = 0.0;
     long long nsteps = 0;
     uint64_t seed = 1;
@@ -1164,13 +1171,13 @@ class Engine {
                 fast_list.clear();
             }
         }
-        if (pbc) {
+        // xw = x - img (wrapped coordinates, PBC only) is kept up to date by
+        // the integrator; after a rebuild, img has changed.
+        if (rebuild_all && pbc) {
 #pragma omp for schedule(static)
             for (size_t c = 0; c < 3 * (size_t)N; ++c) xw[c] = x[c] - img[c];
-        } else {
-#pragma omp for schedule(static)
-            for (size_t c = 0; c < 3 * (size_t)N; ++c) xw[c] = x[c];
         }
+        const double* const XW = pbc ? xw.data() : x.data();
 
         double e = 0.0;
         const uint8_t* is_fast = nfast > 0 ? fast.data() : nullptr;
@@ -1178,7 +1185,7 @@ class Engine {
 #pragma omp for schedule(dynamic, 64)
         for (int p = 0; p < N; ++p) {
             double fx = 0, fy = 0, fz = 0, ep = 0;
-            const double px = xw[3 * p], py = xw[3 * p + 1], pz = xw[3 * p + 2];
+            const double px = XW[3 * p], py = XW[3 * p + 1], pz = XW[3 * p + 2];
             if (!is_fast || !is_fast[p])
             for (const PairForce& pf : pairs) {
                 const double rc2 = pf.cutoff * pf.cutoff;
@@ -1190,8 +1197,8 @@ class Engine {
                     const int q = (int)(ent & NB_INDEX_MASK);
                     if (is_fast && is_fast[q]) continue;
                     const double* sh = shifts[ent >> NB_SHIFT_BITS];
-                    const double dx = px - xw[3 * q] - sh[0], dy = py - xw[3 * q + 1] - sh[1],
-                                 dz = pz - xw[3 * q + 2] - sh[2];
+                    const double dx = px - XW[3 * q] - sh[0], dy = py - XW[3 * q + 1] - sh[1],
+                                 dz = pz - XW[3 * q + 2] - sh[2];
                     const double r2 = dx * dx + dy * dy + dz * dz;
                     if (r2 >= rc2) continue;
                     const double r = std::sqrt(r2);
@@ -1347,61 +1354,79 @@ class Engine {
         }
         thr[(size_t)PAD * tid] = e;
 #pragma omp barrier
-        // gather
-#pragma omp for schedule(static) nowait
-        for (int p = 0; p < N; ++p) {
-            double fx = 0, fy = 0, fz = 0;
-            for (int s = gather_start[p]; s < gather_start[p + 1]; ++s) {
-                const double* c = &contrib[3 * (size_t)gather_idx[s]];
-                fx += c[0];
-                fy += c[1];
-                fz += c[2];
+        // Gather the bonded contributions; this is the last update of f, so the
+        // variable Langevin error sum (sum of |f/m|^2, see integrate_inner) is
+        // accumulated here, in fixed blocks of particles, so that it does not
+        // depend on the number of threads.
+        const bool vl = integrator == VARIABLE_LANGEVIN;
+        const int nblk = (N + SUM_BLOCK - 1) / SUM_BLOCK;
+#pragma omp for schedule(static)
+        for (int b = 0; b < nblk; ++b) {
+            double err = 0.0;
+            for (int p = b * SUM_BLOCK, pe = std::min(N, p + SUM_BLOCK); p < pe; ++p) {
+                double fx = 0, fy = 0, fz = 0;
+                for (int s = gather_start[p]; s < gather_start[p + 1]; ++s) {
+                    const double* c = &contrib[3 * (size_t)gather_idx[s]];
+                    fx += c[0];
+                    fy += c[1];
+                    fz += c[2];
+                }
+                fx += f[3 * p];
+                fy += f[3 * p + 1];
+                fz += f[3 * p + 2];
+                f[3 * p] = fx;
+                f[3 * p + 1] = fy;
+                f[3 * p + 2] = fz;
+                if (vl) {
+                    const double im = inv_mass[p], ax = im * fx, ay = im * fy, az = im * fz;
+                    err += ax * ax;
+                    err += ay * ay;
+                    err += az * az;
+                }
             }
-            f[3 * p] += fx;
-            f[3 * p + 1] += fy;
-            f[3 * p + 2] += fz;
+            block_sum[b] = err;
         }
 #pragma omp single
         {
             epot = thr_sum();
             if (!std::isfinite(epot)) set_error("non-finite potential energy (simulation exploded?)");
+            if (vl) {
+                double err = 0.0;
+                for (int b = 0; b < nblk; ++b) err += block_sum[b];
+                vl_err = err;
+                if (stepping) {
+                    select_step_size();
+                    dt_selected = true;
+                }
+            }
             forces_valid = true;
         }  // implicit barrier
+    }
+
+    // ReferenceVariableStochasticDynamics::updatePart1: step size from the error
+    // sum over all coordinates of (f/m)^2 (vl_err, computed with the forces).
+    void select_step_size() {
+        double er = std::sqrt(vl_err / (3.0 * N));
+        double nd = er > 0 ? std::sqrt(error_tol_ / er) : max_dt;
+        if (dt_ > 0.0) nd = std::min(nd, 2.0 * dt_);
+        if (nd > dt_ && nd < 1.2 * dt_) nd = dt_;
+        if (nd > max_dt) nd = max_dt;
+        if (!std::isfinite(nd) || nd <= 0) {
+            set_error("variable Langevin: invalid step size (simulation exploded?)");
+            nd = dt_ > 0 ? dt_ : 1e-6;
+        }
+        dt_ = nd;
     }
 
     // ---- integration (called by all threads of a team) ------------------------------------
     void integrate_inner() {
         const int tid = thread_id();
-        if (integrator == VARIABLE_LANGEVIN) {
-            // ReferenceVariableStochasticDynamics::updatePart1: step size selection.
-            // Summed in fixed blocks of particles, so that the step size does not
-            // depend on the number of threads.
-            const int nblk = (N + SUM_BLOCK - 1) / SUM_BLOCK;
-#pragma omp for schedule(static)
-            for (int b = 0; b < nblk; ++b) {
-                double err = 0.0;
-                for (int p = b * SUM_BLOCK, pe = std::min(N, p + SUM_BLOCK); p < pe; ++p)
-                    for (int d = 0; d < 3; ++d) {
-                        const double a = inv_mass[p] * f[3 * p + d];
-                        err += a * a;
-                    }
-                block_sum[b] = err;
-            }
+        if (integrator == VARIABLE_LANGEVIN && !dt_selected) {
+            // forces were already valid when the step started (e.g. after getState).
+            // dt_selected is only written in single blocks of forces_inner and
+            // below, so all threads take this branch alike.
 #pragma omp single
-            {
-                double err = 0.0;
-                for (int b = 0; b < nblk; ++b) err += block_sum[b];
-                double er = std::sqrt(err / (3.0 * N));
-                double nd = er > 0 ? std::sqrt(error_tol_ / er) : max_dt;
-                if (dt_ > 0.0) nd = std::min(nd, 2.0 * dt_);
-                if (nd > dt_ && nd < 1.2 * dt_) nd = dt_;
-                if (nd > max_dt) nd = max_dt;
-                if (!std::isfinite(nd) || nd <= 0) {
-                    set_error("variable Langevin: invalid step size (simulation exploded?)");
-                    nd = dt_ > 0 ? dt_ : 1e-6;
-                }
-                dt_ = nd;
-            }
+            select_step_size();
         }
         const double dt = dt_;
         const double kT = BOLTZ * T;
@@ -1436,6 +1461,7 @@ class Engine {
                     v[c] = vv;
                     x[c] = xx;
                 }
+                if (pbc) xw[c] = x[c] - img[c];
                 const double dd = x[c] - x_ref[c];
                 d2 += dd * dd;
             }
@@ -1455,6 +1481,7 @@ class Engine {
             time_ += dt;
             nsteps++;
             forces_valid = false;
+            dt_selected = false;
         }  // implicit barrier
     }
 };
