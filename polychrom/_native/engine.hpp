@@ -194,12 +194,15 @@ static inline const ZigguratTables& zig() {
     return t;
 }
 
-// Standard normal deviate from the stream that starts at state `st`.
-static inline double znormal(uint64_t st) {
+// Rest of znormal after the draw r (from state st) was not accepted by the
+// fast test (about 1 % of the draws); kept out of line, so that the callers'
+// loops stay small.
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline, cold))
+#endif
+static double znormal_slow(uint64_t st, uint64_t r) {
     const ZigguratTables& Z = zig();
     for (;;) {
-        st += 0x9E3779B97F4A7C15ull;
-        const uint64_t r = mix64(st);
         const int iz = (int)(r & 127);
         const int32_t hz = (int32_t)(uint32_t)(r >> 32);
         const uint32_t ahz = hz < 0 ? (uint32_t)(-(int64_t)hz) : (uint32_t)hz;
@@ -218,7 +221,21 @@ static inline double znormal(uint64_t st) {
         const double xx = hz * Z.wn[iz];
         st += 0x9E3779B97F4A7C15ull;
         if (Z.fn[iz] + u01(mix64(st)) * (Z.fn[iz - 1] - Z.fn[iz]) < std::exp(-.5 * xx * xx)) return xx;
+        st += 0x9E3779B97F4A7C15ull;
+        r = mix64(st);
     }
+}
+
+// Standard normal deviate from the stream that starts at state `st`.
+static inline double znormal(uint64_t st) {
+    const ZigguratTables& Z = zig();
+    st += 0x9E3779B97F4A7C15ull;
+    const uint64_t r = mix64(st);
+    const int iz = (int)(r & 127);
+    const int32_t hz = (int32_t)(uint32_t)(r >> 32);
+    const uint32_t ahz = hz < 0 ? (uint32_t)(-(int64_t)hz) : (uint32_t)hz;
+    if (ahz < Z.kn[iz]) return hz * Z.wn[iz];
+    return znormal_slow(st, r);
 }
 
 // ---------------------------------------------------------------------------
@@ -1613,10 +1630,13 @@ class Engine {
             const double im = mass_uniform ? IM[0] : IM[p];
             if (im == 0) continue;
             const double sim = sim_all != 0 ? sim_all : std::sqrt(im);
+            const size_t c0 = 3 * (size_t)p;
+            const double gs[3] = {znormal(base + ((uint64_t)c0 << 24)), znormal(base + ((uint64_t)(c0 + 1) << 24)),
+                                  znormal(base + ((uint64_t)(c0 + 2) << 24))};
             double d2 = 0.0;
             for (int d = 0; d < 3; ++d) {
-                const size_t c = 3 * (size_t)p + d;
-                const double g = znormal(base + ((uint64_t)c << 24));
+                const size_t c = c0 + d;
+                const double g = gs[d];
                 double xx;
                 if (brownian) {
                     // ReferenceBrownianDynamics
