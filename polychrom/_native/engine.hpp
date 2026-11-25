@@ -878,7 +878,7 @@ class Engine {
                 ncell *= grid_nc[d];
             }
             cell_of.resize(N);
-            cell_list.resize(N);
+            cell_list.resize(N + 4);  // + padding for the run copies below
             nb_count.resize(N);
             cell_start.assign(ncell + 1, 0);
         }
@@ -904,12 +904,12 @@ class Engine {
             }
             fill.assign(cell_start.begin(), cell_start.end() - 1);
             for (int p = 0; p < N; ++p) cell_list[fill[cell_of[p]]++] = p;
-            sorted_xyz.resize(3 * (size_t)N);
+            sorted_xyz.resize(3 * ((size_t)N + 4));  // + padding for the run copies below
         }
         // wrapped coordinates in cell order (structure of arrays)
         double* const SX = sorted_xyz.data();
-        double* const SY = SX + N;
-        double* const SZ = SY + N;
+        double* const SY = SX + (N + 4);
+        double* const SZ = SY + (N + 4);
 #pragma omp for schedule(static)
         for (int s = 0; s < N; ++s) {
             const int q = cell_list[s];
@@ -970,11 +970,11 @@ class Engine {
             }
             // One buffer per cell, so that each particle runs a single filter
             // loop (separate short loops per run cost a branch miss each).
-            if ((int)ts.bx.size() < ncand + 3) {  // + padding to a multiple of 4
-                ts.bx.resize(2 * ncand + 3);
-                ts.by.resize(2 * ncand + 3);
-                ts.bz.resize(2 * ncand + 3);
-                ts.be.resize(2 * ncand + 3);
+            if ((int)ts.bx.size() < ncand + 4) {  // + padding to a multiple of 4 / run copies
+                ts.bx.resize(2 * ncand + 4);
+                ts.by.resize(2 * ncand + 4);
+                ts.bz.resize(2 * ncand + 4);
+                ts.be.resize(2 * ncand + 4);
             }
             double* const BX = ts.bx.data();
             double* const BY = ts.by.data();
@@ -987,12 +987,27 @@ class Engine {
                 const double shx = sh[0], shy = sh[1], shz = sh[2];
                 const uint32_t code = (uint32_t)run_code[r] << NB_SHIFT_BITS;
                 const int lo = run_lo[r], len = run_hi[r] - lo;
+#ifdef __AVX2__
+                // Runs are short (a few particles): copy whole groups of 4, which
+                // may read up to 3 entries past the run (the arrays are padded)
+                // and write past it (overwritten by the next run or the padding).
+                const __m256d SHX = _mm256_set1_pd(shx), SHY = _mm256_set1_pd(shy), SHZ = _mm256_set1_pd(shz);
+                const __m128i CODE = _mm_set1_epi32((int)code);
+                for (int k = 0; k < len; k += 4) {
+                    _mm256_storeu_pd(BX + nbuf + k, _mm256_add_pd(_mm256_loadu_pd(SX + lo + k), SHX));
+                    _mm256_storeu_pd(BY + nbuf + k, _mm256_add_pd(_mm256_loadu_pd(SY + lo + k), SHY));
+                    _mm256_storeu_pd(BZ + nbuf + k, _mm256_add_pd(_mm256_loadu_pd(SZ + lo + k), SHZ));
+                    _mm_storeu_si128((__m128i*)(BE + nbuf + k),
+                                     _mm_or_si128(_mm_loadu_si128((const __m128i*)(CL + lo + k)), CODE));
+                }
+#else
                 for (int k = 0; k < len; ++k) {
                     BX[nbuf + k] = SX[lo + k] + shx;
                     BY[nbuf + k] = SY[lo + k] + shy;
                     BZ[nbuf + k] = SZ[lo + k] + shz;
                     BE[nbuf + k] = (uint32_t)CL[lo + k] | code;
                 }
+#endif
                 nbuf += len;
             }
             for (int k = nbuf; k < ((nbuf + 3) & ~3); ++k) {  // far away: never within rl
