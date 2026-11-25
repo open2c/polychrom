@@ -660,8 +660,9 @@ class Engine {
     static constexpr int SUM_BLOCK = 64;
     std::vector<double> block_sum;
     struct ThreadScratch {
-        std::vector<double> bx, by, bz;
-        std::vector<uint32_t> be, tmp, ent;
+        std::vector<double> bx, by, bz;  // candidate buffer of the current cell (capacity, not length)
+        std::vector<uint32_t> be;
+        std::vector<uint32_t> ent;  // list entries found by this thread (capacity, not length)
         std::vector<std::pair<int, size_t>> seg;  // (particle, offset in ent)
         std::vector<int> fast;                    // fast particles found by this thread
         std::vector<Contribution> contrib;        // forces on other particles from the fast set
@@ -670,6 +671,7 @@ class Engine {
 
     // neighbour-list scratch
     std::vector<int> cell_of, cell_start, cell_list, nb_count, fill, occupied;
+    std::vector<double> sorted_xyz;  // wrapped coordinates in cell_list order: x[N], y[N], z[N]
     double shifts[27][3];
     double grid_lo[3], grid_edge[3];
     int grid_nc[3] = {1, 1, 1};
@@ -864,13 +866,26 @@ class Engine {
             }
             fill.assign(cell_start.begin(), cell_start.end() - 1);
             for (int p = 0; p < N; ++p) cell_list[fill[cell_of[p]]++] = p;
+            sorted_xyz.resize(3 * (size_t)N);
+        }
+        // wrapped coordinates in cell order (structure of arrays)
+        double* const SX = sorted_xyz.data();
+        double* const SY = SX + N;
+        double* const SZ = SY + N;
+#pragma omp for schedule(static)
+        for (int s = 0; s < N; ++s) {
+            const int q = cell_list[s];
+            SX[s] = xw[3 * q];
+            SY[s] = xw[3 * q + 1];
+            SZ[s] = xw[3 * q + 2];
         }
         // 3. candidate scan per occupied cell.  The 3x3 columns of the stencil
-        // are contiguous runs of cells along z; their particles are copied once
-        // (shifted to the right periodic image) into a small buffer that all
-        // particles of the cell then filter without branches.
+        // are contiguous runs of cells along z, hence contiguous ranges of the
+        // cell-ordered coordinates.  They are copied (shifted to the right
+        // periodic image) into one flat buffer that all particles of the cell
+        // then filter without branches.
         ThreadScratch& ts = thr_scratch[tid];
-        ts.ent.clear();
+        size_t nent = 0;
         ts.seg.clear();
         const int nc0 = grid_nc[0], nc1 = grid_nc[1], nc2 = grid_nc[2];
         const int nocc = (int)occupied.size();
@@ -878,19 +893,14 @@ class Engine {
         for (int oc = 0; oc < nocc; ++oc) {
             const int c = occupied[oc];
             const int cx = c / (nc1 * nc2), cy = (c / nc2) % nc1, cz = c % nc2;
-            ts.bx.clear();
-            ts.by.clear();
-            ts.bz.clear();
-            ts.be.clear();
+            int run_lo[27], run_hi[27], run_code[27], nrun = 0, ncand = 0;
             auto add_run = [&](int first_cell, int last_cell, int code) {  // inclusive cell range
-                const double shx = shifts[code][0], shy = shifts[code][1], shz = shifts[code][2];
-                for (int s = cell_start[first_cell], se = cell_start[last_cell + 1]; s < se; ++s) {
-                    const int q = cell_list[s];
-                    ts.bx.push_back(xw[3 * q] + shx);
-                    ts.by.push_back(xw[3 * q + 1] + shy);
-                    ts.bz.push_back(xw[3 * q + 2] + shz);
-                    ts.be.push_back((uint32_t)q | ((uint32_t)code << NB_SHIFT_BITS));
-                }
+                const int lo = cell_start[first_cell], hi = cell_start[last_cell + 1];
+                if (lo == hi) return;
+                run_lo[nrun] = lo;
+                run_hi[nrun] = hi;
+                run_code[nrun++] = code;
+                ncand += hi - lo;
             };
             for (int ox = -1; ox <= 1; ++ox) {
                 int a = cx + ox, sx = 0;
@@ -920,34 +930,68 @@ class Engine {
                     }
                 }
             }
-            const int nbuf = (int)ts.bx.size();
-            if ((int)ts.tmp.size() < nbuf) ts.tmp.resize(nbuf);
-            const double* BX = ts.bx.data();
-            const double* BY = ts.by.data();
-            const double* BZ = ts.bz.data();
-            const uint32_t* BE = ts.be.data();
-            uint32_t* tmp = ts.tmp.data();
+            // One buffer per cell, so that each particle runs a single filter
+            // loop (separate short loops per run cost a branch miss each).
+            if ((int)ts.bx.size() < ncand) {
+                ts.bx.resize(2 * ncand);
+                ts.by.resize(2 * ncand);
+                ts.bz.resize(2 * ncand);
+                ts.be.resize(2 * ncand);
+            }
+            double* const BX = ts.bx.data();
+            double* const BY = ts.by.data();
+            double* const BZ = ts.bz.data();
+            uint32_t* const BE = ts.be.data();
+            const int* const CL = cell_list.data();
+            int nbuf = 0;
+            for (int r = 0; r < nrun; ++r) {
+                const double* sh = shifts[run_code[r]];
+                const double shx = sh[0], shy = sh[1], shz = sh[2];
+                const uint32_t code = (uint32_t)run_code[r] << NB_SHIFT_BITS;
+                const int lo = run_lo[r], len = run_hi[r] - lo;
+                for (int k = 0; k < len; ++k) {
+                    BX[nbuf + k] = SX[lo + k] + shx;
+                    BY[nbuf + k] = SY[lo + k] + shy;
+                    BZ[nbuf + k] = SZ[lo + k] + shz;
+                    BE[nbuf + k] = (uint32_t)CL[lo + k] | code;
+                }
+                nbuf += len;
+            }
             for (int si = cell_start[c]; si < cell_start[c + 1]; ++si) {
-                const int p = cell_list[si];
-                const double px = xw[3 * p], py = xw[3 * p + 1], pz = xw[3 * p + 2];
+                const int p = CL[si];
+                const double px = SX[si], py = SY[si], pz = SZ[si];
+                if (ts.ent.size() < nent + nbuf) ts.ent.resize(2 * (nent + nbuf));
+                uint32_t* const out = ts.ent.data() + nent;
                 int n = 0;
                 for (int k = 0; k < nbuf; ++k) {
                     const double dx = px - BX[k], dy = py - BY[k], dz = pz - BZ[k];
-                    tmp[n] = BE[k];
+                    out[n] = BE[k];
                     n += (dx * dx + dy * dy + dz * dz < rl2);
                 }
+                // drop p itself and its exclusions (compared branch-free if few)
                 const int* ex_b = pf.excl.data() + pf.excl_start[p];
-                const int* ex_e = pf.excl.data() + pf.excl_start[p + 1];
-                const size_t start = ts.ent.size();
-                for (int k = 0; k < n; ++k) {
-                    const uint32_t ent = tmp[k];
-                    const int q = (int)(ent & NB_INDEX_MASK);
-                    if (q == p && (ent >> NB_SHIFT_BITS) == 13) continue;
-                    if (ex_b != ex_e && std::binary_search(ex_b, ex_e, q)) continue;
-                    ts.ent.push_back(ent);
+                const int nex = pf.excl_start[p + 1] - pf.excl_start[p];
+                const uint32_t self = (uint32_t)p | (13u << NB_SHIFT_BITS);
+                int m = 0;
+                if (nex <= 8) {
+                    for (int k = 0; k < n; ++k) {
+                        const uint32_t ent = out[k];
+                        const int q = (int)(ent & NB_INDEX_MASK);
+                        bool keep = ent != self;
+                        for (int z = 0; z < nex; ++z) keep &= ex_b[z] != q;
+                        out[m] = ent;
+                        m += keep;
+                    }
+                } else {
+                    for (int k = 0; k < n; ++k) {
+                        const uint32_t ent = out[k];
+                        if (ent == self || std::binary_search(ex_b, ex_b + nex, (int)(ent & NB_INDEX_MASK))) continue;
+                        out[m++] = ent;
+                    }
                 }
-                nb_count[p] = (int)(ts.ent.size() - start);
-                ts.seg.push_back({p, start});
+                nb_count[p] = m;
+                ts.seg.push_back({p, nent});
+                nent += m;
             }
         }
 #pragma omp barrier
