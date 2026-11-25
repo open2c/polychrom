@@ -11,3 +11,4 @@ dist
 polychrom/*.so
 .vscode
 polychrom/_native_engine.cpp
+polychrom/_native_engine_x86_64_v3.cpp

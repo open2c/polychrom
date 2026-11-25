@@ -15,6 +15,8 @@ cnp.import_array()
 
 
 cdef extern from "_native/engine.hpp" namespace "pcn" nogil:
+    cbool cpu_has_x86_64_v3()
+
     cdef cppclass Engine:
         Engine(int N) except +
         void set_threads(int n)
@@ -84,6 +86,11 @@ cdef inline cnp.ndarray _i(a, n=None):
     if n is not None and arr.size != n:
         raise ValueError(f"expected {n} values, got {arr.size}")
     return arr
+
+
+def cpu_supports_x86_64_v3():
+    """True if the CPU can run the x86-64-v3 (AVX2, FMA) build of the engine."""
+    return cpu_has_x86_64_v3()
 
 
 cdef class NativeEngine:

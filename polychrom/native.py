@@ -41,6 +41,10 @@ Threads: ``POLYCHROM_NATIVE_THREADS``, else ``OMP_NUM_THREADS``, else
 ``OPENMM_CPU_THREADS``, else one thread per 500 particles up to the number of
 CPUs available to the process.  On shared machines, set it explicitly to the
 number of cores you have to yourself.
+
+Instruction set: on x86-64 CPUs with AVX2 and FMA, a build of the engine for
+x86-64-v3 is used (same results, faster).  ``POLYCHROM_NATIVE_ISA=baseline``
+selects the generic build; :data:`ENGINE_ISA` tells which one is in use.
 """
 
 import copy
@@ -53,7 +57,26 @@ import numpy as np
 import openmm
 import simtk.unit as u
 
-from polychrom import _native_engine
+from polychrom import _native_engine as _native_engine_baseline
+
+
+def _select_engine_module():
+    """The x86-64-v3 build of the engine if it is installed and the CPU supports
+    it, unless POLYCHROM_NATIVE_ISA=baseline; else the generic build."""
+    if (
+        os.environ.get("POLYCHROM_NATIVE_ISA", "").lower() != "baseline"
+        and _native_engine_baseline.cpu_supports_x86_64_v3()
+    ):
+        try:
+            from polychrom import _native_engine_x86_64_v3
+
+            return _native_engine_x86_64_v3, "x86-64-v3"
+        except ImportError:
+            pass
+    return _native_engine_baseline, "baseline"
+
+
+_native_engine, ENGINE_ISA = _select_engine_module()
 
 nm = u.nanometer
 ps = u.picosecond

@@ -48,6 +48,18 @@ namespace pcn {
 // Same value as OpenMM's BOLTZ (kJ/mol/K).
 constexpr double BOLTZ = 0.0083144626181532395;
 
+// Whether this CPU (and OS) supports the instructions of the x86-64-v3 build of
+// the engine (AVX2, FMA, BMI2).  Both builds use -ffp-contract=off, so they
+// produce the same results.
+static inline bool cpu_has_x86_64_v3() {
+#if (defined(__x86_64__) || defined(_M_X64)) && (defined(__GNUC__) || defined(__clang__))
+    __builtin_cpu_init();
+    return __builtin_cpu_supports("avx2") && __builtin_cpu_supports("fma") && __builtin_cpu_supports("bmi2");
+#else
+    return false;
+#endif
+}
+
 static inline int thread_id() {
 #ifdef _OPENMP
     return omp_get_thread_num();
