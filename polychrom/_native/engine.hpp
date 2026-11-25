@@ -1090,11 +1090,22 @@ class Engine {
                 const double px = SX[si], py = SY[si], pz = SZ[si];
                 if (ts.ent.size() < nent + nbuf + 4) ts.ent.resize(2 * (nent + nbuf + 4));
                 uint32_t* const out = ts.ent.data() + nent;
-                const int n = filter_candidates(px, py, pz, BX, BY, BZ, BE, nbuf, rl2, out);
-                // drop p itself and its exclusions (compared branch-free if few)
+                // drop p itself and its exclusions: in the filter if there are at
+                // most two (chain neighbours), else afterwards (branch-free if few)
                 const int* ex_b = pf.excl.data() + pf.excl_start[p];
                 const int nex = pf.excl_start[p + 1] - pf.excl_start[p];
                 const uint32_t self = (uint32_t)p | (13u << NB_SHIFT_BITS);
+                const uint32_t none = ~0u;  // never equal to a particle index
+                if (nex <= 2) {
+                    const int m = filter_candidates(px, py, pz, BX, BY, BZ, BE, nbuf, rl2, self,
+                                                    nex > 0 ? (uint32_t)ex_b[0] : none,
+                                                    nex > 1 ? (uint32_t)ex_b[1] : none, out);
+                    nb_count[p] = m;
+                    ts.seg.push_back({p, nent});
+                    nent += m;
+                    continue;
+                }
+                const int n = filter_candidates(px, py, pz, BX, BY, BZ, BE, nbuf, rl2, none, none, none, out);
                 int m = 0;
                 if (nex <= 8) {
                     for (int k = 0; k < n; ++k) {
@@ -1141,10 +1152,12 @@ class Engine {
     }
 
     // Entries BE[k] of the candidates within sqrt(rl2) of (px, py, pz), in order,
-    // to out[0, n); returns n.  BX, BY, BZ, BE are padded to a multiple of 4 with
-    // far-away candidates, and out has room for 3 entries beyond n.
+    // to out[0, n); returns n.  Entries equal to `self` and entries whose particle
+    // is ex0 or ex1 are left out.  BX, BY, BZ, BE are padded to a multiple of 4
+    // with far-away candidates, and out has room for 3 entries beyond n.
     static inline int filter_candidates(double px, double py, double pz, const double* BX, const double* BY,
-                                        const double* BZ, const uint32_t* BE, int nbuf, double rl2, uint32_t* out) {
+                                        const double* BZ, const uint32_t* BE, int nbuf, double rl2, uint32_t self,
+                                        uint32_t ex0, uint32_t ex1, uint32_t* out) {
         int n = 0;
 #ifdef __AVX2__
         // 4 candidates at a time; the accepted entries are moved to the front
@@ -1164,14 +1177,19 @@ class Engine {
         };
         const __m256d PX = _mm256_set1_pd(px), PY = _mm256_set1_pd(py), PZ = _mm256_set1_pd(pz);
         const __m256d RL2 = _mm256_set1_pd(rl2);
+        const __m128i SELF = _mm_set1_epi32((int)self), EX0 = _mm_set1_epi32((int)ex0), EX1 = _mm_set1_epi32((int)ex1);
+        const __m128i IMASK = _mm_set1_epi32((int)NB_INDEX_MASK);
         for (int k = 0; k < nbuf; k += 4) {
             const __m256d dx = _mm256_sub_pd(PX, _mm256_loadu_pd(BX + k));
             const __m256d dy = _mm256_sub_pd(PY, _mm256_loadu_pd(BY + k));
             const __m256d dz = _mm256_sub_pd(PZ, _mm256_loadu_pd(BZ + k));
             const __m256d d2 = _mm256_add_pd(_mm256_add_pd(_mm256_mul_pd(dx, dx), _mm256_mul_pd(dy, dy)),
                                              _mm256_mul_pd(dz, dz));
-            const int m = _mm256_movemask_pd(_mm256_cmp_pd(d2, RL2, _CMP_LT_OQ));
             const __m128i e = _mm_loadu_si128((const __m128i*)(BE + k));
+            const __m128i qi = _mm_and_si128(e, IMASK);
+            const __m128i drop = _mm_or_si128(_mm_cmpeq_epi32(e, SELF),
+                                              _mm_or_si128(_mm_cmpeq_epi32(qi, EX0), _mm_cmpeq_epi32(qi, EX1)));
+            const int m = _mm256_movemask_pd(_mm256_cmp_pd(d2, RL2, _CMP_LT_OQ)) & ~_mm_movemask_ps(_mm_castsi128_ps(drop));
             _mm_storeu_si128((__m128i*)(out + n),
                              _mm_shuffle_epi8(e, _mm_load_si128((const __m128i*)compress[m])));
             n += __builtin_popcount(m);
@@ -1179,8 +1197,9 @@ class Engine {
 #else
         for (int k = 0; k < nbuf; ++k) {
             const double dx = px - BX[k], dy = py - BY[k], dz = pz - BZ[k];
-            out[n] = BE[k];
-            n += (dx * dx + dy * dy + dz * dz < rl2);
+            const uint32_t e = BE[k], q = e & NB_INDEX_MASK;
+            out[n] = e;
+            n += (dx * dx + dy * dy + dz * dz < rl2) & (e != self) & (q != ex0) & (q != ex1);
         }
 #endif
         return n;
