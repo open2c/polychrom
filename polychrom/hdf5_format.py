@@ -151,8 +151,8 @@ def encode_positions(pos: np.ndarray, precision: float) -> Dict[str, np.ndarray]
         ``pos_delta`` (int8, (D, N)), ``pos_anchor_idx`` (int32, K), ``pos_anchor_pos`` (int32, (K, D))
     """
     pos = np.asarray(pos, dtype=np.float64)
-    if not precision > 0:
-        raise ValueError(f"pos_precision must be a positive number, got {precision}")
+    if not np.isfinite(precision) or not precision > 0:
+        raise ValueError(f"pos_precision must be a finite positive number, got {precision}")
     if pos.ndim != 2:
         raise ValueError(f"pos must be an (N, 3) array to use pos_precision, got shape {pos.shape}")
     if not np.isfinite(pos).all():
