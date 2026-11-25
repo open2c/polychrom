@@ -14,7 +14,8 @@
 //    rounding.  Particles that have moved more than half the skin since the
 //    last build (the "fast set", e.g. beads pulled by a freshly placed loop
 //    extrusion bond) get their interactions from a direct search every step;
-//    lists are rebuilt only when the fast set grows beyond max(64, N/32);
+//    lists are rebuilt only when the fast set grows beyond
+//    min(1024, max(64, N/32)) particles;
 //  * full (i, j and j, i) neighbour lists, so pair forces are accumulated by the
 //    owning thread without atomics or per-thread force buffers;
 //  * bonded terms evaluated in parallel into a contribution buffer and gathered
@@ -725,7 +726,8 @@ class Engine {
         double smin = std::numeric_limits<double>::infinity();
         for (auto& pf : pairs) smin = std::min(smin, pf.skin);
         fast_lim2 = pairs.empty() ? std::numeric_limits<double>::infinity() : 0.25 * smin * smin;
-        fast_max = std::max(64, N / 32);
+        // fast-fast pairs are checked directly (O(nfast^2)), so keep the set small
+        fast_max = std::min(1024, std::max(64, N / 32));
         for (int a = 0; a < 27; ++a) {
             const int sx = a / 9 - 1, sy = (a / 3) % 3 - 1, sz = a % 3 - 1;
             shifts[a][0] = sx * box[0];
@@ -838,16 +840,22 @@ class Engine {
             cell_list.resize(N);
             nb_count.resize(N);
             cell_start.assign(ncell + 1, 0);
-            for (int p = 0; p < N; ++p) {
-                int ci[3];
-                for (int d = 0; d < 3; ++d) {
-                    double cd = (xw[3 * p + d] - grid_lo[d]) / grid_edge[d];
-                    cd = cd > 0 ? cd : 0;  // also maps NaN to 0
-                    ci[d] = cd < grid_nc[d] - 1 ? (int)cd : grid_nc[d] - 1;
-                }
-                cell_of[p] = (ci[0] * grid_nc[1] + ci[1]) * grid_nc[2] + ci[2];
-                cell_start[cell_of[p] + 1]++;
+        }
+        // cell of each particle (parallel), then counting sort (serial)
+#pragma omp for schedule(static)
+        for (int p = 0; p < N; ++p) {
+            int ci[3];
+            for (int d = 0; d < 3; ++d) {
+                double cd = (xw[3 * p + d] - grid_lo[d]) / grid_edge[d];
+                cd = cd > 0 ? cd : 0;  // also maps NaN to 0
+                ci[d] = cd < grid_nc[d] - 1 ? (int)cd : grid_nc[d] - 1;
             }
+            cell_of[p] = (ci[0] * grid_nc[1] + ci[1]) * grid_nc[2] + ci[2];
+        }
+#pragma omp single
+        {
+            const long ncell = (long)cell_start.size() - 1;
+            for (int p = 0; p < N; ++p) cell_start[cell_of[p] + 1]++;
             occupied.clear();
             for (long c = 0; c < ncell; ++c) {
                 if (cell_start[c + 1]) occupied.push_back((int)c);
