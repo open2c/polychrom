@@ -295,6 +295,7 @@ class Engine {
         img.assign(3 * (size_t)N, 0.0);
         mass.assign(N, 100.0);
         inv_mass.assign(N, 0.01);
+        uniform_sqrt_inv_mass = std::sqrt(inv_mass[0]);
         (void)zig();
     }
 
@@ -314,10 +315,13 @@ class Engine {
     }
 
     void set_masses(const double* m) {
+        bool uniform = true;
         for (int p = 0; p < N; ++p) {
             mass[p] = m[p];
             inv_mass[p] = m[p] > 0 ? 1.0 / m[p] : 0.0;
+            uniform = uniform && inv_mass[p] == inv_mass[0];
         }
+        uniform_sqrt_inv_mass = uniform && inv_mass[0] > 0 ? std::sqrt(inv_mass[0]) : 0.0;
         invalidate();
     }
 
@@ -631,6 +635,7 @@ class Engine {
     bool pbc = false;
     double box[3] = {0, 0, 0};
     std::vector<double> x, v, f, mass, inv_mass;
+    double uniform_sqrt_inv_mass = 0.0;  // sqrt(1 / mass) if all masses are equal, else 0
     std::vector<double> x_ref;  // positions at the last neighbour-list build
     std::vector<double> img;    // periodic image offset at the last build (multiple of box)
     std::vector<double> xw;     // x - img, refreshed every force evaluation
@@ -1518,32 +1523,43 @@ class Engine {
         my_fast.clear();
         bool bad = false;
 
+        // local restrict pointers: the stores below cannot change the inputs
+        double* __restrict X = x.data();
+        double* __restrict V = v.data();
+        double* __restrict XW = xw.data();
+        const double* __restrict F = f.data();
+        const double* __restrict IMG = img.data();
+        const double* __restrict XREF = x_ref.data();
+        const double* __restrict IM = inv_mass.data();
+        const bool brownian = integrator == BROWNIAN, wrap = pbc;
+        const double sim_all = uniform_sqrt_inv_mass;  // 0 unless all masses are equal
 #pragma omp for schedule(static)
         for (int p = 0; p < N; ++p) {
-            const double im = inv_mass[p];
+            const double im = IM[p];
             if (im == 0) continue;
-            const double sim = std::sqrt(im);
+            const double sim = sim_all != 0 ? sim_all : std::sqrt(im);
             double d2 = 0.0;
             for (int d = 0; d < 3; ++d) {
                 const size_t c = 3 * (size_t)p + d;
                 const double g = znormal(base + ((uint64_t)c << 24));
-                if (integrator == BROWNIAN) {
+                double xx;
+                if (brownian) {
                     // ReferenceBrownianDynamics
-                    const double dx = dt / gamma * im * f[c] + std::sqrt(2.0 * kT * dt / gamma) * sim * g;
-                    x[c] += dx;
-                    v[c] = dx / dt;
+                    const double dx = dt / gamma * im * F[c] + std::sqrt(2.0 * kT * dt / gamma) * sim * g;
+                    xx = X[c] + dx;
+                    V[c] = dx / dt;
                 } else {
                     // ReferenceLangevinMiddleDynamics (OpenMM 8: also LangevinIntegrator and,
                     // with the step size chosen above, VariableLangevinIntegrator)
-                    double vv = v[c] + dt * im * f[c];
-                    double xx = x[c] + 0.5 * dt * vv;
+                    double vv = V[c] + dt * im * F[c];
+                    xx = X[c] + 0.5 * dt * vv;
                     vv = vscale * vv + noisescale * sim * g;
                     xx += 0.5 * dt * vv;
-                    v[c] = vv;
-                    x[c] = xx;
+                    V[c] = vv;
                 }
-                if (pbc) xw[c] = x[c] - img[c];
-                const double dd = x[c] - x_ref[c];
+                X[c] = xx;
+                if (wrap) XW[c] = xx - IMG[c];
+                const double dd = xx - XREF[c];
                 d2 += dd * dd;
             }
             if (!(d2 <= std::numeric_limits<double>::max())) bad = true;  // NaN or inf
