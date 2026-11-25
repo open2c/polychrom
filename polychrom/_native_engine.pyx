@@ -42,6 +42,8 @@ cdef extern from "_native/engine.hpp" namespace "pcn" nogil:
         void set_pair_exclusions(int s, int n, const int* i, const int* j) except +
         long get_pair_builds(int s) except +
         long get_pair_list_size(int s) except +
+        int get_fast_count()
+        void get_fast_particles(int* out)
         void set_pair_skin(int s, double skin) except +
         int add_spherical_confinement(int n, const int* particles, double kb, double aa, double t, double tt,
                                       double sign, double cx, double cy, double cz) except +
@@ -203,6 +205,16 @@ cdef class NativeEngine:
 
     def get_pair_list_size(self, int s):
         return self.e.get_pair_list_size(s)
+
+    def get_fast_count(self):
+        """Particles that moved more than half the skin since the last list build."""
+        return self.e.get_fast_count()
+
+    def get_fast_particles(self):
+        cdef cnp.ndarray a = np.empty(self.e.get_fast_count(), dtype=np.intc)
+        if a.size:
+            self.e.get_fast_particles(<int*> a.data)
+        return a
 
     def set_pair_skin(self, int s, double skin):
         self.e.set_pair_skin(s, skin)

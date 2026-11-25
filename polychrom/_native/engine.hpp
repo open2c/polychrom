@@ -14,8 +14,7 @@
 //    rounding.  Particles that have moved more than half the skin since the
 //    last build (the "fast set", e.g. beads pulled by a freshly placed loop
 //    extrusion bond) get their interactions from a direct search every step;
-//    lists are rebuilt only when the fast set grows beyond
-//    min(1024, max(64, N/32)) particles;
+//    lists are rebuilt only when the fast set grows beyond max(64, N/32);
 //  * full (i, j and j, i) neighbour lists, so pair forces are accumulated by the
 //    owning thread without atomics or per-thread force buffers;
 //  * bonded terms evaluated in parallel into a contribution buffer and gathered
@@ -488,6 +487,8 @@ class Engine {
     }
     long get_pair_builds(int s) const { return pairs.at(s).n_builds; }
     long get_pair_list_size(int s) const { return (long)pairs.at(s).nb.size(); }
+    int get_fast_count() const { return nfast; }
+    void get_fast_particles(int* out) const { std::copy(fast_list.begin(), fast_list.end(), out); }
 
     // External forces ---------------------------------------------------------
     int add_spherical_confinement(int n, const int* particles, double kb, double aa, double t, double tt,
@@ -631,6 +632,7 @@ class Engine {
     // Fast set: particles that moved more than half the skin since the last build.
     std::vector<uint8_t> fast;  // per particle
     std::vector<int> fast_list;
+    std::vector<std::pair<int, int>> fast_binned;  // (current cell, particle), sorted
     int nfast = 0;
     double fast_lim2 = 0.0;  // (skin / 2)^2
     int fast_max = 64;
@@ -726,8 +728,7 @@ class Engine {
         double smin = std::numeric_limits<double>::infinity();
         for (auto& pf : pairs) smin = std::min(smin, pf.skin);
         fast_lim2 = pairs.empty() ? std::numeric_limits<double>::infinity() : 0.25 * smin * smin;
-        // fast-fast pairs are checked directly (O(nfast^2)), so keep the set small
-        fast_max = std::min(1024, std::max(64, N / 32));
+        fast_max = std::max(64, N / 32);
         for (int a = 0; a < 27; ++a) {
             const int sx = a / 9 - 1, sy = (a / 3) % 3 - 1, sz = a % 3 - 1;
             shifts[a][0] = sx * box[0];
@@ -976,10 +977,10 @@ class Engine {
     // the list-based pair loop).  Fast-slow pairs are found through the cell
     // grid of the last build: a slow particle moved less than skin/2, so it is
     // within the 27-cell stencil around the fast particle's current cell.
-    // Fast-fast pairs are checked directly.  Each pair is computed once; forces
-    // on the partner are buffered and applied by one thread, in the order of the
-    // fast list, so that the result does not depend on which thread handled
-    // which particle.
+    // Fast-fast pairs are found by binning the fast set into the same grid at
+    // its current positions.  Each pair is computed once; forces on the partner
+    // are buffered and applied by one thread, in the order of the fast list, so
+    // that the result does not depend on which thread handled which particle.
     void fast_set_forces(double& e) {
         const int tid = thread_id();
         const PairForce& pf = pairs[0];
@@ -987,6 +988,26 @@ class Engine {
         const int nc0 = grid_nc[0], nc1 = grid_nc[1], nc2 = grid_nc[2];
         std::vector<Contribution>& out = thr_scratch[tid].contrib;
         out.clear();
+        auto current_cell = [&](int p, int* ci) {
+            for (int d = 0; d < 3; ++d) {
+                double xx = x[3 * p + d];
+                if (pbc) xx -= std::floor(xx / box[d]) * box[d];
+                double cd = (xx - grid_lo[d]) / grid_edge[d];
+                cd = cd > 0 ? cd : 0;
+                ci[d] = cd < grid_nc[d] - 1 ? (int)cd : grid_nc[d] - 1;
+            }
+        };
+#pragma omp single
+        {
+            fast_span.resize(nfast);
+            fast_binned.resize(nfast);
+            for (int a = 0; a < nfast; ++a) {
+                int ci[3];
+                current_cell(fast_list[a], ci);
+                fast_binned[a] = {(ci[0] * nc1 + ci[1]) * nc2 + ci[2], fast_list[a]};
+            }
+            std::sort(fast_binned.begin(), fast_binned.end());
+        }
         auto pair = [&](int p, int q, double& fx, double& fy, double& fz) {
             double dx = x[3 * p] - x[3 * q], dy = x[3 * p + 1] - x[3 * q + 1], dz = x[3 * p + 2] - x[3 * q + 2];
             if (pbc) min_image(dx, dy, dz);
@@ -1005,21 +1026,13 @@ class Engine {
             fz += sc * dz;
             out.push_back({q, -sc * dx, -sc * dy, -sc * dz});
         };
-#pragma omp single
-        fast_span.resize(nfast);
 #pragma omp for schedule(dynamic, 4)
         for (int a = 0; a < nfast; ++a) {
             const int p = fast_list[a];
             const size_t out0 = out.size();
             double fx = 0, fy = 0, fz = 0;
             int ci[3];
-            for (int d = 0; d < 3; ++d) {
-                double xx = x[3 * p + d];
-                if (pbc) xx -= std::floor(xx / box[d]) * box[d];
-                double cd = (xx - grid_lo[d]) / grid_edge[d];
-                cd = cd > 0 ? cd : 0;
-                ci[d] = cd < grid_nc[d] - 1 ? (int)cd : grid_nc[d] - 1;
-            }
+            current_cell(p, ci);
             for (int ox = -1; ox <= 1; ++ox) {
                 int ca = ci[0] + ox;
                 if (ca < 0 || ca >= nc0) {
@@ -1044,10 +1057,13 @@ class Engine {
                             if (fast[q]) continue;  // includes q == p
                             pair(p, q, fx, fy, fz);
                         }
+                        // fast partners binned at their current positions; q > p counts each pair once
+                        auto lo = std::lower_bound(fast_binned.begin(), fast_binned.end(), std::make_pair(cell, 0));
+                        for (; lo != fast_binned.end() && lo->first == cell; ++lo)
+                            if (lo->second > p) pair(p, lo->second, fx, fy, fz);
                     }
                 }
             }
-            for (int b = a + 1; b < nfast; ++b) pair(p, fast_list[b], fx, fy, fz);
             f[3 * p] += fx;
             f[3 * p + 1] += fy;
             f[3 * p + 2] += fz;

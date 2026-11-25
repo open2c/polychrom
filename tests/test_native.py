@@ -188,15 +188,77 @@ def test_integrators_run_and_thermalise(integrator):
         assert 1.0 < res["kineticEnergy"] < 2.0  # 1.5 kT per particle
 
 
-def test_trajectory_independent_of_threads():
+@pytest.mark.parametrize("integrator", ["langevin", "variableLangevin"])
+def test_trajectory_independent_of_threads(integrator):
+    """Bit-identical trajectories for any number of threads, also with a fast
+    set (particles pulled by stiff long bonds) and a variable step size."""
     N = 500
     data = polychrom.starting_conformations.grow_cubic(N, 14)
+    pulls = [(i, i + 60) for i in range(0, N - 60, 23)]
+
+    def build(sim):
+        sim.add_force(forcekits.polymer_chains(sim))
+        sim.add_force(
+            forces.harmonic_bonds(sim, pulls, bondWiggleDistance=0.3, bondLength=0.5, name="pull", override_checks=True)
+        )
+
     out = []
-    for threads in (1, 3):
-        sim = _make("native", N, data, _chain(), PBCbox=[20.0, 20.0, 20.0])
-        sim.context.engine.set_threads(threads)
+    for threads in (1, 3, 4):
+        sim = _make("native", N, data, build, PBCbox=[20.0, 20.0, 20.0], integrator=integrator)
+        eng = sim.context.engine
+        eng.set_threads(threads)
         sim.integrator.setRandomNumberSeed(11)
         sim.context.setVelocitiesToTemperature(300, 5)
-        sim.integrator.step(300)
+        fast = 0
+        for _ in range(60):
+            sim.integrator.step(5)
+            fast = max(fast, eng.get_fast_count())
+        assert fast > 8, "test does not exercise the fast set"
         out.append(sim.context.getState(getPositions=True).getPositions(asNumpy=True)._value)
-    np.testing.assert_array_equal(out[0], out[1])
+    for o in out[1:]:
+        np.testing.assert_array_equal(out[0], o)
+
+
+@pytest.mark.parametrize("PBCbox", [False, [14.0, 14.0, 14.0]])
+def test_fast_set_forces(PBCbox):
+    """Particles pulled by stiff long bonds (as by freshly placed loop extrusion
+    bonds) move more than half the skin; their pair forces come from the direct
+    search, not the lists.  Compare with Reference at the same positions."""
+    N = 400
+    rng = np.random.default_rng(3)
+    data = polychrom.starting_conformations.grow_cubic(N, 12)
+    pulls = [(i, i + 60) for i in range(0, N - 60, 37)]
+
+    def build(sim):
+        sim.add_force(forcekits.polymer_chains(sim, nonbonded_force_kwargs={"trunc": 3.0}))
+        sim.add_force(forces.harmonic_bonds(sim, pulls, bondWiggleDistance=0.3, bondLength=0.5, name="pull", override_checks=True))
+
+    nat = _make("native", N, data, build, PBCbox)
+    eng = nat.context.engine
+    box = np.array(PBCbox) if PBCbox else None
+
+    def fast_fast_contacts(x, fast):
+        d = x[fast][:, None, :] - x[fast][None, :, :]
+        if box is not None:
+            d -= box * np.round(d / box)
+        r = np.linalg.norm(d, axis=-1)
+        not_bonded = np.abs(fast[:, None] - fast[None, :]) > 1  # chain neighbours are excluded
+        return np.sum(np.triu((r < 1.0) & not_bonded, 1))
+
+    found = False
+    for _ in range(400):
+        nat.integrator.step(1)
+        fast = eng.get_fast_particles()
+        if len(fast) > 1:
+            x = nat.context.getState(getPositions=True).getPositions(asNumpy=True)._value
+            if fast_fast_contacts(x, fast) > 0:
+                found = True
+                break
+    assert found, "no fast-fast contact: test does not exercise the fast set"
+    builds = eng.get_pair_builds(0)
+    ref = _make("reference", N, x, build, PBCbox)
+    f_ref, e_ref = _forces_energy(ref)
+    f_nat, e_nat = _forces_energy(nat)
+    assert eng.get_pair_builds(0) == builds  # the forces above came from lists + fast set
+    np.testing.assert_allclose(f_nat, f_ref, atol=2e-6 * np.abs(f_ref).max(), rtol=0)
+    assert e_nat == pytest.approx(e_ref, rel=2e-6)
