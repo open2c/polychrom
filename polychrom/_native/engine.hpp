@@ -640,7 +640,10 @@ class Engine {
 
     bool topology_dirty = true;
     std::vector<double> contrib;
-    std::vector<int> gather_start, gather_idx;
+    std::vector<int> gather_start;
+    std::vector<uint32_t> gather_idx;
+    // gather_idx kinds: add vector v, subtract it, or subtract v and the next vector
+    static constexpr uint32_t GATHER_PLUS = 0, GATHER_MINUS = 1, GATHER_MINUS_PAIR = 2;
 
     bool forces_valid = false;
     double epot = 0.0;
@@ -766,35 +769,48 @@ class Engine {
     }
 
     // ---- bonded bookkeeping ----------------------------------------------------
+    // The contribution buffer holds one force vector per bond (on i; j gets its
+    // negative) and two per angle (on i and k; j gets -f_i - f_k).  The gather
+    // index entries are (vector index << 2 | GATHER_*), in the order of the
+    // terms, so each particle sums its contributions in a fixed order.
     void rebuild_topology() {
-        size_t off = 0;
+        size_t slots = 0, nterm = 0;
         for (auto& b : bonds) {
-            b.contrib_offset = off;
-            off += 2 * b.i.size();
+            b.contrib_offset = slots;
+            slots += b.i.size();
+            nterm += 2 * b.i.size();
         }
         for (auto& a : angles) {
-            a.contrib_offset = off;
-            off += 3 * a.i.size();
+            a.contrib_offset = slots;
+            slots += 2 * a.i.size();
+            nterm += 3 * a.i.size();
         }
-        contrib.assign(3 * off, 0.0);
-        std::vector<int> owner(off);
+        if (slots >= (size_t(1) << 30)) throw std::invalid_argument("too many bonds and angles");
+        contrib.assign(3 * slots, 0.0);
+        std::vector<int> owner(nterm);
+        std::vector<uint32_t> code(nterm);
+        size_t t = 0;
+        auto add = [&](int p, size_t slot, uint32_t kind) {
+            owner[t] = p;
+            code[t++] = (uint32_t)(slot << 2) | kind;
+        };
         for (auto& b : bonds)
             for (size_t q = 0; q < b.i.size(); ++q) {
-                owner[b.contrib_offset + 2 * q] = b.i[q];
-                owner[b.contrib_offset + 2 * q + 1] = b.j[q];
+                add(b.i[q], b.contrib_offset + q, GATHER_PLUS);
+                add(b.j[q], b.contrib_offset + q, GATHER_MINUS);
             }
         for (auto& a : angles)
             for (size_t q = 0; q < a.i.size(); ++q) {
-                owner[a.contrib_offset + 3 * q] = a.i[q];
-                owner[a.contrib_offset + 3 * q + 1] = a.j[q];
-                owner[a.contrib_offset + 3 * q + 2] = a.k[q];
+                add(a.i[q], a.contrib_offset + 2 * q, GATHER_PLUS);
+                add(a.j[q], a.contrib_offset + 2 * q, GATHER_MINUS_PAIR);
+                add(a.k[q], a.contrib_offset + 2 * q + 1, GATHER_PLUS);
             }
         gather_start.assign(N + 1, 0);
-        for (size_t c = 0; c < off; ++c) gather_start[owner[c] + 1]++;
+        for (size_t c = 0; c < nterm; ++c) gather_start[owner[c] + 1]++;
         for (int p = 0; p < N; ++p) gather_start[p + 1] += gather_start[p];
-        gather_idx.assign(off, 0);
+        gather_idx.assign(nterm, 0);
         std::vector<int> fl(gather_start.begin(), gather_start.end() - 1);
-        for (size_t c = 0; c < off; ++c) gather_idx[fl[owner[c]]++] = (int)c;
+        for (size_t c = 0; c < nterm; ++c) gather_idx[fl[owner[c]]++] = code[c];
         topology_dirty = false;
     }
 
@@ -1270,13 +1286,10 @@ class Engine {
                 }
                 e += en;
                 const double s = r > 0 ? -de / r : 0.0;
-                double* c = C + 6 * (size_t)q;
+                double* c = C + 3 * (size_t)q;
                 c[0] = s * dx;
                 c[1] = s * dy;
                 c[2] = s * dz;
-                c[3] = -c[0];
-                c[4] = -c[1];
-                c[5] = -c[2];
             }
         }
         for (const AngleSet& a : angles) {
@@ -1292,7 +1305,7 @@ class Engine {
                     min_image(ax, ay, az);
                     min_image(bx, by, bz);
                 }
-                double* c = C + 9 * (size_t)q;
+                double* c = C + 6 * (size_t)q;  // f_i, f_k
                 const AngleTable& at = a.tables[a.tab[q]];
                 const double aa2 = ax * ax + ay * ay + az * az, bb2 = bx * bx + by * by + bz * bz;
                 const double dot = ax * bx + ay * by + az * bz;
@@ -1300,7 +1313,7 @@ class Engine {
                 if (aa2 == 0 || bb2 == 0) {
                     at.t.eval(0.0, en, de);
                     e += en;
-                    for (int z = 0; z < 9; ++z) c[z] = 0.0;
+                    for (int z = 0; z < 6; ++z) c[z] = 0.0;
                     continue;
                 }
                 const double inv_ab = 1.0 / std::sqrt(aa2 * bb2);
@@ -1318,12 +1331,9 @@ class Engine {
                     c[0] = fix;
                     c[1] = fiy;
                     c[2] = fiz;
-                    c[3] = -fix - fkx;
-                    c[4] = -fiy - fky;
-                    c[5] = -fiz - fkz;
-                    c[6] = fkx;
-                    c[7] = fky;
-                    c[8] = fkz;
+                    c[3] = fkx;
+                    c[4] = fky;
+                    c[5] = fkz;
                 } else {
                     const double nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
                     const double nn = std::sqrt(nx * nx + ny * ny + nz * nz);
@@ -1331,7 +1341,7 @@ class Engine {
                     at.t.eval(theta, en, de);  // de = dE/dtheta
                     e += en;
                     if (nn < 1e-12 * std::sqrt(aa2 * bb2)) {
-                        for (int z = 0; z < 9; ++z) c[z] = 0.0;
+                        for (int z = 0; z < 6; ++z) c[z] = 0.0;
                         continue;
                     }
                     // f_i = dE/dtheta (n x a) / (|n| |a|^2), f_k = dE/dtheta (b x n) / (|n| |b|^2)
@@ -1343,12 +1353,9 @@ class Engine {
                     c[0] = fix;
                     c[1] = fiy;
                     c[2] = fiz;
-                    c[3] = -fix - fkx;
-                    c[4] = -fiy - fky;
-                    c[5] = -fiz - fkz;
-                    c[6] = fkx;
-                    c[7] = fky;
-                    c[8] = fkz;
+                    c[3] = fkx;
+                    c[4] = fky;
+                    c[5] = fkz;
                 }
             }
         }
@@ -1366,10 +1373,21 @@ class Engine {
             for (int p = b * SUM_BLOCK, pe = std::min(N, p + SUM_BLOCK); p < pe; ++p) {
                 double fx = 0, fy = 0, fz = 0;
                 for (int s = gather_start[p]; s < gather_start[p + 1]; ++s) {
-                    const double* c = &contrib[3 * (size_t)gather_idx[s]];
-                    fx += c[0];
-                    fy += c[1];
-                    fz += c[2];
+                    const uint32_t g = gather_idx[s];
+                    const double* c = &contrib[3 * (size_t)(g >> 2)];
+                    if ((g & 3) == GATHER_PLUS) {
+                        fx += c[0];
+                        fy += c[1];
+                        fz += c[2];
+                    } else if ((g & 3) == GATHER_MINUS) {
+                        fx += -c[0];
+                        fy += -c[1];
+                        fz += -c[2];
+                    } else {  // the same expression as -f_i - f_k in the angle loop
+                        fx += -c[0] - c[3];
+                        fy += -c[1] - c[4];
+                        fz += -c[2] - c[5];
+                    }
                 }
                 fx += f[3 * p];
                 fy += f[3 * p + 1];
