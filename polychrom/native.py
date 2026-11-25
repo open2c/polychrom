@@ -430,43 +430,56 @@ def _table(deriv, energy_at, x0, x1, knots, anchor, what, extend=True):
     with np.errstate(all="ignore"):
         D = deriv(x)
         Dm = deriv(0.5 * (x[1:] + x[:-1]))
+    best = None
+    prev_err = None
+    aligned = not extend
     while True:
         E, lo, hi = _integrate(x, D, Dm, energy_at, anchor, what)
         err, kbad, xq, Dq = _quarter_error(deriv, x, E, D, lo, hi)
-        if err <= TABLE_TOL or 2 * n - 1 > nmax:
+        if best is None or err < best[-1]:
+            best = (x, D, E, lo, hi, err)
+        if err <= TABLE_TOL or 2 * len(x) - 1 > nmax:
             break
+        # cubic Hermite gains ~8x per doubling where the force is smooth
+        slow = prev_err is not None and err > 0.3 * prev_err
+        if slow and not aligned and lo < kbad < hi - 1:
+            # A kink strictly inside the finite range (not a singularity at its
+            # edge): put a knot on it and (as closely as possible) on x1, which is
+            # a kink too for pair potentials that vanish at the cutoff.  Later
+            # doublings keep both on knots.
+            aligned = True
+            h = x[1] - x[0]
+            xk = _locate_kink(deriv, x[kbad], x[kbad + 1])
+            if xk - x0 > 4 * h:
+                m0 = int(round((xk - x0) / h))
+                ratio = (x1 - x0) / (xk - x0)
+                ms = np.arange(max(1, m0 // 2), 2 * m0 + 1)
+                frac = np.abs(ms * ratio - np.round(ms * ratio))
+                good = ms[frac <= 1e-4]
+                m = int(good[0]) if len(good) else int(ms[np.argmin(frac)])
+                h2 = (xk - x0) / m
+                n2 = int(np.ceil((x1 - x0) / h2 - 1e-6)) + 1
+                if n2 <= nmax:
+                    x = x0 + h2 * np.arange(n2)
+                    with np.errstate(all="ignore"):
+                        D = deriv(x)
+                        Dm = deriv(0.5 * (x[1:] + x[:-1]))
+                    prev_err = None
+                    continue
+        if slow and err > 0.9 * prev_err:
+            # No improvement: the error is noise in OpenMM's own derivative (e.g.
+            # of the angle near theta = pi).  Keep the best table.
+            break
+        prev_err = err
         # refine: midpoints become knots, quarter points become midpoints
+        n = len(x)
         xn = np.empty(2 * n - 1)
         Dn = np.empty(2 * n - 1)
         xn[0::2], xn[1::2] = x, 0.5 * (x[1:] + x[:-1])
         Dn[0::2], Dn[1::2] = D, Dm
         order = np.argsort(xq)
-        x, D, Dm, n = xn, Dn, Dq[order], 2 * n - 1
-    # A kink strictly inside the finite range (not a singularity at its edge):
-    # put knots on it and (as closely as possible) on x1, which is a kink too
-    # for pair potentials that vanish at the cutoff.
-    h = x[1] - x[0]
-    xk = _locate_kink(deriv, x[kbad], x[kbad + 1]) if err > TABLE_TOL and extend and lo < kbad < hi - 1 else None
-    if xk is not None and xk - x0 > 4 * h:
-        m0 = int(round((xk - x0) / h))
-        ratio = (x1 - x0) / (xk - x0)
-        ms = np.arange(max(1, m0 // 2), 2 * m0 + 1)
-        frac = np.abs(ms * ratio - np.round(ms * ratio))
-        good = ms[frac <= 1e-4]
-        m = int(good[0]) if len(good) else int(ms[np.argmin(frac)])
-        h2 = (xk - x0) / m
-        n2 = int(np.ceil((x1 - x0) / h2 - 1e-6)) + 1
-    else:
-        n2 = 0
-    if 0 < n2 <= 2 * nmax:
-        x2 = x0 + h2 * np.arange(n2)
-        with np.errstate(all="ignore"):
-            D2 = deriv(x2)
-            Dm2 = deriv(0.5 * (x2[1:] + x2[:-1]))
-        E2, lo2, hi2 = _integrate(x2, D2, Dm2, energy_at, anchor, what)
-        err2 = _quarter_error(deriv, x2, E2, D2, lo2, hi2)[0]
-        if err2 < err:
-            x, D, E, lo, hi, err = x2, D2, E2, lo2, hi2, err2
+        x, D, Dm = xn, Dn, Dq[order]
+    x, D, E, lo, hi, err = best
     if err > TABLE_WARN:
         warnings.warn(f"{what}: tabulated force has a relative error of up to {err:.1e}")
     if lo > 0 or hi < len(x) - 1:
