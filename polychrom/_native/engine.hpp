@@ -229,6 +229,7 @@ struct BondSet {  // harmonic (k, r0) or tabulated E(r)
     bool pbc = false;
     std::vector<int> i, j;
     std::vector<double> r0, k;  // harmonic
+    bool uniform = false;       // harmonic with the same r0 and k for all bonds (not loaded per bond)
     std::vector<int> tab;       // tabulated: index into tables
     std::vector<Table> tables;
     size_t contrib_offset = 0;
@@ -243,6 +244,7 @@ struct AngleTable {
 struct AngleSet {
     bool pbc = false;
     std::vector<int> i, j, k, tab;
+    int tab_all = -1;  // table of all angles if they share one (tab not loaded per angle), else -1
     std::vector<AngleTable> tables;
     size_t contrib_offset = 0;
 };
@@ -321,6 +323,7 @@ class Engine {
             inv_mass[p] = m[p] > 0 ? 1.0 / m[p] : 0.0;
             uniform = uniform && inv_mass[p] == inv_mass[0];
         }
+        mass_uniform = uniform;
         uniform_sqrt_inv_mass = uniform && inv_mass[0] > 0 ? std::sqrt(inv_mass[0]) : 0.0;
         invalidate();
     }
@@ -379,6 +382,8 @@ class Engine {
         }
         b.r0.assign(r0, r0 + n);
         b.k.assign(k, k + n);
+        b.uniform = n > 0 && std::all_of(r0, r0 + n, [&](double v) { return v == r0[0]; }) &&
+                    std::all_of(k, k + n, [&](double v) { return v == k[0]; });
         invalidate();
     }
     int add_bond_table(int s, double x0, double x1, int nknots, const double* E, const double* D) {
@@ -444,6 +449,7 @@ class Engine {
         a.j.assign(j, j + n);
         a.k.assign(k, k + n);
         a.tab.assign(tab, tab + n);
+        a.tab_all = n > 0 && std::all_of(tab, tab + n, [&](int t) { return t == tab[0]; }) ? tab[0] : -1;
         topology_dirty = true;
         invalidate();
     }
@@ -635,6 +641,7 @@ class Engine {
     bool pbc = false;
     double box[3] = {0, 0, 0};
     std::vector<double> x, v, f, mass, inv_mass;
+    bool mass_uniform = true;            // all masses equal: inv_mass[0] is used, not loaded per particle
     double uniform_sqrt_inv_mass = 0.0;  // sqrt(1 / mass) if all masses are equal, else 0
     std::vector<double> x_ref;  // positions at the last neighbour-list build
     std::vector<double> img;    // periodic image offset at the last build (multiple of box)
@@ -1348,8 +1355,8 @@ class Engine {
                 if (b.tabulated) {
                     b.tables[b.tab[q]].eval(r, en, de);
                 } else {
-                    const double ext = r - b.r0[q];
-                    de = b.k[q] * ext;
+                    const double ext = r - (b.uniform ? b.r0[0] : b.r0[q]);
+                    de = (b.uniform ? b.k[0] : b.k[q]) * ext;
                     en = 0.5 * de * ext;
                 }
                 e += en;
@@ -1374,7 +1381,7 @@ class Engine {
                     min_image(bx, by, bz);
                 }
                 double* c = C + 6 * (size_t)q;  // f_i, f_k
-                const AngleTable& at = a.tables[a.tab[q]];
+                const AngleTable& at = a.tables[a.tab_all >= 0 ? a.tab_all : a.tab[q]];
                 const double aa2 = ax * ax + ay * ay + az * az, bb2 = bx * bx + by * by + bz * bz;
                 const double dot = ax * bx + ay * by + az * bz;
                 double en, de;
@@ -1464,7 +1471,8 @@ class Engine {
                 f[3 * p + 1] = fy;
                 f[3 * p + 2] = fz;
                 if (vl) {
-                    const double im = inv_mass[p], ax = im * fx, ay = im * fy, az = im * fz;
+                    const double im = mass_uniform ? inv_mass[0] : inv_mass[p];
+                    const double ax = im * fx, ay = im * fy, az = im * fz;
                     err += ax * ax;
                     err += ay * ay;
                     err += az * az;
@@ -1535,7 +1543,7 @@ class Engine {
         const double sim_all = uniform_sqrt_inv_mass;  // 0 unless all masses are equal
 #pragma omp for schedule(static)
         for (int p = 0; p < N; ++p) {
-            const double im = IM[p];
+            const double im = mass_uniform ? IM[0] : IM[p];
             if (im == 0) continue;
             const double sim = sim_all != 0 ? sim_all : std::sqrt(im);
             double d2 = 0.0;
