@@ -220,6 +220,28 @@ def test_trajectory_independent_of_threads(integrator):
         np.testing.assert_array_equal(out[0], o)
 
 
+def test_bonded_terms_across_chunks():
+    """Bonded terms are processed in chunks of particles; a ring's closing bond
+    and long bonds reach over several chunks and thread ranges."""
+    N = 2600
+    rng = np.random.default_rng(5)
+    data = polychrom.starting_conformations.grow_cubic(N, 20) + rng.normal(0, 0.15, (N, 3))
+    longs = [(i, i + 1500) for i in range(0, N - 1500, 97)]
+
+    def build(sim):
+        sim.add_force(forcekits.polymer_chains(sim, chains=[(0, None, True)]))
+        sim.add_force(forces.harmonic_bonds(sim, longs, bondLength=2.0, name="long", override_checks=True))
+
+    ref = _make("reference", N, data, build)
+    f_ref, e_ref = _forces_energy(ref)
+    for threads in (1, 4):
+        nat = _make("native", N, data, build)
+        nat.context.engine.set_threads(threads)
+        f_nat, e_nat = _forces_energy(nat)
+        np.testing.assert_allclose(f_nat, f_ref, atol=2e-6 * np.abs(f_ref).max(), rtol=0)
+        assert e_nat == pytest.approx(e_ref, rel=2e-6)
+
+
 @pytest.mark.parametrize("PBCbox", [False, [14.0, 14.0, 14.0]])
 def test_fast_set_forces(PBCbox):
     """Particles pulled by stiff long bonds (as by freshly placed loop extrusion

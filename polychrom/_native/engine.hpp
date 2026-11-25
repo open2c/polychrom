@@ -233,6 +233,10 @@ struct BondSet {  // harmonic (k, r0) or tabulated E(r)
     std::vector<int> tab;       // tabulated: index into tables
     std::vector<Table> tables;
     size_t contrib_offset = 0;
+    // processing order: terms order[chunk_off[k], chunk_off[k + 1]) have their lowest
+    // particle in chunk k (order is the identity if in_order)
+    std::vector<int> order, chunk_off;
+    bool in_order = true;
 };
 
 struct AngleTable {
@@ -247,6 +251,8 @@ struct AngleSet {
     int tab_all = -1;  // table of all angles if they share one (tab not loaded per angle), else -1
     std::vector<AngleTable> tables;
     size_t contrib_offset = 0;
+    std::vector<int> order, chunk_off;  // as in BondSet
+    bool in_order = true;
 };
 
 constexpr int NB_SHIFT_BITS = 27;
@@ -657,6 +663,7 @@ class Engine {
     std::vector<double> contrib;
     std::vector<int> gather_start;
     std::vector<uint32_t> gather_idx;
+    std::vector<int> chunk_reach;  // lowest chunk holding the lowest particle of a term that reaches chunk k
     // gather_idx kinds: add vector v, subtract it, or subtract v and the next vector
     static constexpr uint32_t GATHER_PLUS = 0, GATHER_MINUS = 1, GATHER_MINUS_PAIR = 2;
 
@@ -820,6 +827,40 @@ class Engine {
                 add(a.j[q], a.contrib_offset + 2 * q, GATHER_MINUS_PAIR);
                 add(a.k[q], a.contrib_offset + 2 * q + 1, GATHER_PLUS);
             }
+        // processing order of the terms: by the chunk of their lowest particle
+        const int nblk = (N + SUM_BLOCK - 1) / SUM_BLOCK;
+        chunk_reach.resize(nblk);
+        for (int k = 0; k < nblk; ++k) chunk_reach[k] = k;
+        auto order_terms = [&](int n, auto lo_hi, std::vector<int>& order, std::vector<int>& off, bool& in_order) {
+            off.assign(nblk + 1, 0);
+            std::vector<int> lo(n);
+            in_order = true;
+            for (int q = 0; q < n; ++q) {
+                int a, b;
+                lo_hi(q, a, b);
+                lo[q] = a / SUM_BLOCK;
+                for (int k = b / SUM_BLOCK; k > lo[q]; --k) chunk_reach[k] = std::min(chunk_reach[k], lo[q]);
+                off[lo[q] + 1]++;
+                if (q > 0 && lo[q] < lo[q - 1]) in_order = false;
+            }
+            for (int k = 0; k < nblk; ++k) off[k + 1] += off[k];
+            order.clear();
+            if (!in_order) {
+                order.resize(n);
+                std::vector<int> fl(off.begin(), off.end() - 1);
+                for (int q = 0; q < n; ++q) order[fl[lo[q]]++] = q;
+            }
+        };
+        for (auto& b : bonds)
+            order_terms((int)b.i.size(), [&](int q, int& lo, int& hi) {
+                lo = std::min(b.i[q], b.j[q]);
+                hi = std::max(b.i[q], b.j[q]);
+            }, b.order, b.chunk_off, b.in_order);
+        for (auto& a : angles)
+            order_terms((int)a.i.size(), [&](int q, int& lo, int& hi) {
+                lo = std::min(a.i[q], std::min(a.j[q], a.k[q]));
+                hi = std::max(a.i[q], std::max(a.j[q], a.k[q]));
+            }, a.order, a.chunk_off, a.in_order);
         gather_start.assign(N + 1, 0);
         for (size_t c = 0; c < nterm; ++c) gather_start[owner[c] + 1]++;
         for (int p = 0; p < N; ++p) gather_start[p + 1] += gather_start[p];
@@ -1236,6 +1277,146 @@ class Engine {
         }
     }
 
+    // ---- bonded terms (any thread) ---------------------------------------------------
+    // Forces on i of bonds order[t] (or t if in order), t in [t0, t1), into the
+    // contribution buffer; energies added to e.
+    inline void bond_terms(const BondSet& b, int t0, int t1, double& e) {
+        const bool bp = b.pbc && pbc;
+        double en_sum = 0.0;
+        for (int t = t0; t < t1; ++t) {
+            const int q = b.in_order ? t : b.order[t];
+            const int i = b.i[q], j = b.j[q];
+            double dx = x[3 * i] - x[3 * j], dy = x[3 * i + 1] - x[3 * j + 1], dz = x[3 * i + 2] - x[3 * j + 2];
+            if (bp) min_image(dx, dy, dz);
+            const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
+            double en, de;
+            if (b.tabulated) {
+                b.tables[b.tab[q]].eval(r, en, de);
+            } else {
+                const double ext = r - (b.uniform ? b.r0[0] : b.r0[q]);
+                de = (b.uniform ? b.k[0] : b.k[q]) * ext;
+                en = 0.5 * de * ext;
+            }
+            en_sum += en;
+            const double s = r > 0 ? -de / r : 0.0;
+            double* c = contrib.data() + 3 * (b.contrib_offset + (size_t)q);
+            c[0] = s * dx;
+            c[1] = s * dy;
+            c[2] = s * dz;
+        }
+        e += en_sum;
+    }
+
+    // Forces on i and k of angles order[t] (or t if in order), t in [t0, t1), into
+    // the contribution buffer; energies added to e.
+    inline void angle_terms(const AngleSet& a, int t0, int t1, double& e) {
+        const bool ap = a.pbc && pbc;
+        double en_sum = 0.0;
+        for (int t = t0; t < t1; ++t) {
+            const int q = a.in_order ? t : a.order[t];
+            const int i = a.i[q], j = a.j[q], k = a.k[q];
+            double ax = x[3 * i] - x[3 * j], ay = x[3 * i + 1] - x[3 * j + 1], az = x[3 * i + 2] - x[3 * j + 2];
+            double bx = x[3 * k] - x[3 * j], by = x[3 * k + 1] - x[3 * j + 1], bz = x[3 * k + 2] - x[3 * j + 2];
+            if (ap) {
+                min_image(ax, ay, az);
+                min_image(bx, by, bz);
+            }
+            double* c = contrib.data() + 3 * (a.contrib_offset + 2 * (size_t)q);  // f_i, f_k
+            const AngleTable& at = a.tables[a.tab_all >= 0 ? a.tab_all : a.tab[q]];
+            const double aa2 = ax * ax + ay * ay + az * az, bb2 = bx * bx + by * by + bz * bz;
+            const double dot = ax * bx + ay * by + az * bz;
+            double en, de;
+            if (aa2 == 0 || bb2 == 0) {
+                at.t.eval(0.0, en, de);
+                en_sum += en;
+                for (int z = 0; z < 6; ++z) c[z] = 0.0;
+                continue;
+            }
+            const double inv_ab = 1.0 / std::sqrt(aa2 * bb2);
+            double cs = dot * inv_ab;
+            cs = cs > 1.0 ? 1.0 : (cs < -1.0 ? -1.0 : cs);
+            if (cs >= at.c_lo && cs <= at.c_hi) {
+                at.tc.eval(cs, en, de);  // de = dE/dcos
+                en_sum += en;
+                // f_i = -dE/dc * (b/(|a||b|) - c a/|a|^2), f_k likewise
+                const double ca = cs / aa2, cb = cs / bb2;
+                const double fix = -de * (bx * inv_ab - ca * ax), fiy = -de * (by * inv_ab - ca * ay),
+                             fiz = -de * (bz * inv_ab - ca * az);
+                const double fkx = -de * (ax * inv_ab - cb * bx), fky = -de * (ay * inv_ab - cb * by),
+                             fkz = -de * (az * inv_ab - cb * bz);
+                c[0] = fix;
+                c[1] = fiy;
+                c[2] = fiz;
+                c[3] = fkx;
+                c[4] = fky;
+                c[5] = fkz;
+            } else {
+                const double nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+                const double nn = std::sqrt(nx * nx + ny * ny + nz * nz);
+                const double theta = std::atan2(nn, dot);
+                at.t.eval(theta, en, de);  // de = dE/dtheta
+                en_sum += en;
+                if (nn < 1e-12 * std::sqrt(aa2 * bb2)) {
+                    for (int z = 0; z < 6; ++z) c[z] = 0.0;
+                    continue;
+                }
+                // f_i = dE/dtheta (n x a) / (|n| |a|^2), f_k = dE/dtheta (b x n) / (|n| |b|^2)
+                const double si = de / (nn * aa2), sk = de / (nn * bb2);
+                const double fix = si * (ny * az - nz * ay), fiy = si * (nz * ax - nx * az),
+                             fiz = si * (nx * ay - ny * ax);
+                const double fkx = sk * (by * nz - bz * ny), fky = sk * (bz * nx - bx * nz),
+                             fkz = sk * (bx * ny - by * nx);
+                c[0] = fix;
+                c[1] = fiy;
+                c[2] = fiz;
+                c[3] = fkx;
+                c[4] = fky;
+                c[5] = fkz;
+            }
+        }
+        e += en_sum;
+    }
+
+    // Gather the bonded contributions of the particles of chunk blk into f
+    // (after the other forces), and the variable Langevin error sum of the chunk.
+    inline void gather_block(int blk, bool vl) {
+        double err = 0.0;
+        for (int p = blk * SUM_BLOCK, pe = std::min(N, p + SUM_BLOCK); p < pe; ++p) {
+            double fx = 0, fy = 0, fz = 0;
+            for (int s = gather_start[p]; s < gather_start[p + 1]; ++s) {
+                const uint32_t g = gather_idx[s];
+                const double* c = &contrib[3 * (size_t)(g >> 2)];
+                if ((g & 3) == GATHER_PLUS) {
+                    fx += c[0];
+                    fy += c[1];
+                    fz += c[2];
+                } else if ((g & 3) == GATHER_MINUS) {
+                    fx += -c[0];
+                    fy += -c[1];
+                    fz += -c[2];
+                } else {  // the same expression as -f_i - f_k in the angle loop
+                    fx += -c[0] - c[3];
+                    fy += -c[1] - c[4];
+                    fz += -c[2] - c[5];
+                }
+            }
+            fx += f[3 * p];
+            fy += f[3 * p + 1];
+            fz += f[3 * p + 2];
+            f[3 * p] = fx;
+            f[3 * p + 1] = fy;
+            f[3 * p + 2] = fz;
+            if (vl) {
+                const double im = mass_uniform ? inv_mass[0] : inv_mass[p];
+                const double ax = im * fx, ay = im * fy, az = im * fz;
+                err += ax * ax;
+                err += ay * ay;
+                err += az * az;
+            }
+        }
+        block_sum[blk] = err;
+    }
+
     // ---- forces (called by all threads of a team) ------------------------------------
     void forces_inner() {
         if (forces_valid) return;  // shared flag, consistent after the last barrier
@@ -1342,146 +1523,29 @@ class Engine {
                 f[3 * p + 2] -= 2 * t.k[2] * dz;
             }
         }
-        // bonded terms into the contribution buffer
-        for (const BondSet& b : bonds) {
-            const int n = (int)b.i.size();
-            const bool bp = b.pbc && pbc;
-            double* C = contrib.data() + 3 * b.contrib_offset;
-#pragma omp for schedule(static) nowait
-            for (int q = 0; q < n; ++q) {
-                const int i = b.i[q], j = b.j[q];
-                double dx = x[3 * i] - x[3 * j], dy = x[3 * i + 1] - x[3 * j + 1], dz = x[3 * i + 2] - x[3 * j + 2];
-                if (bp) min_image(dx, dy, dz);
-                const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
-                double en, de;
-                if (b.tabulated) {
-                    b.tables[b.tab[q]].eval(r, en, de);
-                } else {
-                    const double ext = r - (b.uniform ? b.r0[0] : b.r0[q]);
-                    de = (b.uniform ? b.k[0] : b.k[q]) * ext;
-                    en = 0.5 * de * ext;
-                }
-                e += en;
-                const double s = r > 0 ? -de / r : 0.0;
-                double* c = C + 3 * (size_t)q;
-                c[0] = s * dx;
-                c[1] = s * dy;
-                c[2] = s * dz;
-            }
-        }
-        for (const AngleSet& a : angles) {
-            const int n = (int)a.i.size();
-            const bool ap = a.pbc && pbc;
-            double* C = contrib.data() + 3 * a.contrib_offset;
-#pragma omp for schedule(static) nowait
-            for (int q = 0; q < n; ++q) {
-                const int i = a.i[q], j = a.j[q], k = a.k[q];
-                double ax = x[3 * i] - x[3 * j], ay = x[3 * i + 1] - x[3 * j + 1], az = x[3 * i + 2] - x[3 * j + 2];
-                double bx = x[3 * k] - x[3 * j], by = x[3 * k + 1] - x[3 * j + 1], bz = x[3 * k + 2] - x[3 * j + 2];
-                if (ap) {
-                    min_image(ax, ay, az);
-                    min_image(bx, by, bz);
-                }
-                double* c = C + 6 * (size_t)q;  // f_i, f_k
-                const AngleTable& at = a.tables[a.tab_all >= 0 ? a.tab_all : a.tab[q]];
-                const double aa2 = ax * ax + ay * ay + az * az, bb2 = bx * bx + by * by + bz * bz;
-                const double dot = ax * bx + ay * by + az * bz;
-                double en, de;
-                if (aa2 == 0 || bb2 == 0) {
-                    at.t.eval(0.0, en, de);
-                    e += en;
-                    for (int z = 0; z < 6; ++z) c[z] = 0.0;
-                    continue;
-                }
-                const double inv_ab = 1.0 / std::sqrt(aa2 * bb2);
-                double cs = dot * inv_ab;
-                cs = cs > 1.0 ? 1.0 : (cs < -1.0 ? -1.0 : cs);
-                if (cs >= at.c_lo && cs <= at.c_hi) {
-                    at.tc.eval(cs, en, de);  // de = dE/dcos
-                    e += en;
-                    // f_i = -dE/dc * (b/(|a||b|) - c a/|a|^2), f_k likewise
-                    const double ca = cs / aa2, cb = cs / bb2;
-                    const double fix = -de * (bx * inv_ab - ca * ax), fiy = -de * (by * inv_ab - ca * ay),
-                                 fiz = -de * (bz * inv_ab - ca * az);
-                    const double fkx = -de * (ax * inv_ab - cb * bx), fky = -de * (ay * inv_ab - cb * by),
-                                 fkz = -de * (az * inv_ab - cb * bz);
-                    c[0] = fix;
-                    c[1] = fiy;
-                    c[2] = fiz;
-                    c[3] = fkx;
-                    c[4] = fky;
-                    c[5] = fkz;
-                } else {
-                    const double nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
-                    const double nn = std::sqrt(nx * nx + ny * ny + nz * nz);
-                    const double theta = std::atan2(nn, dot);
-                    at.t.eval(theta, en, de);  // de = dE/dtheta
-                    e += en;
-                    if (nn < 1e-12 * std::sqrt(aa2 * bb2)) {
-                        for (int z = 0; z < 6; ++z) c[z] = 0.0;
-                        continue;
-                    }
-                    // f_i = dE/dtheta (n x a) / (|n| |a|^2), f_k = dE/dtheta (b x n) / (|n| |b|^2)
-                    const double si = de / (nn * aa2), sk = de / (nn * bb2);
-                    const double fix = si * (ny * az - nz * ay), fiy = si * (nz * ax - nx * az),
-                                 fiz = si * (nx * ay - ny * ax);
-                    const double fkx = sk * (by * nz - bz * ny), fky = sk * (bz * nx - bx * nz),
-                                 fkz = sk * (bx * ny - by * nx);
-                    c[0] = fix;
-                    c[1] = fiy;
-                    c[2] = fiz;
-                    c[3] = fkx;
-                    c[4] = fky;
-                    c[5] = fkz;
-                }
-            }
+        // Bonded terms and the gather of their contributions, in chunks of
+        // SUM_BLOCK particles, so that the contributions are still in the cache
+        // when they are gathered.  The terms are processed by the chunk of their
+        // lowest particle; once the terms of chunks 0..k are done, chunk k can be
+        // gathered.  Each thread takes a contiguous range of chunks; a chunk that
+        // terms from an earlier thread's range reach into is gathered after a
+        // barrier.  The gather is the last update of f, so the variable Langevin
+        // error sum (sum of |f/m|^2, see integrate_inner) is accumulated there,
+        // per chunk, so that it does not depend on the number of threads.
+        const bool vl = integrator == VARIABLE_LANGEVIN;
+        const int nblk = (N + SUM_BLOCK - 1) / SUM_BLOCK;
+        const int nt = team_size();
+        const int k0 = (int)((long)tid * nblk / nt), k1 = (int)((long)(tid + 1) * nblk / nt);
+        for (int k = k0; k < k1; ++k) {
+            for (const BondSet& bs : bonds) bond_terms(bs, bs.chunk_off[k], bs.chunk_off[k + 1], e);
+            for (const AngleSet& as : angles) angle_terms(as, as.chunk_off[k], as.chunk_off[k + 1], e);
+            if (chunk_reach[k] >= k0) gather_block(k, vl);
         }
         thr[(size_t)PAD * tid] = e;
 #pragma omp barrier
-        // Gather the bonded contributions; this is the last update of f, so the
-        // variable Langevin error sum (sum of |f/m|^2, see integrate_inner) is
-        // accumulated here, in fixed blocks of particles, so that it does not
-        // depend on the number of threads.
-        const bool vl = integrator == VARIABLE_LANGEVIN;
-        const int nblk = (N + SUM_BLOCK - 1) / SUM_BLOCK;
-#pragma omp for schedule(static)
-        for (int b = 0; b < nblk; ++b) {
-            double err = 0.0;
-            for (int p = b * SUM_BLOCK, pe = std::min(N, p + SUM_BLOCK); p < pe; ++p) {
-                double fx = 0, fy = 0, fz = 0;
-                for (int s = gather_start[p]; s < gather_start[p + 1]; ++s) {
-                    const uint32_t g = gather_idx[s];
-                    const double* c = &contrib[3 * (size_t)(g >> 2)];
-                    if ((g & 3) == GATHER_PLUS) {
-                        fx += c[0];
-                        fy += c[1];
-                        fz += c[2];
-                    } else if ((g & 3) == GATHER_MINUS) {
-                        fx += -c[0];
-                        fy += -c[1];
-                        fz += -c[2];
-                    } else {  // the same expression as -f_i - f_k in the angle loop
-                        fx += -c[0] - c[3];
-                        fy += -c[1] - c[4];
-                        fz += -c[2] - c[5];
-                    }
-                }
-                fx += f[3 * p];
-                fy += f[3 * p + 1];
-                fz += f[3 * p + 2];
-                f[3 * p] = fx;
-                f[3 * p + 1] = fy;
-                f[3 * p + 2] = fz;
-                if (vl) {
-                    const double im = mass_uniform ? inv_mass[0] : inv_mass[p];
-                    const double ax = im * fx, ay = im * fy, az = im * fz;
-                    err += ax * ax;
-                    err += ay * ay;
-                    err += az * az;
-                }
-            }
-            block_sum[b] = err;
-        }
+        for (int k = k0; k < k1; ++k)
+            if (chunk_reach[k] < k0) gather_block(k, vl);
+#pragma omp barrier
 #pragma omp single
         {
             epot = thr_sum();
