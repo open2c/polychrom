@@ -15,15 +15,22 @@
 //    last build (the "fast set", e.g. beads pulled by a freshly placed loop
 //    extrusion bond) get their interactions from a direct search every step;
 //    lists are rebuilt only when the fast set grows beyond max(64, N/32);
+//  * list builds from cell-ordered coordinates: the candidates of a cell are
+//    copied into one buffer and filtered four at a time (AVX2), dropping
+//    chain-neighbour exclusions in the same pass;
 //  * full (i, j and j, i) neighbour lists, so pair forces are accumulated by the
 //    owning thread without atomics or per-thread force buffers;
-//  * bonded terms evaluated in parallel into a contribution buffer and gathered
-//    per particle through a CSR index;
+//  * bonded terms evaluated into a contribution buffer (one vector per bond,
+//    two per angle) and gathered per particle through a CSR index, in chunks
+//    of particles, so that the buffer stays in the cache;
+//  * few passes over the per-particle arrays per step, and no per-particle or
+//    per-term loads of parameters that are the same for all;
 //  * a counter-based Ziggurat Gaussian generator keyed by (seed, step,
 //    coordinate).
 //
 // Forces and trajectories therefore do not depend on the number of threads
-// (only the summation order of the reported potential energy does).
+// (only the summation order of the reported potential energy does).  The
+// generic and the x86-64-v3 (AVX2) build give the same results.
 //
 // Units follow OpenMM: nm, ps, amu, kJ/mol, K.
 
