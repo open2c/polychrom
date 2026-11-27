@@ -212,6 +212,9 @@ class Simulation(object):
             CUDA (preferred fast GPU platform)
             OpenCL (maybe slower GPU platofrm, does not need CUDA installed)
             CPU (medium speed parallelized CPU platform)
+            native (polychrom's own multi-threaded CPU engine, much faster than
+            OpenMM's CPU platform; see :mod:`polychrom.native` for supported forces
+            and integrators)
             reference (slow CPU platform for debug)
 
         verbose : bool, optional
@@ -294,6 +297,10 @@ class Simulation(object):
             platform_object = openmm.Platform.getPlatformByName("CUDA")
         elif platform.lower() == "cpu":
             platform_object = openmm.Platform.getPlatformByName("CPU")
+        elif platform.lower() == "native":
+            from polychrom import native
+
+            platform_object = native.NativePlatform()
         else:
             raise RuntimeError("Undefined platform: {0}".format(platform))
         self.platform = platform_object
@@ -303,7 +310,20 @@ class Simulation(object):
         self.collisionRate = kwargs["collision_rate"] * (1 / picosecond)
 
         self.integrator_type = kwargs["integrator"]
-        if isinstance(self.integrator_type, str):
+        self.native = platform.lower() == "native"
+        if self.native:
+            if not isinstance(self.integrator_type, str):
+                raise NotImplementedError("the native platform does not support user-defined integrators")
+            from polychrom import native
+
+            self.integrator = native.NativeIntegrator(
+                self.integrator_type,
+                self.temperature,
+                kwargs["collision_rate"],
+                timestep=kwargs["timestep"] * 1e-3 if "timestep" in kwargs else None,
+                error_tol=kwargs.get("error_tol"),
+            )
+        elif isinstance(self.integrator_type, str):
             self.integrator_type = str(self.integrator_type)
             if self.integrator_type.lower() == "langevin":
                 self.integrator = openmm.LangevinIntegrator(
@@ -553,10 +573,24 @@ class Simulation(object):
                 {i: j.__getstate__() for i, j in self.force_dict.items()},
             )
 
-        self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
+        self._create_context()
         self.init_positions()
         self.init_velocities()
         self.forces_applied = True
+
+    def _create_context(self):
+        if self.native:
+            from polychrom import native
+
+            self.context = native.NativeContext(
+                self.system,
+                self.integrator,
+                list(self.force_dict.values()),
+                pbc=self.PBC,
+                length_scale=self.length_scale,
+            )
+        else:
+            self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
 
     def initialize(self, **kwargs):
         """Initialize, particles, velocities for the first time.
@@ -568,7 +602,7 @@ class Simulation(object):
         self.masses = np.zeros(self.N, dtype=float) + self.kwargs["mass"]
         for mass in self.masses:
             self.system.addParticle(mass)
-        self.context = openmm.Context(self.system, self.integrator, self.platform, self.properties)
+        self._create_context()
         self.init_positions()
         self.init_velocities(**kwargs)
 
@@ -672,7 +706,10 @@ class Simulation(object):
         locTime = self.state.getTime()
         logging.info("before minimization eK={0}, eP={1}, time={2}".format(eK, eP, locTime))
 
-        openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)  # type: ignore
+        if self.native:
+            self.context.minimize(tolerance, maxIterations)
+        else:
+            openmm.LocalEnergyMinimizer.minimize(self.context, tolerance, maxIterations)  # type: ignore
 
         self.state = self.context.getState(getPositions=True, getEnergy=True)
         eK = self.state.getKineticEnergy() / self.N / self.kT

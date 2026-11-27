@@ -1,0 +1,4 @@
+include polychrom/_native/engine.hpp
+include polychrom/*.pyx
+include polychrom/__polymer_math.cpp
+include polychrom/__polymer_math.h
